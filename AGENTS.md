@@ -8,16 +8,9 @@ Goal: help restaurants manage operations with simple, reliable software and usef
 
 ## Product scope
 
-Core modules:
+Business logic is not yet decided. The domain model is being charted via the wayfinder map in GitHub Issues; do not assume a fixed module list until decisions land there and in `CONTEXT.md`.
 
-- Restaurant onboarding and multi-tenant SaaS accounts
-- Menu, modifiers, allergens, and pricing
-- Tables, reservations, orders, and kitchen display workflows
-- Inventory, purchasing, waste tracking, and stock alerts
-- Staff roles, shifts, payroll exports, and permissions
-- Customer profiles, loyalty, feedback, and marketing
-- Analytics, forecasts, and AI recommendations
-- Integrations for POS, payments, delivery, accounting, and messaging
+Direction so far: a platform where restaurants self-register and integrate; Go backend core; satellite services (web backoffice, POS terminal, waiter app, web menu); an AI agent (or MCP tools/skills) assisting management, analysis, and forecasting.
 
 ## Working rules for agents
 
@@ -39,6 +32,20 @@ AI must assist, not silently control business-critical actions.
 - Log AI-generated operational recommendations.
 - Keep prompts and model calls tenant-safe.
 - Do not train or leak data across tenants.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues (`Nap20192/aivo`), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
 
 ## Commands
 
