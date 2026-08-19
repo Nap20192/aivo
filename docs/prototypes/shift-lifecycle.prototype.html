@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PROTOTYPE — Shift Lifecycle (throwaway, do not ship)</title>
+<style>
+  :root {
+    --accent: #b45309;
+    --bg: #faf7f2;
+    --panel: #ffffff;
+    --ink: #1f2328;
+    --muted: #6b7280;
+    --border: #e5e0d8;
+    --bad: #b91c1c;
+    --good: #166534;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  header {
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  header h1 { margin: 0 0 6px; font-size: 22px; }
+  header p { margin: 0; color: var(--muted); max-width: 780px; }
+  .banner {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+    padding: 8px 32px;
+    font-size: 13px;
+  }
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 32px 64px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  section.panel h2 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .full { grid-column: 1 / -1; }
+  .shift-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .shift-card.changed { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(180,83,9,0.15); }
+  .shift-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .shift-head .id { font-weight: 600; }
+  .status {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .status.open { background: #dcfce7; color: var(--good); }
+  .status.closed { background: #fef3c7; color: #92400e; }
+  .status.accepted { background: #dbeafe; color: #1e40af; }
+  .status.cancelled { background: #f3f4f6; color: var(--muted); }
+  dl.fields { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0 0; font-size: 13px; }
+  dl.fields dt { color: var(--muted); }
+  dl.fields dd { margin: 0; }
+  .gl-line { font-size: 13px; padding: 3px 0; border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; }
+  .gl-line:last-child { border-bottom: none; }
+  .gl-line select { font-size: 12px; }
+  .variance-bad { color: var(--bad); font-weight: 600; }
+  .variance-ok { color: var(--good); }
+  .log { font-size: 12px; color: var(--muted); margin-top: 8px; white-space: pre-wrap; }
+  .log .illegal { color: var(--bad); font-weight: 600; }
+  button {
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    cursor: pointer;
+    margin: 3px 4px 3px 0;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+  button.primary:hover:not(:disabled) { color: white; opacity: 0.9; }
+  .action-group { margin-bottom: 14px; }
+  .action-group h3 { font-size: 12px; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; letter-spacing: 0.03em; }
+  input[type=number] { width: 90px; font-size: 13px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tabs button { margin: 0; }
+  .tabs button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .scenario-desc { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .scenario-steps button { display: block; width: 100%; text-align: left; margin-bottom: 6px; }
+  .scenario-steps button.done { background: #f3f4f6; color: var(--muted); border-style: dashed; }
+  .scenario-steps button.next { background: var(--accent); color: white; border-color: var(--accent); }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="banner">
+  PROTOTYPE — throwaway HTML, not production code. Answers one question, then gets committed
+  to a throwaway branch and deleted from main. See <code>docs/prototypes/</code>.
+</div>
+
+<header>
+  <h1>Shift Lifecycle — does Open &rarr; Closed &rarr; Accepted feel right?</h1>
+  <p>
+    Question this demo answers: does the <strong>D6 shift model</strong> from the RMS reference
+    doc hold up under real cases? One open shift per till <em>and</em> per cashier. Closing
+    always uses the current moment (no backdated close). Closing just freezes a cash count —
+    it does not touch the ledger. <strong>Acceptance</strong> is the only step that posts to
+    GL, and it is where a back-office reviewer can override which account each line lands on
+    before it becomes fact. A cash variance is never a soft warning — it is a mandatory GL line
+    the reviewer cannot remove, only redirect. Once accepted, a shift cannot be cancelled: the
+    only shift that can be freely cancelled is one still <strong>Open</strong>, since nothing
+    downstream depends on it yet.
+  </p>
+</header>
+
+<main>
+
+  <section class="panel full">
+    <h2>Guided walkthroughs</h2>
+    <div class="tabs" id="tabs"></div>
+    <div class="scenario-desc" id="scenario-desc"></div>
+    <div class="scenario-steps" id="scenario-steps"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Free play — open a new shift</h2>
+    <div class="action-group">
+      <h3>Till</h3>
+      <select id="new-till">
+        <option value="till-1">Till 1</option>
+        <option value="till-2">Till 2</option>
+      </select>
+      <h3 style="margin-top:8px;">Cashier</h3>
+      <select id="new-cashier">
+        <option value="alice">Alice</option>
+        <option value="bob">Bob</option>
+      </select>
+      <div style="margin-top:10px;">
+        <button class="primary" id="open-shift-btn">Open shift</button>
+      </div>
+      <div class="log" id="open-shift-log"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>State legend</h2>
+    <p style="font-size:13px; color:var(--muted); margin:0;">
+      <span class="status open">open</span> ringing sales, pay-in/out allowed<br/><br/>
+      <span class="status closed">closed</span> cash counted &amp; frozen, awaiting review<br/><br/>
+      <span class="status accepted">accepted</span> GL posted, immutable<br/><br/>
+      <span class="status cancelled">cancelled</span> voided before anything downstream existed
+    </p>
+  </section>
+
+  <section class="panel full">
+    <h2>Shifts — current state</h2>
+    <div id="shifts"></div>
+  </section>
+
+</main>
+
+<script>
+// ============================================================================
+// PURE LOGIC MODULE — no DOM access below this line until the marked boundary.
+// This is the part worth lifting into the real codebase if the model holds up.
+// ============================================================================
+
+const ShiftLifecycle = (() => {
+  const STATUS = { OPEN: 'open', CLOSED: 'closed', ACCEPTED: 'accepted', CANCELLED: 'cancelled' };
+
+  function initialState() {
+    return { shifts: {}, nextId: 1, now: 1 };
+  }
+
+  function findOpenShiftFor(state, { till, cashier }) {
+    return Object.values(state.shifts).find(
+      (s) => s.status === STATUS.OPEN && (s.till === till || s.cashier === cashier)
+    );
+  }
+
+  function expectedCash(shift) {
+    const sales = shift.sales.reduce((a, s) => a + s.amount, 0);
+    const payIns = shift.payIns.reduce((a, p) => a + p.amount, 0);
+    const payOuts = shift.payOuts.reduce((a, p) => a + p.amount, 0);
+    return sales + payIns - payOuts;
+  }
+
+  // (state, action) -> { state, error? }
+  // error is set (state unchanged) when the action is illegal in the current state —
+  // this IS the thing under test: which actions are even legal right now.
+  function reduce(state, action) {
+    const now = state.now + 1;
+
+    switch (action.type) {
+      case 'OPEN_SHIFT': {
+        const conflict = findOpenShiftFor(state, action);
+        if (conflict) {
+          return {
+            state,
+            error: `Cannot open: ${conflict.till === action.till ? 'till ' + action.till : 'cashier ' + action.cashier} already has an open shift (${conflict.id}). One open shift per till AND per cashier.`,
+          };
+        }
+        const id = 'shift-' + state.nextId;
+        const shift = {
+          id,
+          till: action.till,
+          cashier: action.cashier,
+          status: STATUS.OPEN,
+          openedAt: now,
+          closedAt: null,
+          sales: [],
+          payIns: [],
+          payOuts: [],
+          declaredCash: null,
+          expectedCash: null,
+          variance: null,
+          glLines: null,
+        };
+        return {
+          state: { ...state, now, nextId: state.nextId + 1, shifts: { ...state.shifts, [id]: shift } },
+        };
+      }
+
+      case 'RING_SALE': {
+        const shift = state.shifts[action.shiftId];
+        if (!shift) return { state, error: 'No such shift.' };
+        if (shift.status !== STATUS.OPEN) {
+          return { state, error: `Cannot ring a sale: shift ${shift.id} is ${shift.status}, not open.` };
+        }
+        const updated = { ...shift, sales: [...shift.sales, { amount: action.amount }] };
+        return { state: { ...state, now, shifts: { ...state.shifts, [shift.id]: updated } } };
+      }
+
+      case 'PAY_IN':
+      case 'PAY_OUT': {
+        const shift = state.shifts[action.shiftId];
+        if (!shift) return { state, error: 'No such shift.' };
+        if (shift.status !== STATUS.OPEN) {
+          return { state, error: `Cannot ${action.type === 'PAY_IN' ? 'pay in' : 'pay out'}: shift ${shift.id} is ${shift.status}, not open.` };
+        }
+        const key = action.type === 'PAY_IN' ? 'payIns' : 'payOuts';
+        const updated = { ...shift, [key]: [...shift[key], { amount: action.amount, reason: action.reason }] };
+        return { state: { ...state, now, shifts: { ...state.shifts, [shift.id]: updated } } };
+      }
+
+      case 'CLOSE_SHIFT': {
+        const shift = state.shifts[action.shiftId];
+        if (!shift) return { state, error: 'No such shift.' };
+        if (shift.status !== STATUS.OPEN) {
+          return { state, error: `Cannot close: shift ${shift.id} is ${shift.status}, not open.` };
+        }
+        const expected = expectedCash(shift);
+        const variance = round2(action.declaredCash - expected);
+        const updated = {
+          ...shift,
+          status: STATUS.CLOSED,
+          closedAt: now, // always "now" — closing cannot be backdated, no date param exists on this action
+          declaredCash: action.declaredCash,
+          expectedCash: expected,
+          variance,
+        };
+        return { state: { ...state, now, shifts: { ...state.shifts, [shift.id]: updated } } };
+      }
+
+      case 'CANCEL_SHIFT': {
+        const shift = state.shifts[action.shiftId];
+        if (!shift) return { state, error: 'No such shift.' };
+        if (shift.status !== STATUS.OPEN) {
+          return {
+            state,
+            error: `Cannot cancel: shift ${shift.id} is ${shift.status}. Only an OPEN shift with nothing downstream can be cancelled — a closed cash count or posted GL entries are dependents.`,
+          };
+        }
+        const updated = { ...shift, status: STATUS.CANCELLED };
+        return { state: { ...state, now, shifts: { ...state.shifts, [shift.id]: updated } } };
+      }
+
+      case 'PREPARE_ACCEPT_LINES': {
+        // Not a state mutation — a pure read producing the proposed GL lines
+        // for the reviewer to override before ACCEPT_SHIFT is dispatched.
+        const shift = state.shifts[action.shiftId];
+        if (!shift) return { state, error: 'No such shift.' };
+        return { state, lines: buildProposedLines(shift) };
+      }
+
+      case 'ACCEPT_SHIFT': {
+        const shift = state.shifts[action.shiftId];
+        if (!shift) return { state, error: 'No such shift.' };
+        if (shift.status !== STATUS.CLOSED) {
+          return { state, error: `Cannot accept: shift ${shift.id} is ${shift.status}, not closed.` };
+        }
+        const lines = action.lines;
+        const varianceLine = lines.find((l) => l.kind === 'variance');
+        if (shift.variance !== 0 && (!varianceLine || varianceLine.amount === 0)) {
+          return {
+            state,
+            error: `Cannot accept: variance of ${shift.variance} exists and has no shortage/surplus GL line. Variance cannot be dropped, only redirected to a different account.`,
+          };
+        }
+        const updated = { ...shift, status: STATUS.ACCEPTED, glLines: lines };
+        return { state: { ...state, now, shifts: { ...state.shifts, [shift.id]: updated } } };
+      }
+
+      default:
+        return { state, error: 'Unknown action.' };
+    }
+  }
+
+  function buildProposedLines(shift) {
+    const sales = shift.sales.reduce((a, s) => a + s.amount, 0);
+    const payIns = shift.payIns.reduce((a, p) => a + p.amount, 0);
+    const payOuts = shift.payOuts.reduce((a, p) => a + p.amount, 0);
+    const lines = [
+      { kind: 'sales', account: 'Sales Revenue', amount: round2(sales) },
+    ];
+    if (payIns) lines.push({ kind: 'payin', account: 'Cash Clearing', amount: round2(payIns) });
+    if (payOuts) lines.push({ kind: 'payout', account: 'Cash Clearing', amount: round2(-payOuts) });
+    if (shift.variance !== 0) {
+      lines.push({
+        kind: 'variance',
+        account: shift.variance < 0 ? 'Cash Short' : 'Cash Over',
+        amount: round2(shift.variance),
+      });
+    } else {
+      lines.push({ kind: 'variance', account: 'Cash Short', amount: 0 });
+    }
+    return lines;
+  }
+
+  function round2(n) { return Math.round(n * 100) / 100; }
+
+  function legalActions(state, shiftId) {
+    const shift = state.shifts[shiftId];
+    if (!shift) return [];
+    switch (shift.status) {
+      case STATUS.OPEN: return ['RING_SALE', 'PAY_IN', 'PAY_OUT', 'CLOSE_SHIFT', 'CANCEL_SHIFT'];
+      case STATUS.CLOSED: return ['ACCEPT_SHIFT'];
+      case STATUS.ACCEPTED: return [];
+      case STATUS.CANCELLED: return [];
+      default: return [];
+    }
+  }
+
+  return { STATUS, initialState, reduce, legalActions, buildProposedLines, expectedCash, round2 };
+})();
+
+// ============================================================================
+// PAGE SHELL — everything below is throwaway wiring, not meant to survive.
+// ============================================================================
+
+let state = ShiftLifecycle.initialState();
+let lastChangedShiftId = null;
+let lastError = null;
+let acceptDrafts = {}; // shiftId -> editable lines array, while a CLOSED shift is under review
+
+function dispatch(action) {
+  const result = ShiftLifecycle.reduce(state, action);
+  if (result.error) {
+    lastError = { action, message: result.error };
+    console.warn('[illegal action]', action.type, result.error);
+  } else {
+    lastError = null;
+    lastChangedShiftId = action.shiftId || (result.state.nextId ? 'shift-' + (result.state.nextId - 1) : null);
+    state = result.state;
+    if (action.type === 'CLOSE_SHIFT') {
+      const shift = state.shifts[action.shiftId];
+      acceptDrafts[action.shiftId] = ShiftLifecycle.buildProposedLines(shift);
+    }
+  }
+  render();
+}
+
+function fmtMoney(n) { return (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2); }
+
+function render() {
+  renderOpenPanel();
+  renderShifts();
+  renderScenarioTabs();
+}
+
+function renderOpenPanel() {
+  document.getElementById('open-shift-log').innerHTML =
+    lastError && lastError.action.type === 'OPEN_SHIFT'
+      ? `<span class="illegal">${lastError.message}</span>`
+      : '';
+}
+
+function renderShifts() {
+  const el = document.getElementById('shifts');
+  const shifts = Object.values(state.shifts).sort((a, b) => a.openedAt - b.openedAt);
+  if (!shifts.length) {
+    el.innerHTML = '<p style="color:var(--muted); font-size:13px;">No shifts yet — open one on the left, or run a walkthrough above.</p>';
+    return;
+  }
+  el.innerHTML = shifts.map((shift) => renderShiftCard(shift)).join('');
+
+  shifts.forEach((shift) => {
+    const legal = ShiftLifecycle.legalActions(state, shift.id);
+
+    bindClick(`sale-${shift.id}`, () => dispatch({ type: 'RING_SALE', shiftId: shift.id, amount: numVal(`sale-amt-${shift.id}`, 12.5) }));
+    bindClick(`payin-${shift.id}`, () => dispatch({ type: 'PAY_IN', shiftId: shift.id, amount: numVal(`payin-amt-${shift.id}`, 20), reason: 'float top-up' }));
+    bindClick(`payout-${shift.id}`, () => dispatch({ type: 'PAY_OUT', shiftId: shift.id, amount: numVal(`payout-amt-${shift.id}`, 10), reason: 'petty cash' }));
+    bindClick(`close-${shift.id}`, () => dispatch({ type: 'CLOSE_SHIFT', shiftId: shift.id, declaredCash: numVal(`close-amt-${shift.id}`, ShiftLifecycle.expectedCash(shift)) }));
+    bindClick(`cancel-${shift.id}`, () => dispatch({ type: 'CANCEL_SHIFT', shiftId: shift.id }));
+    bindClick(`accept-${shift.id}`, () => dispatch({ type: 'ACCEPT_SHIFT', shiftId: shift.id, lines: acceptDrafts[shift.id] }));
+
+    if (shift.status === ShiftLifecycle.STATUS.CLOSED) {
+      const draft = acceptDrafts[shift.id] || [];
+      draft.forEach((line, i) => {
+        const sel = document.getElementById(`line-account-${shift.id}-${i}`);
+        if (sel) sel.addEventListener('change', (e) => { draft[i].account = e.target.value; });
+      });
+    }
+  });
+}
+
+function renderShiftCard(shift) {
+  const changed = shift.id === lastChangedShiftId ? ' changed' : '';
+  const err = lastError && lastError.action.shiftId === shift.id ? `<div class="log illegal">${lastError.message}</div>` : '';
+  const legal = ShiftLifecycle.legalActions(state, shift.id);
+  const can = (a) => legal.includes(a) ? '' : 'disabled';
+
+  let acceptSection = '';
+  if (shift.status === ShiftLifecycle.STATUS.CLOSED) {
+    const draft = acceptDrafts[shift.id] || ShiftLifecycle.buildProposedLines(shift);
+    acceptDrafts[shift.id] = draft;
+    acceptSection = `
+      <div style="margin-top:10px; border-top:1px solid var(--border); padding-top:10px;">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Proposed GL lines (reviewer can redirect the account, not delete the line):</div>
+        ${draft.map((l, i) => `
+          <div class="gl-line">
+            <span>${l.kind === 'variance' ? (shift.variance < 0 ? 'Cash short' : shift.variance > 0 ? 'Cash over' : 'Cash variance (none)') : l.kind}</span>
+            <span>
+              <select id="line-account-${shift.id}-${i}" ${l.kind === 'variance' && shift.variance === 0 ? 'disabled' : ''}>
+                <option value="${l.account}" selected>${l.account}</option>
+                ${l.kind === 'variance' ? `<option value="Manager Adjustment">Manager Adjustment</option>` : `<option value="Suspense">Suspense</option>`}
+              </select>
+              ${fmtMoney(l.amount)}
+            </span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="shift-card${changed}">
+      <div class="shift-head">
+        <span class="id">${shift.id}</span>
+        <span class="status ${shift.status}">${shift.status}</span>
+      </div>
+      <dl class="fields">
+        <dt>Till</dt><dd>${shift.till}</dd>
+        <dt>Cashier</dt><dd>${shift.cashier}</dd>
+        <dt>Sales</dt><dd>${fmtMoney(shift.sales.reduce((a,s)=>a+s.amount,0))} (${shift.sales.length} rung)</dd>
+        <dt>Pay-in / Pay-out</dt><dd>${fmtMoney(shift.payIns.reduce((a,p)=>a+p.amount,0))} / ${fmtMoney(shift.payOuts.reduce((a,p)=>a+p.amount,0))}</dd>
+        ${shift.declaredCash !== null ? `
+          <dt>Expected cash</dt><dd>${fmtMoney(shift.expectedCash)}</dd>
+          <dt>Declared cash</dt><dd>${fmtMoney(shift.declaredCash)}</dd>
+          <dt>Variance</dt><dd class="${shift.variance === 0 ? 'variance-ok' : 'variance-bad'}">${fmtMoney(shift.variance)}</dd>
+        ` : ''}
+      </dl>
+      ${acceptSection}
+      ${err}
+      <div style="margin-top:10px;">
+        <input type="number" id="sale-amt-${shift.id}" value="12.50" step="0.5" />
+        <button id="sale-${shift.id}" ${can('RING_SALE')}>Ring sale</button>
+      </div>
+      <div>
+        <input type="number" id="payin-amt-${shift.id}" value="20" step="1" />
+        <button id="payin-${shift.id}" ${can('PAY_IN')}>Pay in</button>
+        <input type="number" id="payout-amt-${shift.id}" value="10" step="1" />
+        <button id="payout-${shift.id}" ${can('PAY_OUT')}>Pay out</button>
+      </div>
+      <div>
+        <input type="number" id="close-amt-${shift.id}" value="${ShiftLifecycle.round2(ShiftLifecycle.expectedCash(shift))}" step="0.5" />
+        <button id="close-${shift.id}" ${can('CLOSE_SHIFT')}>Close shift (declare counted cash)</button>
+      </div>
+      <div>
+        <button id="accept-${shift.id}" class="primary" ${can('ACCEPT_SHIFT')}>Accept &amp; post to GL</button>
+        <button id="cancel-${shift.id}" ${can('CANCEL_SHIFT')}>Cancel shift</button>
+      </div>
+    </div>
+  `;
+}
+
+function bindClick(id, fn) {
+  const el = document.getElementById(id);
+  if (el) el.onclick = fn;
+}
+function numVal(id, fallback) {
+  const el = document.getElementById(id);
+  const v = el ? parseFloat(el.value) : NaN;
+  return Number.isFinite(v) ? v : fallback;
+}
+
+document.getElementById('open-shift-btn').onclick = () => {
+  dispatch({
+    type: 'OPEN_SHIFT',
+    till: document.getElementById('new-till').value,
+    cashier: document.getElementById('new-cashier').value,
+  });
+};
+
+// ---------------------------------------------------------------------------
+// Guided walkthroughs
+// ---------------------------------------------------------------------------
+
+const scenarios = [
+  {
+    name: 'Happy path',
+    desc: 'Open a shift, ring sales, count cash exactly right, accept with no variance line needed.',
+    steps: [
+      { label: 'Open shift: Till 1, Alice', run: () => dispatch({ type: 'OPEN_SHIFT', till: 'till-1', cashier: 'alice' }) },
+      { label: 'Ring $12.50 sale', run: (id) => dispatch({ type: 'RING_SALE', shiftId: id, amount: 12.5 }) },
+      { label: 'Ring $8.00 sale', run: (id) => dispatch({ type: 'RING_SALE', shiftId: id, amount: 8 }) },
+      { label: 'Close shift, declare exact expected cash ($20.50)', run: (id) => dispatch({ type: 'CLOSE_SHIFT', shiftId: id, declaredCash: 20.5 }) },
+      { label: 'Accept shift (posts Sales Revenue only, variance is $0)', run: (id) => dispatch({ type: 'ACCEPT_SHIFT', shiftId: id, lines: acceptDrafts[id] }) },
+    ],
+  },
+  {
+    name: 'Cash short → mandatory GL line',
+    desc: 'Drawer comes up $5 short at close. Watch: the shortage is not a soft warning, it is a GL line the reviewer cannot delete, only redirect to a different account.',
+    steps: [
+      { label: 'Open shift: Till 2, Bob', run: () => dispatch({ type: 'OPEN_SHIFT', till: 'till-2', cashier: 'bob' }) },
+      { label: 'Ring $30.00 sale', run: (id) => dispatch({ type: 'RING_SALE', shiftId: id, amount: 30 }) },
+      { label: 'Close shift, declare $25.00 (short $5)', run: (id) => dispatch({ type: 'CLOSE_SHIFT', shiftId: id, declaredCash: 25 }) },
+      { label: 'Accept shift — the Cash Short line posts automatically', run: (id) => dispatch({ type: 'ACCEPT_SHIFT', shiftId: id, lines: acceptDrafts[id] }) },
+    ],
+  },
+  {
+    name: 'Illegal: double-book a till',
+    desc: 'Try opening a second shift on the same till while one is still open. Then try the same cashier on a different till. Both should be rejected — the invariant is till OR cashier, not just till.',
+    steps: [
+      { label: 'Open shift: Till 1, Carol', run: () => dispatch({ type: 'OPEN_SHIFT', till: 'till-1', cashier: 'carol' }) },
+      { label: 'Try: open Till 1 again with Dave — should be REJECTED (till busy)', run: () => dispatch({ type: 'OPEN_SHIFT', till: 'till-1', cashier: 'dave' }) },
+      { label: 'Try: open Till 2 with Carol again — should be REJECTED (cashier busy)', run: () => dispatch({ type: 'OPEN_SHIFT', till: 'till-2', cashier: 'carol' }) },
+    ],
+  },
+  {
+    name: 'Illegal: cancel after close',
+    desc: 'A shift can be freely cancelled while open — nothing depends on it yet. Once it is closed (cash counted), cancellation is blocked: the cash count is itself a dependent fact.',
+    steps: [
+      { label: 'Open shift: Till 1, Erin', run: () => dispatch({ type: 'OPEN_SHIFT', till: 'till-1', cashier: 'erin' }) },
+      { label: 'Ring $5.00 sale', run: (id) => dispatch({ type: 'RING_SALE', shiftId: id, amount: 5 }) },
+      { label: 'Close shift, declare $5.00', run: (id) => dispatch({ type: 'CLOSE_SHIFT', shiftId: id, declaredCash: 5 }) },
+      { label: 'Try: cancel the closed shift — should be REJECTED', run: (id) => dispatch({ type: 'CANCEL_SHIFT', shiftId: id }) },
+    ],
+  },
+  {
+    name: 'Illegal: sell after close',
+    desc: 'Once a shift is closed, no further sales can post against it — a stale-dated open shift is not a legal target for new activity.',
+    steps: [
+      { label: 'Open shift: Till 2, Frank', run: () => dispatch({ type: 'OPEN_SHIFT', till: 'till-2', cashier: 'frank' }) },
+      { label: 'Close shift, declare $0.00', run: (id) => dispatch({ type: 'CLOSE_SHIFT', shiftId: id, declaredCash: 0 }) },
+      { label: 'Try: ring a sale on the closed shift — should be REJECTED', run: (id) => dispatch({ type: 'RING_SALE', shiftId: id, amount: 9.99 }) },
+    ],
+  },
+];
+
+let activeScenario = 0;
+let scenarioShiftId = null;
+let scenarioStep = 0;
+
+function renderScenarioTabs() {
+  const tabsEl = document.getElementById('tabs');
+  tabsEl.innerHTML = scenarios.map((s, i) =>
+    `<button class="${i === activeScenario ? 'active' : ''}" data-tab="${i}">${s.name}</button>`
+  ).join('');
+  scenarios.forEach((_, i) => {
+    document.querySelector(`[data-tab="${i}"]`).onclick = () => startScenario(i);
+  });
+
+  document.getElementById('scenario-desc').textContent = scenarios[activeScenario].desc;
+
+  const stepsEl = document.getElementById('scenario-steps');
+  stepsEl.innerHTML = scenarios[activeScenario].steps.map((s, i) => {
+    const cls = i < scenarioStep ? 'done' : i === scenarioStep ? 'next' : '';
+    return `<button class="${cls}" data-step="${i}" ${i === scenarioStep ? '' : 'disabled'}>${i + 1}. ${s.label}</button>`;
+  }).join('');
+
+  scenarios[activeScenario].steps.forEach((step, i) => {
+    const btn = document.querySelector(`[data-step="${i}"]`);
+    if (btn && i === scenarioStep) {
+      btn.onclick = () => {
+        step.run(scenarioShiftId);
+        if (scenarioStep === 0) {
+          scenarioShiftId = 'shift-' + (state.nextId - 1);
+        }
+        scenarioStep++;
+        render();
+      };
+    }
+  });
+}
+
+function startScenario(i) {
+  activeScenario = i;
+  scenarioStep = 0;
+  scenarioShiftId = null;
+  render();
+}
+
+startScenario(0);
+render();
+</script>
+
+</body>
+</html>
