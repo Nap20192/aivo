@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Menu</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div id="banner-slot"></div>
+
+<header class="topbar">
+  <div class="topbar-id">
+    <span class="eyebrow" id="restaurant-name">&nbsp;</span>
+    <span class="table-label" id="table-label"></span>
+  </div>
+  <div class="topbar-actions">
+    <button type="button" class="btn btn-ghost" data-service="call_waiter">Call waiter</button>
+    <button type="button" class="btn btn-ghost" data-service="request_bill">Request bill</button>
+  </div>
+</header>
+
+<main id="app">
+  <div class="state-message" id="load-message">Loading menu…</div>
+
+  <section id="landing" class="landing" hidden></section>
+
+  <section id="menu" class="menu" hidden></section>
+</main>
+
+<div id="cart-bar" class="cart-bar" hidden>
+  <button type="button" id="cart-toggle" class="cart-toggle">
+    <span id="cart-count">0 items</span>
+    <span id="cart-total" class="aivo-num">€0.00</span>
+  </button>
+</div>
+
+<div id="cart-panel" class="cart-panel" hidden>
+  <div class="cart-panel-head">
+    <h2>Your order</h2>
+    <button type="button" id="cart-close" class="icon-btn" aria-label="Close cart">&times;</button>
+  </div>
+  <div id="cart-lines" class="cart-lines"></div>
+  <label class="cart-comment-label" for="cart-comment">Note for the kitchen (optional)</label>
+  <textarea id="cart-comment" class="cart-comment" rows="2" placeholder="e.g. no onion on anything"></textarea>
+  <div class="cart-panel-foot">
+    <div class="cart-total-row">
+      <span>Total</span>
+      <span id="cart-panel-total" class="aivo-num">€0.00</span>
+    </div>
+    <button type="button" id="submit-order" class="btn btn-primary btn-touch" disabled>Submit order</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden role="status"></div>
+
+<script src="/app.js" defer></script>
+</body>
+</html>
