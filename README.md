@@ -1,4 +1,4 @@
-# Menu
+# <img src="docs/assets/icon.svg" alt="aivo" width="28"/> Menu
 
 The `web-menu` satellite service: the diner-facing digital menu, ordering,
 and landing page for a single restaurant, reached via a per-table link. See
