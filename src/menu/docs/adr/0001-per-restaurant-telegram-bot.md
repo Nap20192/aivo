@@ -1,0 +1,3 @@
+# Each restaurant registers its own Telegram bot, not a shared AIVO bot
+
+Menu notifications (new Order, Service request) go to a Restaurant's own Telegram bot, registered and configured by that Restaurant's staff (bot token pasted into the admin panel) — not a single AIVO-owned bot that restaurants link a chat to. This trades higher restaurant-side setup friction (a BotFather registration) for avoiding a shared-bot bottleneck: no per-tenant chat-linking flow to build, no AIVO-side rate limits shared across all restaurants, and no single point of platform-level Telegram API risk. The bot token is a per-tenant credential and must be stored with the same security bar as other tenant-isolated secrets (see the Menu map's ticket on bot token storage).

@@ -1,0 +1,3 @@
+# Menu orders are decoupled from the till/shift/GL POS domain
+
+A diner-submitted Order is its own lightweight record in the Menu context — it does not create a till line, touch a shift, or post a GL line. This is surprising for a restaurant-management system, but the till/shift/GL POS domain isn't ratified upstream yet (AGENTS.md: "business logic not yet decided"), so wiring Menu orders into it now would build on a domain model that could still change shape. Staff see new Orders and Service requests only via the Restaurant's Telegram notification channel for v1; reconciling Menu orders with POS/till is deferred to when the POS context is charted, and will likely need a migration at that point.
