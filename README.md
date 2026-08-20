@@ -9,13 +9,20 @@ throughout this codebase.
 
 ## Running locally
 
-1. Start Postgres:
+1. Start infra + the server (Postgres, MinIO for image storage, and
+   `menu-server` itself, built from the root `Dockerfile`):
 
    ```bash
-   docker-compose up -d
+   docker-compose up -d --build
    ```
 
-2. Set environment variables:
+   `menu-server` will be up but empty — run the migration and seed step
+   below against it before it's useful. Env vars for the containerized
+   server live in `docker-compose.yml` (dev-only values, safe to commit);
+   see the table below if running `go run` natively instead.
+
+2. Set environment variables (only needed if running natively, i.e. not
+   via `docker-compose`):
 
    | Var | Required | Notes |
    |---|---|---|
@@ -42,7 +49,7 @@ throughout this codebase.
    Not idempotent — re-running against an already-seeded database fails on
    the `restaurants.slug` unique constraint.
 
-5. Run the server:
+5. Run the server (skip if you started it via `docker-compose` in step 1):
 
    ```bash
    go run ./cmd/menu-server
@@ -50,6 +57,18 @@ throughout this codebase.
 
 6. Open the table link the seed script printed (`Table link: ...`) in a
    browser.
+
+## Image storage
+
+`docker-compose.yml` provisions MinIO (S3-compatible) with a public-read
+bucket, `aivo-menu-images`, at `http://localhost:9000` (console:
+`http://localhost:9001`, `aivo_menu` / `aivo_menu_minio`) — diners' browsers
+load images directly from it, no signed URLs. `domain.MenuItem.ImageURL`
+and Landing banner blocks are already just URL strings, so pointing one at
+`http://localhost:9000/aivo-menu-images/<key>` works today. There is no
+upload endpoint yet (nothing in the app writes to the bucket) — this only
+provisions where those URLs will eventually point; building an actual
+upload path is future work, not speculated on here.
 
 ## What's not done
 
@@ -61,5 +80,8 @@ throughout this codebase.
 - No gRPC/proto layer — deferred per the `ponytail:` note near `main.go`
   (see root `docs/adr/0001`) until a second internal service needs to call
   this one.
-- Currency/locale and image hosting are still "Not yet specified" in the
-  wayfinder map.
+- Currency/locale is still "Not yet specified" in the wayfinder map.
+- Image *storage* is provisioned (MinIO, see "Image storage" above) but
+  there's no upload endpoint — images still have to land in the bucket by
+  hand (or via the S3 API directly) and get their URL pasted into
+  `ImageURL`/banner data manually.

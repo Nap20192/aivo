@@ -10,5 +10,53 @@ services:
     volumes:
       - aivo_menu_pgdata:/var/lib/postgresql/data
 
+  # S3-compatible storage for Menu item / Landing banner images (see
+  # README "Image hosting" — MenuItem.ImageURL and LandingBlock banner
+  # data just take a URL today; nothing in the app uploads to this bucket
+  # yet, this only provisions where those URLs will eventually point).
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: aivo_menu
+      MINIO_ROOT_PASSWORD: aivo_menu_minio
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console
+    volumes:
+      - aivo_menu_s3:/data
+
+  # One-shot: creates the bucket and makes it publicly readable (diners'
+  # browsers load images directly, no signed URLs) then exits.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 aivo_menu aivo_menu_minio; do sleep 1; done &&
+      mc mb -p local/aivo-menu-images &&
+      mc anonymous set download local/aivo-menu-images
+      "
+
+  menu-server:
+    build: .
+    depends_on:
+      - postgres
+    # depends_on only waits for the container to start, not for Postgres
+    # to accept connections — retry instead of a healthcheck+condition,
+    # simpler for a single dev-compose dependency.
+    restart: on-failure
+    environment:
+      DATABASE_URL: postgres://aivo_menu:aivo_menu@postgres:5432/aivo_menu?sslmode=disable
+      # dev-only key, fine to commit — swap for a real secret outside
+      # docker-compose (see README "Running locally").
+      TOKEN_ENCRYPTION_KEY: "Q/FdcxiVr0KrjLPWlHhjr+AOXqSL86BizU+FhcdkagI="
+      BASE_URL: http://localhost:8080
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+
 volumes:
   aivo_menu_pgdata:
+  aivo_menu_s3:
