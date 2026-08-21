@@ -2,6 +2,7 @@
 // persisted to localStorage so demo edits survive reload.
 import {
   demoCategories,
+  demoGuests,
   demoItems,
   demoMenus,
   demoOrg,
@@ -18,6 +19,8 @@ import type {
   AssistantApplyResult,
   AssistantMessage,
   Category,
+  GuestDetail,
+  GuestSummary,
   Me,
   Menu,
   MenuItem,
@@ -47,6 +50,18 @@ interface Db {
   staff: StaffMember[];
   subscription: Subscription;
   assistant: AssistantMessage[];
+  guests: GuestDetail[];
+}
+
+function seedGuests(): GuestDetail[] {
+  // Deep copy with totals derived from order history.
+  return demoGuests.map((g) => ({
+    ...g,
+    tags: [...g.tags],
+    orders: g.orders.map((o) => ({ ...o, lines: o.lines.map((l) => ({ ...l })) })),
+    visits: g.orders.length,
+    total_spent_cents: g.orders.reduce((t, o) => t + o.total_cents, 0),
+  }));
 }
 
 const KEY = "aivo-admin-mock";
@@ -66,6 +81,7 @@ function seed(): Db {
     staff: demoStaff,
     subscription: demoSubscription,
     assistant: [],
+    guests: seedGuests(),
   };
 }
 
@@ -83,6 +99,7 @@ function load(): Db {
         db.categories.forEach((c) => (c.menu_id = c.menu_id ?? "menu-default"));
       }
       db.assistant = db.assistant ?? [];
+      db.guests = db.guests ?? seedGuests();
       return db;
     }
   } catch {
@@ -160,6 +177,8 @@ export const mockApi = {
       { id: uid("staff"), email: input.email, role: "owner", status: "active" },
     ];
     db.subscription = { plan: "free", status: "trialing", renews_at: "" };
+    db.assistant = [];
+    db.guests = [];
     db.loggedIn = true;
     save();
     return delay(me());
@@ -571,6 +590,50 @@ export const mockApi = {
     msg.action_status = "discarded";
     save();
     return delay(undefined);
+  },
+
+  async listGuests(id: string, query?: string): Promise<GuestSummary[]> {
+    requireRestaurant(id);
+    const q = (query ?? "").trim().toLowerCase();
+    return delay(
+      db.guests
+        .filter(
+          (g) =>
+            !q ||
+            g.customer.name.toLowerCase().includes(q) ||
+            g.customer.email.toLowerCase().includes(q) ||
+            g.tags.some((t) => t.toLowerCase().includes(q)),
+        )
+        .sort((a, b) => b.last_seen.localeCompare(a.last_seen))
+        .map((g) => ({
+          customer: { ...g.customer },
+          visits: g.visits,
+          total_spent_cents: g.total_spent_cents,
+          last_seen: g.last_seen,
+          tags: [...g.tags],
+        })),
+    );
+  },
+
+  async getGuest(id: string, customerId: string): Promise<GuestDetail> {
+    requireRestaurant(id);
+    const g = db.guests.find((x) => x.customer.id === customerId);
+    if (!g) throw new ApiError("not_found", "Guest not found.", 404);
+    return delay(JSON.parse(JSON.stringify(g)) as GuestDetail);
+  },
+
+  async patchGuest(
+    id: string,
+    customerId: string,
+    patch: { notes?: string; tags?: string[] },
+  ): Promise<GuestDetail> {
+    requireRestaurant(id);
+    const g = db.guests.find((x) => x.customer.id === customerId);
+    if (!g) throw new ApiError("not_found", "Guest not found.", 404);
+    if (patch.notes !== undefined) g.notes = patch.notes;
+    if (patch.tags !== undefined) g.tags = [...patch.tags];
+    save();
+    return delay(JSON.parse(JSON.stringify(g)) as GuestDetail);
   },
 
   async getSubscription(): Promise<Subscription> {

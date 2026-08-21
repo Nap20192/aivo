@@ -9,6 +9,8 @@ import { Shell } from "./layout";
 import { LoadingPage } from "./ui";
 import Assistant from "./pages/Assistant";
 import Dashboard from "./pages/Dashboard";
+import GuestDetail from "./pages/GuestDetail";
+import Guests from "./pages/Guests";
 import Login from "./pages/Login";
 import MenuScreen from "./pages/MenuScreen";
 import Register from "./pages/Register";
@@ -63,6 +65,8 @@ const router = createBrowserRouter(
         { path: "menu/brief", element: <MenuScreen tab="brief" /> },
         { path: "design", element: <Navigate to="/menu/design" replace /> },
         { path: "assistant", element: <Assistant /> },
+        { path: "guests", element: <Guests /> },
+        { path: "guests/:customerId", element: <GuestDetail /> },
         { path: "tables", element: <Tables /> },
         { path: "staff", element: <Staff /> },
         { path: "settings", element: <Settings /> },
