@@ -4,10 +4,14 @@ import { Badge, Button, Placeholder } from "../ui";
 export function Landing({
   session,
   browse,
+  accountLabel,
+  onAccount,
   onMenu,
 }: {
   session: TableSession;
   browse: boolean;
+  accountLabel: string | null;
+  onAccount: () => void;
   onMenu: () => void;
 }) {
   const { restaurant, table, theme } = session;
@@ -29,11 +33,18 @@ export function Landing({
               {theme.brand_name}
               <span style={{ color: "var(--accent-solid)" }}>.</span>
             </span>
-            {!browse && table.label ? (
-              <Badge tone="outline" uppercase>
-                {table.label}
-              </Badge>
-            ) : null}
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {accountLabel ? (
+                <span onClick={onAccount} style={{ font: "var(--type-label)", color: "var(--text-link)", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  {accountLabel}
+                </span>
+              ) : null}
+              {!browse && table.label ? (
+                <Badge tone="outline" uppercase>
+                  {table.label}
+                </Badge>
+              ) : null}
+            </span>
           </div>
           {restaurant.tagline ? (
             <p style={{ margin: "12px 0 0", font: "var(--weight-regular) 15px/1.6 var(--font-sans)", color: "var(--ink-700)", textWrap: "pretty" }}>

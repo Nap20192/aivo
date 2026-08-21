@@ -61,6 +61,18 @@ const GLYPHS: Record<string, ReactElement> = {
       <path d="M12 21v-1" />
     </>
   ),
+  user: (
+    <>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </>
+  ),
+  x: (
+    <>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </>
+  ),
   "refresh-cw": (
     <>
       <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
@@ -286,6 +298,48 @@ export function QtyStepper({
         +
       </button>
     </div>
+  );
+}
+
+export function Input({
+  label,
+  type = "text",
+  value,
+  onChange,
+  placeholder,
+  autoComplete,
+}: {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  autoComplete?: string;
+}) {
+  return (
+    <label style={{ display: "block" }}>
+      <span style={{ display: "block", font: "600 11px/1.2 var(--font-sans)", letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--ink-500)", marginBottom: 6 }}>
+        {label}
+      </span>
+      <input
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          background: "var(--paper-0)",
+          border: "1px solid var(--border-strong)",
+          borderRadius: 6,
+          padding: "12px 14px",
+          font: "var(--weight-regular) 14px/1.5 var(--font-sans)",
+          color: "var(--ink-800)",
+          outline: "none",
+        }}
+      />
+    </label>
   );
 }
 

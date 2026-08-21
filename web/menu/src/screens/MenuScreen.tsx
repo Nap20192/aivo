@@ -17,6 +17,8 @@ export function MenuScreen({
   cat,
   onPickCat,
   cartLabel,
+  accountLabel,
+  onAccount,
   onOpenItem,
   onLanding,
   onCart,
@@ -29,6 +31,8 @@ export function MenuScreen({
   cat: number;
   onPickCat: (i: number) => void;
   cartLabel: string;
+  accountLabel: string | null;
+  onAccount: () => void;
   onOpenItem: (item: MenuItem) => void;
   onLanding: () => void;
   onCart: () => void;
@@ -47,11 +51,18 @@ export function MenuScreen({
           {theme.brand_name}
           <span style={{ color: "var(--accent-solid)" }}>.</span>
         </span>
-        {!browse && table.label ? (
-          <Badge tone="outline" uppercase>
-            {table.label}
-          </Badge>
-        ) : null}
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {accountLabel ? (
+            <span onClick={onAccount} style={{ font: "var(--type-label)", color: "var(--text-link)", cursor: "pointer", whiteSpace: "nowrap" }}>
+              {accountLabel}
+            </span>
+          ) : null}
+          {!browse && table.label ? (
+            <Badge tone="outline" uppercase>
+              {table.label}
+            </Badge>
+          ) : null}
+        </span>
       </div>
       {menus.length > 1 ? (
         <div style={{ flex: "none", display: "flex", gap: 6, padding: "0 16px 10px", background: "var(--paper-0)", overflowX: "auto" }}>

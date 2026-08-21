@@ -13,8 +13,10 @@ export function CartScreen({
   countdown,
   lastSentTime,
   error,
+  notice,
   sending,
   onSend,
+  onHandoff,
   onMenu,
 }: {
   tableLabel: string;
@@ -27,8 +29,10 @@ export function CartScreen({
   countdown: string;
   lastSentTime: string;
   error: string | null;
+  notice: string | null;
   sending: boolean;
   onSend: () => void;
+  onHandoff: () => void;
   onMenu: () => void;
 }) {
   const total = lines.reduce((t, l) => t + l.unitCents * l.qty, 0);
@@ -63,6 +67,11 @@ export function CartScreen({
       ) : (
         <>
           <div style={{ flex: 1, overflowY: "auto", minHeight: 0, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+            {notice ? (
+              <div style={{ background: "var(--yellow-100)", border: "1px solid var(--yellow-200)", borderRadius: 10, padding: "12px 16px", font: "var(--weight-regular) 14px/1.5 var(--font-sans)", color: "var(--yellow-800)" }}>
+                {notice}
+              </div>
+            ) : null}
             {rateLimited ? (
               <div style={{ background: "var(--paper-0)", border: "1px solid var(--orange-200)", borderRadius: 10, padding: "16px 18px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, color: "var(--orange-700)" }}>
@@ -147,9 +156,12 @@ export function CartScreen({
               </div>
             </div>
           </div>
-          <div style={{ flex: "none", padding: "12px 14px 16px", background: "var(--paper-0)", borderTop: "1px solid var(--border-default)" }}>
+          <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: 8, padding: "12px 14px 16px", background: "var(--paper-0)", borderTop: "1px solid var(--border-default)" }}>
             <Button variant="primary" size="touch" fullWidth disabled={rateLimited || sending} onClick={onSend}>
               {rateLimited ? "Send again in " + countdown : sending ? "Sending…" : "Send to the kitchen"}
+            </Button>
+            <Button variant="secondary" size="touch" fullWidth iconLeft="qr-code" disabled={sending} onClick={onHandoff}>
+              Show to waiter
             </Button>
           </div>
         </>

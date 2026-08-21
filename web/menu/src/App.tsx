@@ -1,21 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, httpClient, mockClient, preferMock, type Client } from "./api";
-import { loadCart, loadSentAt, saveCart, saveSentAt, type CartLine } from "./cart";
+import {
+  clearHandoff,
+  handoffExpired,
+  loadCart,
+  loadHandoff,
+  loadSentAt,
+  saveCart,
+  saveHandoff,
+  saveSentAt,
+  type CartLine,
+  type StoredHandoff,
+} from "./cart";
 import { countdownStr, hhmm } from "./format";
 import { fmtCents } from "./format";
+import { AccountScreen } from "./screens/AccountScreen";
+import { AuthSheet } from "./screens/AuthSheet";
 import { CartScreen } from "./screens/CartScreen";
 import { ExpiredScreen, NotFoundScreen } from "./screens/ExpiredScreen";
+import { HandoffScreen } from "./screens/HandoffScreen";
 import { ItemScreen } from "./screens/ItemScreen";
 import { Landing } from "./screens/Landing";
 import { MenuScreen } from "./screens/MenuScreen";
 import { SentScreen } from "./screens/SentScreen";
 import { ServiceScreen } from "./screens/ServiceScreen";
 import { themeVars } from "./theme";
-import type { TableSession } from "./types";
+import type { CustomerMe, TableSession } from "./types";
 
 const COOLDOWN_MS = 90_000;
 
-type Screen = "landing" | "menu" | "item" | "cart" | "sent" | "service";
+type Screen = "landing" | "menu" | "item" | "cart" | "sent" | "service" | "account" | "handoff";
 
 export interface SentOrder {
   lines: { name: string; qty: number }[];
@@ -57,7 +71,47 @@ export default function App() {
   const [billAt, setBillAt] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
+  const [cartNotice, setCartNotice] = useState<string | null>(null);
+  const [me, setMe] = useState<CustomerMe | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [handoff, setHandoff] = useState<StoredHandoff | null>(() => (token ? loadHandoff(token) : null));
   const [now, setNow] = useState(() => Date.now());
+
+  // A refresh mid-handoff returns to the code screen.
+  useEffect(() => {
+    if (handoff && !handoffExpired(handoff, Date.now())) setScreen("handoff");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Customer session — optional; anonymous flow untouched.
+  useEffect(() => {
+    if (browse) return;
+    let live = true;
+    client
+      .me()
+      .then((m) => {
+        if (live) setMe(m);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [client, browse]);
+
+  // Expired unused pickup code puts the cart back.
+  useEffect(() => {
+    if (!token || !handoff) return;
+    if (handoffExpired(handoff, now)) {
+      // Storage doubles as the idempotency guard (StrictMode runs effects twice).
+      if (loadHandoff(token)) {
+        setCart((c) => [...handoff.backup, ...c]);
+        setCartNotice("Code expired unused — your cart is back.");
+        clearHandoff(token);
+      }
+      setHandoff(null);
+      setScreen((s) => (s === "handoff" ? "cart" : s));
+    }
+  }, [now, handoff, token]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -140,6 +194,7 @@ export default function App() {
       });
       setCart([]);
       setNote("");
+      setCartNotice(null);
       setSentTimestamp(at);
       setScreen("sent");
     } catch (e) {
@@ -153,6 +208,39 @@ export default function App() {
     } finally {
       setSending(false);
     }
+  }
+
+  async function sendHandoff() {
+    if (!token || sending || cart.length === 0) return;
+    setSending(true);
+    setCartError(null);
+    try {
+      const h = await client.submitHandoff(token, {
+        lines: cart.map((l) => ({ menu_item_id: l.menuItemId, qty: l.qty, options: l.options })),
+        note: note.trim() || undefined,
+      });
+      const stored = { handoff: h, backup: cart };
+      saveHandoff(token, stored);
+      setHandoff(stored);
+      setCart([]);
+      setNote("");
+      setCartNotice(null);
+      setScreen("handoff");
+    } catch (e) {
+      setCartError(e instanceof ApiError ? e.message : "Something went wrong — nothing was sent. Try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function doLogout() {
+    try {
+      await client.logout();
+    } catch {
+      // best effort
+    }
+    setMe(null);
+    setScreen("menu");
   }
 
   async function submitRequest(type: "waiter" | "bill") {
@@ -174,6 +262,8 @@ export default function App() {
 
   const theme = session?.theme;
   const vars = theme ? themeVars(theme) : {};
+  const accountLabel = browse ? null : me ? me.customer.name.split(" ")[0] : "Sign in";
+  const onAccount = () => (me ? setScreen("account") : setAuthOpen(true));
   const cartCount = cart.reduce((t, l) => t + l.qty, 0);
   const cartTotal = cart.reduce((t, l) => t + l.unitCents * l.qty, 0);
   const item =
@@ -196,7 +286,26 @@ export default function App() {
   } else if (phase === "expired" || !session) {
     body = <ExpiredScreen />;
   } else if (screen === "landing") {
-    body = <Landing session={session} browse={browse} onMenu={() => setScreen("menu")} />;
+    body = (
+      <Landing
+        session={session}
+        browse={browse}
+        accountLabel={accountLabel}
+        onAccount={onAccount}
+        onMenu={() => setScreen("menu")}
+      />
+    );
+  } else if (screen === "account" && me) {
+    body = <AccountScreen me={me} onLogout={doLogout} onBack={() => setScreen("menu")} />;
+  } else if (screen === "handoff" && handoff) {
+    body = (
+      <HandoffScreen
+        handoff={handoff.handoff}
+        now={now}
+        tableLabel={session.table.label}
+        onMenu={() => setScreen("menu")}
+      />
+    );
   } else if (screen === "item" && item) {
     body = (
       <ItemScreen
@@ -222,8 +331,10 @@ export default function App() {
         countdown={countdownStr(cooldownLeft)}
         lastSentTime={lastSentAt ? hhmm(lastSentAt) : ""}
         error={cartError}
+        notice={cartNotice}
         sending={sending}
         onSend={sendOrder}
+        onHandoff={sendHandoff}
         onMenu={() => setScreen("menu")}
       />
     );
@@ -260,6 +371,8 @@ export default function App() {
         cat={cat}
         onPickCat={setCat}
         cartLabel={cartCount ? "Cart · " + fmtCents(cartTotal) : "Cart"}
+        accountLabel={accountLabel}
+        onAccount={onAccount}
         onOpenItem={(it) => {
           setItemId(it.id);
           setScreen("item");
@@ -276,6 +389,7 @@ export default function App() {
       <div style={{ minHeight: "100dvh", background: "var(--paper-2)", display: "flex", justifyContent: "center", fontFamily: "var(--font-sans)" }}>
         <div
           style={{
+            position: "relative",
             width: "100%",
             maxWidth: 430,
             height: "100dvh",
@@ -288,6 +402,16 @@ export default function App() {
           }}
         >
           {body}
+          {authOpen ? (
+            <AuthSheet
+              client={client}
+              onClose={() => setAuthOpen(false)}
+              onDone={async () => {
+                setAuthOpen(false);
+                setMe(await client.me());
+              }}
+            />
+          ) : null}
         </div>
       </div>
     </div>
