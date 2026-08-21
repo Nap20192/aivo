@@ -79,7 +79,9 @@ service with a phone POS for waiters.
 ## API surface (JSON, `/api/v1`)
 
 Public (diner, table-token scoped — existing menu handlers keep their shapes):
-- `GET  /api/v1/t/{table_token}` → restaurant, table, theme, menu
+- `GET  /api/v1/t/{table_token}` → restaurant, table, theme, menu,
+  `open_requests` (open service requests for the table, so the menu app can
+  render the one-open-request-per-table state — added by the menu stream)
 - `POST /api/v1/t/{table_token}/orders`
 - `POST /api/v1/t/{table_token}/requests` (waiter|bill)
 
