@@ -153,6 +153,21 @@ func (f *fakeStore) RestaurantByID(_ context.Context, id uuid.UUID) (domain.Rest
 func (f *fakeStore) CustomDomainForRestaurant(context.Context, uuid.UUID) (string, error) {
 	return "", nil
 }
+func (f *fakeStore) AssistantThread(context.Context, uuid.UUID) (uuid.UUID, error) {
+	return uuid.Nil, nil
+}
+func (f *fakeStore) CreateAssistantMessage(context.Context, uuid.UUID, domain.AssistantMessage) error {
+	return nil
+}
+func (f *fakeStore) AssistantMessages(context.Context, uuid.UUID, int) ([]domain.AssistantMessage, error) {
+	return nil, nil
+}
+func (f *fakeStore) AssistantMessageByID(context.Context, uuid.UUID, uuid.UUID) (domain.AssistantMessage, error) {
+	return domain.AssistantMessage{}, ports.ErrNotFound
+}
+func (f *fakeStore) SetAssistantMessageStatus(context.Context, uuid.UUID, uuid.UUID, string) error {
+	return nil
+}
 func (f *fakeStore) SetCustomDomain(context.Context, uuid.UUID, string) error { return nil }
 func (f *fakeStore) RestaurantIDByDomain(context.Context, string) (uuid.UUID, error) {
 	return uuid.Nil, ports.ErrNotFound

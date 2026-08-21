@@ -500,6 +500,29 @@ func (a *App) AddStaff(ctx context.Context, orgID, restaurantID uuid.UUID, email
 	return u, nil
 }
 
+// --- Assistant (thin store pass-throughs; orchestration lives in the
+// --- HTTP adapter, which composes menu-context data into the prompt) ---
+
+func (a *App) AssistantThread(ctx context.Context, restaurantID uuid.UUID) (uuid.UUID, error) {
+	return a.store.AssistantThread(ctx, restaurantID)
+}
+
+func (a *App) SaveAssistantMessage(ctx context.Context, restaurantID uuid.UUID, m domain.AssistantMessage) error {
+	return a.store.CreateAssistantMessage(ctx, restaurantID, m)
+}
+
+func (a *App) AssistantHistory(ctx context.Context, restaurantID uuid.UUID, limit int) ([]domain.AssistantMessage, error) {
+	return a.store.AssistantMessages(ctx, restaurantID, limit)
+}
+
+func (a *App) AssistantMessage(ctx context.Context, restaurantID, id uuid.UUID) (domain.AssistantMessage, error) {
+	return a.store.AssistantMessageByID(ctx, restaurantID, id)
+}
+
+func (a *App) SetAssistantMessageStatus(ctx context.Context, restaurantID, id uuid.UUID, status string) error {
+	return a.store.SetAssistantMessageStatus(ctx, restaurantID, id, status)
+}
+
 // ItemLimitFor returns the org's per-restaurant menu item limit
 // (0 = unlimited), for the admin item-create path.
 func (a *App) ItemLimitFor(ctx context.Context, orgID uuid.UUID) (int, error) {

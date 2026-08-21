@@ -101,27 +101,44 @@ func run() error {
 	posApplication := posapp.New(posStore, menubridge.New(menuStore))
 
 	var images platformports.ImageStore
+	imagePrefix := ""
 	if ep := os.Getenv("S3_ENDPOINT"); ep != "" {
+		bucket := envDefault("S3_BUCKET", "aivo-menu-images")
+		publicURL := envDefault("S3_PUBLIC_URL", "http://localhost:9000")
 		images, err = s3.New(ep,
 			os.Getenv("S3_ACCESS_KEY"), os.Getenv("S3_SECRET_KEY"),
-			envDefault("S3_BUCKET", "aivo-menu-images"),
-			envDefault("S3_PUBLIC_URL", "http://localhost:9000"),
-			os.Getenv("S3_USE_SSL") == "true")
+			bucket, publicURL, os.Getenv("S3_USE_SSL") == "true")
 		if err != nil {
 			return err
 		}
+		imagePrefix = strings.TrimRight(publicURL, "/") + "/" + bucket + "/"
 	} else {
 		log.Print("server: S3_ENDPOINT not set, image uploads disabled")
 	}
 
+	// Admin AI assistant: opt-in via ASSISTANT=claudecli (same CLI and
+	// CLAUDE_BIN as the theme generator).
+	var assistant platformports.Assistant
+	switch os.Getenv("ASSISTANT") {
+	case "claudecli":
+		assistant = claudecli.NewAssistant(os.Getenv("CLAUDE_BIN"))
+		log.Print("server: assistant: claudecli")
+	case "":
+		log.Print("server: ASSISTANT not set, admin assistant disabled")
+	default:
+		return fmt.Errorf("server: unknown ASSISTANT %q (want claudecli)", os.Getenv("ASSISTANT"))
+	}
+
 	apiV1 := platformhttp.NewMux(platformhttp.Deps{
-		Platform:  platformApplication,
-		Pos:       posApplication,
-		Menu:      menuStore,
-		MenuAdmin: menuStore,
-		MenuApp:   menuApplication,
-		Images:    images,
-		BaseURL:   baseURL,
+		Platform:    platformApplication,
+		Pos:         posApplication,
+		Menu:        menuStore,
+		MenuAdmin:   menuStore,
+		MenuApp:     menuApplication,
+		Images:      images,
+		Assistant:   assistant,
+		ImagePrefix: imagePrefix,
+		BaseURL:     baseURL,
 	})
 
 	mux := http.NewServeMux()

@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"regexp"
 	"strings"
 	"time"
 
@@ -112,12 +111,9 @@ type proposedTheme struct {
 	CSSVars   map[string]string `json:"css_vars"`
 }
 
-var cssVarNameRe = regexp.MustCompile(`^--[a-z0-9-]+$`)
-
 const (
-	maxCSSVars     = 40
-	maxCSSValueLen = 200
-	maxBrandLen    = 100
+	maxCSSVars  = 40
+	maxBrandLen = 100
 )
 
 // parseAndValidate turns raw CLI stdout into a validated Theme, keeping
@@ -157,10 +153,7 @@ func parseAndValidate(cliOut []byte, current domain.Theme) (domain.Theme, error)
 		p.CSSVars = map[string]string{}
 	}
 	for name, value := range p.CSSVars {
-		if !cssVarNameRe.MatchString(name) {
-			return fail("css var name %q invalid", name)
-		}
-		if err := checkCSSValue(value); err != nil {
+		if err := domain.ValidCSSVar(name, value); err != nil {
 			return fail("css var %s: %v", name, err)
 		}
 	}
@@ -181,22 +174,6 @@ func parseAndValidate(cliOut []byte, current domain.Theme) (domain.Theme, error)
 		ThemeJSON:    themeJSON,
 		DesignMD:     current.DesignMD,
 	}, nil
-}
-
-// checkCSSValue is the CSS injection guard: values become inline custom
-// properties in diner pages, so anything that could break out of a
-// declaration or load remote content is rejected.
-func checkCSSValue(v string) error {
-	if len(v) == 0 || len(v) > maxCSSValueLen {
-		return fmt.Errorf("empty or too long")
-	}
-	lower := strings.ToLower(v)
-	for _, bad := range []string{"url(", "expression(", ";", "{", "}"} {
-		if strings.Contains(lower, bad) {
-			return fmt.Errorf("contains %q", bad)
-		}
-	}
-	return nil
 }
 
 func currentBannerURL(t domain.Theme) string {

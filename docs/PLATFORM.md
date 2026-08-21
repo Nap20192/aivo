@@ -128,6 +128,29 @@ Platform (session cookie):
 - `POST /api/v1/restaurants/{id}/images` — multipart upload → S3, returns URL
 - Staff: `GET/POST /api/v1/restaurants/{id}/staff` {email, role}
 
+Admin AI assistant (manager+, restaurant-scoped chat; nothing applies
+without explicit confirm — proposals and applied sets are slog-logged):
+- `GET  /api/v1/restaurants/{id}/assistant/messages?limit=50` — history
+  (oldest first), message: `{id, role, text, attachments, actions,
+  action_status, created_at}`.
+- `POST /api/v1/restaurants/{id}/assistant/messages` — multipart `text` +
+  `files[]` (images stored in S3 and listed to the model as usable
+  `image_url`s; `.md/.txt/.csv` ≤64KB inlined into the prompt and stored
+  too). Returns the stored assistant message with `actions` proposed, NOT
+  executed. Action allowlist: create/rename/delete_category, create/
+  update/delete_item, set_item_available, update_theme, create_menu —
+  hard-validated at the boundary (unknown type or any invalid action
+  drops the whole list but keeps the reply; referenced ids must belong to
+  the restaurant; `price_cents` int ≥ 0; `image_url` only on our S3 public
+  host; css_vars same injection guard as the theme generator).
+- `POST .../assistant/messages/{msg_id}/apply` `{action_indexes?: [int]}`
+  — executes selected actions via the existing commands (sequential,
+  stop-on-first-failure with per-action results), marks `applied`.
+  `POST .../discard` marks `discarded`. Both 409 if already decided.
+- 503 `assistant_unconfigured` unless `ASSISTANT=claudecli` (shares
+  `CLAUDE_BIN` with the theme generator; 120s timeout; 502
+  `assistant_failed` on CLI/parse failure).
+
 POS (session cookie, waiter+):
 - `GET  /api/v1/pos/state` — restaurant, open shift, tables w/ tickets, requests,
   plus (pos-stream extension, implemented by backend): `menu` (categories →
