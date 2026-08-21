@@ -185,6 +185,29 @@ export const mockApi = {
     return delay({ ...db.theme });
   },
 
+  // Canned proposal so the AI flow is demoable without the backend.
+  async generateTheme(
+    id: string,
+  ): Promise<{ proposal: Theme; based_on: string }> {
+    requireRestaurant(id);
+    if (!db.theme.design_md.trim())
+      throw new ApiError(
+        "empty_brief",
+        "The design brief is empty — write or paste one first.",
+        409,
+      );
+    await new Promise((r) => setTimeout(r, 1400));
+    return {
+      proposal: {
+        ...db.theme,
+        accent: "Wine",
+        bold: true,
+        css_vars: { ...db.theme.css_vars, "--radius-md": "6px" },
+      },
+      based_on: "design_md",
+    };
+  },
+
   async listCategories(id: string): Promise<Category[]> {
     requireRestaurant(id);
     return delay([...db.categories].sort((a, b) => a.position - b.position));

@@ -145,6 +145,13 @@ export const api = {
     );
   },
 
+  generateTheme(id: string): Promise<{ proposal: Theme; based_on: string }> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/theme/generate`),
+      () => mockApi.generateTheme(id),
+    );
+  },
+
   listCategories(id: string): Promise<Category[]> {
     return withFallback(
       () => request("GET", `/restaurants/${id}/categories`),
