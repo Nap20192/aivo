@@ -57,6 +57,26 @@ test("full shift lifecycle in mock mode", async () => {
   s = await mockApi.state();
   assert.equal(s.requests.length, 0);
 
+  // cart handoff: lookup (case-insensitive), accept appends, single-use, expiry
+  const h = await mockApi.handoff("k7m2px");
+  assert.equal(h.code, "K7M2PX");
+  assert.equal(h.table_number, "07");
+  assert.equal(h.customer_name, "Mila K.");
+  assert.equal(h.lines.length, 2);
+  await mockApi.acceptHandoff("K7M2PX", h.table_id);
+  s = await mockApi.state();
+  const t07 = s.tables.find((t) => t.number === "07")!;
+  assert.equal(t07.ticket!.lines.length, 2);
+  assert.equal(t07.ticket!.note, "Glasses chilled, please.");
+  assert.equal(
+    t07.ticket!.lines.reduce((a, l) => a + l.unit_price_cents * l.qty, 0),
+    1800 + 2 * 1400
+  );
+  await assert.rejects(() => mockApi.handoff("K7M2PX")); // single-use
+  await assert.rejects(() => mockApi.acceptHandoff("K7M2PX", h.table_id));
+  await assert.rejects(() => mockApi.handoff("XPRD99")); // expired
+  await assert.rejects(() => mockApi.handoff("NOPE22")); // unknown
+
   // close with a variance
   const expected = s.shift!.expected_cents;
   const posted = await mockApi.closeShift(s.shift!.id, expected - 250);

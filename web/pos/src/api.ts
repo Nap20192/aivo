@@ -1,4 +1,4 @@
-import type { Me, NewLine, PosApi, PosState, PostedShift } from "./types.ts";
+import type { HandoffPreview, Me, NewLine, PosApi, PosState, PostedShift } from "./types.ts";
 import { mockApi } from "./mock.ts";
 
 export class ApiError extends Error {
@@ -40,6 +40,8 @@ const realApi: PosApi = {
   openShift: (opening_float_cents) => req("POST", "/pos/shifts", { opening_float_cents }),
   addLines: (tableId, lines: NewLine[]) => req("POST", `/pos/tables/${tableId}/lines`, { lines }),
   fire: (ticketId) => req("POST", `/pos/tickets/${ticketId}/fire`),
+  handoff: (code) => req<HandoffPreview>("GET", `/pos/handoff/${encodeURIComponent(code)}`),
+  acceptHandoff: (code, table_id) => req("POST", `/pos/handoff/${encodeURIComponent(code)}/accept`, { table_id }),
   ack: (requestId) => req("POST", `/pos/requests/${requestId}/ack`),
   dismiss: (requestId) => req("POST", `/pos/requests/${requestId}/dismiss`),
   closeShift: (shiftId, declared_cents) => req<PostedShift>("POST", `/pos/shifts/${shiftId}/close`, { declared_cents }),

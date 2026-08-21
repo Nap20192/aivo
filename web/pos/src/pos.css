@@ -365,6 +365,29 @@ body {
   color: var(--paper-0);
 }
 
+/* handoff code entry */
+.code-input {
+  width: 100%;
+  height: 64px;
+  text-align: center;
+  background: var(--paper-0);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font: 600 28px/1 var(--font-mono);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--ink-900);
+  outline: none;
+}
+.code-input::placeholder {
+  color: var(--ink-300);
+  letter-spacing: 0.35em;
+}
+.code-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
+}
+
 /* login */
 .login-input {
   width: 100%;
