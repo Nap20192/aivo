@@ -79,9 +79,14 @@ service with a phone POS for waiters.
 ## API surface (JSON, `/api/v1`)
 
 Public (diner, table-token scoped — existing menu handlers keep their shapes):
-- `GET  /api/v1/t/{table_token}` → restaurant, table, theme (flat), menu
-  (categories with nested items), `open_requests` (menu-stream extension,
-  implemented). Client types: `web/menu/src/types.ts`.
+- `GET  /api/v1/t/{table_token}` → restaurant, table, theme (flat),
+  `menus`: `[{id, slug, name, is_default, categories: [...]}]` (default
+  first, then position — replaces the old flat `menu` array),
+  `open_requests`. Client types: `web/menu/src/types.ts`.
+- `GET  /api/v1/m/{restaurant_slug}/{menu_slug}` — public read-only
+  browse of one menu (no table, no session): `{restaurant, theme, menu:
+  {id, slug, name, categories}}`, 404 unknown. Served by the diner SPA
+  at `/{restaurant_slug}/m/{menu_slug}` in browse mode.
 - `POST /api/v1/t/{table_token}/orders` — 204 on success; 429 with
   `error.retry_after_seconds` + `Retry-After` header on the order cooldown
 - `POST /api/v1/t/{table_token}/requests` {type: waiter|bill} → {request};
@@ -99,16 +104,59 @@ Platform (session cookie):
 - `GET/PUT  /api/v1/restaurants/{id}/theme` — flat Theme object
   `{brand_name, accent, bold, banner_url, css_vars, design_md}` (stored
   as theme JSON + design_md text)
-- CRUD `/api/v1/restaurants/{id}/categories`, `/api/v1/restaurants/{id}/items`
+- `POST /api/v1/restaurants/{id}/theme/generate` (manager+) — AI theme
+  proposal from the stored design_md: `{proposal: <Theme>, based_on:
+  "design_md"}`. Never saves — applying is the PUT above. 409
+  `no_design_md` when the brief is empty; 503 `generator_unconfigured`
+  unless the server runs with `THEME_GENERATOR=claudecli` (shells out to
+  the `claude` CLI, `CLAUDE_BIN` overrides the binary path); 502
+  `generation_failed` on CLI/validation failure. Model output is strictly
+  validated (accent enum, `--name` css var keys, value injection guard,
+  banner_url always kept from the current theme); proposals are logged
+  server-side.
+- Menus (1..N per restaurant, exactly one default, auto-created on
+  provisioning as "menu"/"Menu"): `GET/POST /api/v1/restaurants/{id}/menus`,
+  `PATCH/DELETE .../menus/{menu_id}` `{name, slug, position, is_default}` —
+  promoting a menu clears the old default atomically; deleting the default
+  or last menu is 422; deleting a non-empty menu needs `?force=1`
+  (categories + items cascade).
+- CRUD `/api/v1/restaurants/{id}/categories` (categories belong to a menu:
+  `menu_id` field on create — default menu when omitted — and `?menu_id=`
+  filter on list), `/api/v1/restaurants/{id}/items`
   (items: name, desc, price cents, image_url, allergens[], option_groups[], available)
 - `GET/POST /api/v1/restaurants/{id}/tables`, `POST .../tables/{id}/regenerate` (token), `GET .../tables/{id}/qr`
 - `POST /api/v1/restaurants/{id}/images` — multipart upload → S3, returns URL
 - Staff: `GET/POST /api/v1/restaurants/{id}/staff` {email, role}
 
+Admin AI assistant (manager+, restaurant-scoped chat; nothing applies
+without explicit confirm — proposals and applied sets are slog-logged):
+- `GET  /api/v1/restaurants/{id}/assistant/messages?limit=50` — history
+  (oldest first), message: `{id, role, text, attachments, actions,
+  action_status, created_at}`.
+- `POST /api/v1/restaurants/{id}/assistant/messages` — multipart `text` +
+  `files[]` (images stored in S3 and listed to the model as usable
+  `image_url`s; `.md/.txt/.csv` ≤64KB inlined into the prompt and stored
+  too). Returns the stored assistant message with `actions` proposed, NOT
+  executed. Action allowlist: create/rename/delete_category, create/
+  update/delete_item, set_item_available, update_theme, create_menu —
+  hard-validated at the boundary (unknown type or any invalid action
+  drops the whole list but keeps the reply; referenced ids must belong to
+  the restaurant; `price_cents` int ≥ 0; `image_url` only on our S3 public
+  host; css_vars same injection guard as the theme generator).
+- `POST .../assistant/messages/{msg_id}/apply` `{action_indexes?: [int]}`
+  — executes selected actions via the existing commands (sequential,
+  stop-on-first-failure with per-action results), marks `applied`.
+  `POST .../discard` marks `discarded`. Both 409 if already decided.
+- 503 `assistant_unconfigured` unless `ASSISTANT=claudecli` (shares
+  `CLAUDE_BIN` with the theme generator; 120s timeout; 502
+  `assistant_failed` on CLI/parse failure).
+
 POS (session cookie, waiter+):
 - `GET  /api/v1/pos/state` — restaurant, open shift, tables w/ tickets, requests,
   plus (pos-stream extension, implemented by backend): `menu` (categories →
-  items with `price_cents`, optional `mods` = single-select option labels),
+  items with `price_cents`, optional `mods` = single-select option labels;
+  union of every menu's categories, labels prefixed "Dinner · Starters"
+  when the restaurant has more than one menu),
   `till` (always 1 in v1), `cashier`, `other_till_shift` (always null in v1 —
   one till per restaurant); shift carries server-computed running
   `expected_cents` and a display `number` ("shift-N"). Display times are

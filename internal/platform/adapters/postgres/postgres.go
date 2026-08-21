@@ -54,6 +54,9 @@ func (s *Store) CreateOrgWithOwner(ctx context.Context, org domain.Organization,
 		}
 		return fmt.Errorf("store: register: restaurant: %w", err)
 	}
+	if err := insertDefaultMenu(ctx, tx, rest.ID); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO users (id, org_id, email, password_hash, role, restaurant_id) VALUES ($1, $2, $3, $4, $5, $6)`,
 		owner.ID, org.ID, owner.Email, owner.PasswordHash, owner.Role, owner.RestaurantID); err != nil {
@@ -253,7 +256,12 @@ func (s *Store) CreateRestaurant(ctx context.Context, r domain.Restaurant) error
 	if err != nil {
 		return fmt.Errorf("store: create restaurant: encode hours: %w", err)
 	}
-	_, err = s.db.ExecContext(ctx,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: create restaurant: begin: %w", err)
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx,
 		`INSERT INTO restaurants (id, org_id, slug, name, address, hours, contacts)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		r.ID, r.OrgID, r.Slug, r.Name, r.Address, hours, contacts)
@@ -262,6 +270,22 @@ func (s *Store) CreateRestaurant(ctx context.Context, r domain.Restaurant) error
 			return fmt.Errorf("slug taken: %w", ports.ErrConflict)
 		}
 		return fmt.Errorf("store: create restaurant: %w", err)
+	}
+	if err := insertDefaultMenu(ctx, tx, r.ID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// insertDefaultMenu provisions the restaurant's default menu ("menu" /
+// "Menu"). The menus table belongs to the menu context; writing it here
+// keeps provisioning atomic with the restaurant row (same DB, same tx).
+func insertDefaultMenu(ctx context.Context, tx *sql.Tx, restaurantID uuid.UUID) error {
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO menus (id, restaurant_id, slug, name, position, is_default)
+		 VALUES ($1, $2, 'menu', 'Menu', 0, true)`,
+		uuid.New(), restaurantID); err != nil {
+		return fmt.Errorf("store: default menu: %w", err)
 	}
 	return nil
 }

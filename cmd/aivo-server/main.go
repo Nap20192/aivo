@@ -26,6 +26,7 @@ import (
 	"aivo/internal/menu/adapters/telegram"
 	menuapp "aivo/internal/menu/app"
 	"aivo/internal/platform/adapters/billing"
+	"aivo/internal/platform/adapters/claudecli"
 	platformhttp "aivo/internal/platform/adapters/http"
 	platformpg "aivo/internal/platform/adapters/postgres"
 	"aivo/internal/platform/adapters/s3"
@@ -82,31 +83,62 @@ func run() error {
 	posStore := pospg.NewStore(db)
 
 	menuApplication := menuapp.NewApplication(menuStore, telegram.New(), key, baseURL)
-	platformApplication := platformapp.New(platformStore, billing.NewFake())
+
+	// AI theme generation: opt-in via THEME_GENERATOR=claudecli. Off by
+	// default so prod without the CLI fails clean (endpoint answers 503).
+	var themeGen platformports.ThemeGenerator
+	switch gen := os.Getenv("THEME_GENERATOR"); gen {
+	case "claudecli":
+		themeGen = claudecli.New(os.Getenv("CLAUDE_BIN"))
+		log.Print("server: theme generator: claudecli")
+	case "":
+		log.Print("server: THEME_GENERATOR not set, theme generation disabled")
+	default:
+		return fmt.Errorf("server: unknown THEME_GENERATOR %q (want claudecli)", gen)
+	}
+
+	platformApplication := platformapp.New(platformStore, billing.NewFake(), themeGen)
 	posApplication := posapp.New(posStore, menubridge.New(menuStore))
 
 	var images platformports.ImageStore
+	imagePrefix := ""
 	if ep := os.Getenv("S3_ENDPOINT"); ep != "" {
+		bucket := envDefault("S3_BUCKET", "aivo-menu-images")
+		publicURL := envDefault("S3_PUBLIC_URL", "http://localhost:9000")
 		images, err = s3.New(ep,
 			os.Getenv("S3_ACCESS_KEY"), os.Getenv("S3_SECRET_KEY"),
-			envDefault("S3_BUCKET", "aivo-menu-images"),
-			envDefault("S3_PUBLIC_URL", "http://localhost:9000"),
-			os.Getenv("S3_USE_SSL") == "true")
+			bucket, publicURL, os.Getenv("S3_USE_SSL") == "true")
 		if err != nil {
 			return err
 		}
+		imagePrefix = strings.TrimRight(publicURL, "/") + "/" + bucket + "/"
 	} else {
 		log.Print("server: S3_ENDPOINT not set, image uploads disabled")
 	}
 
+	// Admin AI assistant: opt-in via ASSISTANT=claudecli (same CLI and
+	// CLAUDE_BIN as the theme generator).
+	var assistant platformports.Assistant
+	switch os.Getenv("ASSISTANT") {
+	case "claudecli":
+		assistant = claudecli.NewAssistant(os.Getenv("CLAUDE_BIN"))
+		log.Print("server: assistant: claudecli")
+	case "":
+		log.Print("server: ASSISTANT not set, admin assistant disabled")
+	default:
+		return fmt.Errorf("server: unknown ASSISTANT %q (want claudecli)", os.Getenv("ASSISTANT"))
+	}
+
 	apiV1 := platformhttp.NewMux(platformhttp.Deps{
-		Platform:  platformApplication,
-		Pos:       posApplication,
-		Menu:      menuStore,
-		MenuAdmin: menuStore,
-		MenuApp:   menuApplication,
-		Images:    images,
-		BaseURL:   baseURL,
+		Platform:    platformApplication,
+		Pos:         posApplication,
+		Menu:        menuStore,
+		MenuAdmin:   menuStore,
+		MenuApp:     menuApplication,
+		Images:      images,
+		Assistant:   assistant,
+		ImagePrefix: imagePrefix,
+		BaseURL:     baseURL,
 	})
 
 	mux := http.NewServeMux()

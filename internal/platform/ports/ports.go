@@ -67,6 +67,18 @@ type Store interface {
 	// claim). Returns ErrConflict if another restaurant holds it.
 	SetCustomDomain(ctx context.Context, restaurantID uuid.UUID, host string) error
 
+	// AssistantThread returns the restaurant's chat thread ID, creating
+	// it on first use.
+	AssistantThread(ctx context.Context, restaurantID uuid.UUID) (uuid.UUID, error)
+	CreateAssistantMessage(ctx context.Context, restaurantID uuid.UUID, m domain.AssistantMessage) error
+	// AssistantMessages returns the newest `limit` messages, oldest
+	// first.
+	AssistantMessages(ctx context.Context, restaurantID uuid.UUID, limit int) ([]domain.AssistantMessage, error)
+	AssistantMessageByID(ctx context.Context, restaurantID, id uuid.UUID) (domain.AssistantMessage, error)
+	// SetAssistantMessageStatus stamps applied/discarded on a message
+	// whose status is still NULL; ErrConflict if already decided.
+	SetAssistantMessageStatus(ctx context.Context, restaurantID, id uuid.UUID, status string) error
+
 	// RestaurantByID is the org-unscoped lookup for server-side
 	// composition of public pages (diner entry) — never expose it on an
 	// org-authenticated path; those use Restaurant(orgID, id).
@@ -75,6 +87,28 @@ type Store interface {
 	// RestaurantIDByDomain resolves a verified custom domain to its
 	// restaurant, for Host-header routing.
 	RestaurantIDByDomain(ctx context.Context, host string) (uuid.UUID, error)
+}
+
+// ErrThemeGeneration wraps any theme-generation failure (CLI error, bad
+// JSON, validation reject). Callers get this or a valid Theme, never a
+// half-parsed one.
+var ErrThemeGeneration = errors.New("theme generation failed")
+
+// ThemeGenerator turns a design.md brief into a PROPOSED Theme. It never
+// saves — applying stays an explicit PUT by the user (AGENTS.md: AI must
+// not silently control).
+type ThemeGenerator interface {
+	Generate(ctx context.Context, designMD string, current domain.Theme) (domain.Theme, error)
+}
+
+// ErrAssistant wraps any assistant failure (CLI error, bad JSON).
+var ErrAssistant = errors.New("assistant call failed")
+
+// Assistant is the admin chat model behind the "Assistant" screen. It
+// returns a reply plus shape-validated proposed actions; tenant-scope
+// validation and applying are the caller's job — nothing here executes.
+type Assistant interface {
+	Chat(ctx context.Context, prompt string) (reply string, actions []domain.AssistantAction, err error)
 }
 
 // BillingProvider is the payment side of subscriptions. v1 ships only a

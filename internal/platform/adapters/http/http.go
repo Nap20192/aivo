@@ -16,6 +16,7 @@ import (
 	menudomain "aivo/internal/menu/domain"
 	menuports "aivo/internal/menu/ports"
 	"aivo/internal/platform/app"
+	"aivo/internal/platform/domain"
 	platformports "aivo/internal/platform/ports"
 	posapp "aivo/internal/pos/app"
 	posdomain "aivo/internal/pos/domain"
@@ -35,7 +36,12 @@ type Deps struct {
 	MenuAdmin menuports.AdminStore
 	MenuApp   menuapp.Application
 	Images    platformports.ImageStore // nil disables image upload (503)
-	BaseURL   string                   // origin table links are built under
+	Assistant platformports.Assistant  // nil disables the admin assistant (503)
+	// ImagePrefix is the public URL prefix of our image bucket
+	// (e.g. "http://localhost:9000/aivo-menu-images/") — the only host
+	// assistant-proposed image_url values may point at.
+	ImagePrefix string
+	BaseURL     string // origin table links are built under
 }
 
 type handler struct {
@@ -67,6 +73,13 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("PATCH /api/v1/restaurants/{id}", h.restaurant(true, h.patchRestaurant))
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/theme", h.restaurant(false, h.getTheme))
 	mux.HandleFunc("PUT /api/v1/restaurants/{id}/theme", h.restaurant(true, h.putTheme))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/theme/generate", h.restaurant(true, h.generateTheme))
+
+	// Menus (1..N per restaurant).
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/menus", h.restaurant(false, h.listMenus))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/menus", h.restaurant(true, h.createMenu))
+	mux.HandleFunc("PATCH /api/v1/restaurants/{id}/menus/{menuID}", h.restaurant(true, h.updateMenu))
+	mux.HandleFunc("DELETE /api/v1/restaurants/{id}/menus/{menuID}", h.restaurant(true, h.deleteMenu))
 
 	// Menu content (categories, items).
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/categories", h.restaurant(false, h.listCategories))
@@ -89,6 +102,12 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/staff", h.restaurant(false, h.listStaff))
 	mux.HandleFunc("POST /api/v1/restaurants/{id}/staff", h.restaurant(true, h.addStaff))
 
+	// Admin AI assistant (manager+).
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/assistant/messages", h.restaurant(true, h.assistantHistory))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/assistant/messages", h.restaurant(true, h.assistantSend))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/assistant/messages/{msgID}/apply", h.restaurant(true, h.assistantApply))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/assistant/messages/{msgID}/discard", h.restaurant(true, h.assistantDiscard))
+
 	// POS (any authenticated role, scoped to the user's restaurant).
 	mux.HandleFunc("GET /api/v1/pos/state", h.pos(h.posState))
 	mux.HandleFunc("POST /api/v1/pos/shifts", h.pos(h.posOpenShift))
@@ -99,6 +118,7 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("POST /api/v1/pos/requests/{id}/dismiss", h.pos(h.posDismissRequest))
 
 	// Diner (table-token scoped, anonymous).
+	mux.HandleFunc("GET /api/v1/m/{restaurantSlug}/{menuSlug}", h.dinerBrowseMenu)
 	mux.HandleFunc("GET /api/v1/t/{token}", h.dinerEntry)
 	mux.HandleFunc("POST /api/v1/t/{token}/orders", h.dinerOrder)
 	mux.HandleFunc("POST /api/v1/t/{token}/requests", h.dinerRequest)
@@ -151,8 +171,12 @@ func writeAppErr(w http.ResponseWriter, err error) bool {
 		errors.Is(err, posports.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "not_found", "not found")
 	case errors.Is(err, platformports.ErrConflict), errors.Is(err, posports.ErrConflict),
-		errors.Is(err, posdomain.ErrShiftClosed):
+		errors.Is(err, menuports.ErrConflict), errors.Is(err, posdomain.ErrShiftClosed):
 		writeErr(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, menudomain.ErrDefaultMenuDelete),
+		errors.Is(err, menudomain.ErrLastMenuDelete),
+		errors.Is(err, menudomain.ErrMenuNotEmpty):
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
 	case errors.Is(err, menuports.ErrItemReferenced):
 		writeErr(w, http.StatusConflict, "referenced", err.Error())
 	case errors.Is(err, app.ErrInvalid), errors.Is(err, posapp.ErrInvalid),
@@ -161,6 +185,18 @@ func writeAppErr(w http.ResponseWriter, err error) bool {
 		errors.Is(err, menudomain.ErrItemUnavailable),
 		errors.Is(err, menudomain.ErrUnknownOption),
 		errors.Is(err, menuapp.ErrUnknownMenuItem):
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
+	case errors.Is(err, app.ErrGeneratorUnavailable):
+		writeErr(w, http.StatusServiceUnavailable, "generator_unconfigured", err.Error())
+	case errors.Is(err, app.ErrNoDesignMD):
+		writeErr(w, http.StatusConflict, "no_design_md", err.Error())
+	case errors.Is(err, platformports.ErrThemeGeneration):
+		log.Printf("api: %v", err)
+		writeErr(w, http.StatusBadGateway, "generation_failed", "theme generation failed; try again")
+	case errors.Is(err, platformports.ErrAssistant):
+		log.Printf("api: %v", err)
+		writeErr(w, http.StatusBadGateway, "assistant_failed", "assistant call failed; try again")
+	case errors.Is(err, domain.ErrInvalidAction):
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
 	case errors.Is(err, posapp.ErrNoOpenShift):
 		writeErr(w, http.StatusUnprocessableEntity, "no_open_shift", err.Error())

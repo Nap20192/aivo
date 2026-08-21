@@ -19,29 +19,178 @@ import (
 // Shapes here match the admin client (web/admin/src/api/types.ts): bare
 // arrays for lists, option groups as {name, type: single|multi, choices}.
 
+// --- Menus -------------------------------------------------------------
+
+type menuView struct {
+	ID        uuid.UUID `json:"id"`
+	Slug      string    `json:"slug"`
+	Name      string    `json:"name"`
+	Position  int       `json:"position"`
+	IsDefault bool      `json:"is_default"`
+}
+
+func toMenuView(m menudomain.Menu) menuView {
+	return menuView{ID: m.ID, Slug: m.Slug, Name: m.Name, Position: m.Position, IsDefault: m.IsDefault}
+}
+
+func (h *handler) listMenus(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+	menus, err := h.MenuAdmin.Menus(r.Context(), rest.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+	views := make([]menuView, len(menus))
+	for i, m := range menus {
+		views[i] = toMenuView(m)
+	}
+	writeJSON(w, http.StatusOK, views)
+}
+
+func (h *handler) createMenu(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+	var req struct {
+		Name     string `json:"name"`
+		Slug     string `json:"slug"`
+		Position *int   `json:"position"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Name == "" {
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", "name is required")
+		return
+	}
+	if req.Slug == "" {
+		req.Slug = app.Slugify(req.Name)
+	}
+	if !domain.ValidSlug(req.Slug) {
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", "invalid menu slug")
+		return
+	}
+	position := 0
+	if req.Position != nil {
+		position = *req.Position
+	} else if menus, err := h.MenuAdmin.Menus(r.Context(), rest.ID); err == nil {
+		for _, m := range menus {
+			if m.Position >= position {
+				position = m.Position + 1
+			}
+		}
+	}
+	m := menudomain.Menu{ID: uuid.New(), RestaurantID: rest.ID, Slug: req.Slug, Name: req.Name, Position: position}
+	if writeAppErr(w, h.MenuAdmin.CreateMenu(r.Context(), m)) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, toMenuView(m))
+}
+
+func (h *handler) updateMenu(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+	id, err := uuid.Parse(r.PathValue("menuID"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	menus, err := h.MenuAdmin.Menus(r.Context(), rest.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+	var current *menudomain.Menu
+	for i := range menus {
+		if menus[i].ID == id {
+			current = &menus[i]
+			break
+		}
+	}
+	if current == nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	var req struct {
+		Name      *string `json:"name"`
+		Slug      *string `json:"slug"`
+		Position  *int    `json:"position"`
+		IsDefault *bool   `json:"is_default"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.Name != nil {
+		if strings.TrimSpace(*req.Name) == "" {
+			writeErr(w, http.StatusUnprocessableEntity, "invalid", "name cannot be empty")
+			return
+		}
+		current.Name = strings.TrimSpace(*req.Name)
+	}
+	if req.Slug != nil {
+		if !domain.ValidSlug(*req.Slug) {
+			writeErr(w, http.StatusUnprocessableEntity, "invalid", "invalid menu slug")
+			return
+		}
+		current.Slug = *req.Slug
+	}
+	if req.Position != nil {
+		current.Position = *req.Position
+	}
+	if req.IsDefault != nil {
+		current.IsDefault = *req.IsDefault
+	}
+	if writeAppErr(w, h.MenuAdmin.UpdateMenu(r.Context(), *current)) {
+		return
+	}
+	writeJSON(w, http.StatusOK, toMenuView(*current))
+}
+
+func (h *handler) deleteMenu(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+	id, err := uuid.Parse(r.PathValue("menuID"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	force := r.URL.Query().Get("force") == "1"
+	if writeAppErr(w, h.MenuAdmin.DeleteMenu(r.Context(), rest.ID, id, force)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // --- Categories --------------------------------------------------------
 
 type categoryView struct {
 	ID       uuid.UUID `json:"id"`
+	MenuID   uuid.UUID `json:"menu_id"`
 	Name     string    `json:"name"`
 	Position int       `json:"position"`
 }
 
+func toCategoryView(c menudomain.Category) categoryView {
+	return categoryView{ID: c.ID, MenuID: c.MenuID, Name: c.Name, Position: c.Position}
+}
+
+// listCategories lists all categories, or one menu's with ?menu_id=.
 func (h *handler) listCategories(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
 	cats, _, err := h.Menu.Menu(r.Context(), rest.ID)
 	if writeAppErr(w, err) {
 		return
 	}
-	views := make([]categoryView, len(cats))
-	for i, c := range cats {
-		views[i] = categoryView{ID: c.ID, Name: c.Name, Position: c.Position}
+	var menuID uuid.UUID
+	if q := r.URL.Query().Get("menu_id"); q != "" {
+		if menuID, err = uuid.Parse(q); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity, "invalid", "invalid menu_id")
+			return
+		}
+	}
+	views := []categoryView{}
+	for _, c := range cats {
+		if menuID == uuid.Nil || c.MenuID == menuID {
+			views = append(views, toCategoryView(c))
+		}
 	}
 	writeJSON(w, http.StatusOK, views)
 }
 
 type categoryRequest struct {
-	Name     string `json:"name"`
-	Position *int   `json:"position"`
+	Name     string     `json:"name"`
+	MenuID   *uuid.UUID `json:"menu_id"` // nil = restaurant's default menu
+	Position *int       `json:"position"`
 }
 
 func (h *handler) createCategory(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
@@ -53,26 +202,43 @@ func (h *handler) createCategory(w http.ResponseWriter, r *http.Request, _ domai
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", "name is required")
 		return
 	}
+
+	var menuID uuid.UUID
+	if req.MenuID != nil {
+		menuID = *req.MenuID
+	} else {
+		menus, err := h.MenuAdmin.Menus(r.Context(), rest.ID)
+		if writeAppErr(w, err) {
+			return
+		}
+		for _, m := range menus {
+			if m.IsDefault {
+				menuID = m.ID
+				break
+			}
+		}
+	}
+
 	position := 0
 	if req.Position != nil {
 		position = *req.Position
 	} else {
-		// Default: append after the existing categories.
+		// Default: append after the menu's existing categories.
 		cats, _, err := h.Menu.Menu(r.Context(), rest.ID)
 		if writeAppErr(w, err) {
 			return
 		}
 		for _, c := range cats {
-			if c.Position >= position {
+			if c.MenuID == menuID && c.Position >= position {
 				position = c.Position + 1
 			}
 		}
 	}
-	c := menudomain.Category{ID: uuid.New(), RestaurantID: rest.ID, Name: strings.TrimSpace(req.Name), Position: position}
+	c := menudomain.Category{ID: uuid.New(), RestaurantID: rest.ID, MenuID: menuID, Name: strings.TrimSpace(req.Name), Position: position}
 	if writeAppErr(w, h.MenuAdmin.CreateCategory(r.Context(), c)) {
 		return
 	}
-	writeJSON(w, http.StatusCreated, categoryView{ID: c.ID, Name: c.Name, Position: c.Position})
+	writeJSON(w, http.StatusCreated, toCategoryView(c))
 }
 
 func (h *handler) updateCategory(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
@@ -117,7 +283,7 @@ func (h *handler) updateCategory(w http.ResponseWriter, r *http.Request, _ domai
 	if writeAppErr(w, h.MenuAdmin.UpdateCategory(r.Context(), *current)) {
 		return
 	}
-	writeJSON(w, http.StatusOK, categoryView{ID: current.ID, Name: current.Name, Position: current.Position})
+	writeJSON(w, http.StatusOK, toCategoryView(*current))
 }
 
 func (h *handler) deleteCategory(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
@@ -185,12 +351,12 @@ func toItemView(it menudomain.MenuItem) itemView {
 
 // itemPatch is Partial<MenuItem> from the admin client; nil = keep.
 type itemPatch struct {
-	CategoryID  *uuid.UUID `json:"category_id"`
-	Name        *string    `json:"name"`
-	Description *string    `json:"description"`
-	PriceCents  *int       `json:"price_cents"`
-	ImageURL    *string    `json:"image_url"`
-	Allergens   *[]string  `json:"allergens"`
+	CategoryID   *uuid.UUID `json:"category_id"`
+	Name         *string    `json:"name"`
+	Description  *string    `json:"description"`
+	PriceCents   *int       `json:"price_cents"`
+	ImageURL     *string    `json:"image_url"`
+	Allergens    *[]string  `json:"allergens"`
 	OptionGroups *[]struct {
 		Name    string `json:"name"`
 		Type    string `json:"type"`

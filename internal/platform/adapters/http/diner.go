@@ -136,41 +136,13 @@ func (h *handler) dinerEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	menus, err := h.MenuAdmin.Menus(r.Context(), rest.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+
 	// Anonymous diner session for order rate limiting, success path only.
 	session.IssueOrRefresh(w, r)
-
-	itemsByCat := map[uuid.UUID][]dinerItemView{}
-	for _, it := range items {
-		groups := make([]dinerOptionGroupView, len(it.OptionGroups))
-		for i, g := range it.OptionGroups {
-			sel := "single"
-			if g.Multi {
-				sel = "multi"
-			}
-			opts := make([]dinerOptionView, len(g.Options))
-			for j, o := range g.Options {
-				opts[j] = dinerOptionView{ID: o.ID, Label: o.Label, PriceDeltaCents: o.PriceDeltaCents}
-			}
-			groups[i] = dinerOptionGroupView{ID: g.ID, Name: g.Name, Select: sel, Options: opts}
-		}
-		allergens := make([]string, len(it.Allergens))
-		for i, a := range it.Allergens {
-			allergens[i] = string(a)
-		}
-		itemsByCat[it.CategoryID] = append(itemsByCat[it.CategoryID], dinerItemView{
-			ID: it.ID, Name: it.Name, Description: it.Description, PriceCents: it.PriceCents,
-			ImageURL: optStr(it.ImageURL), Allergens: allergens, OptionGroups: groups,
-			Available: it.Available, SoldOutAt: nil, // 86-time not tracked yet
-		})
-	}
-	menu := make([]dinerCategoryView, len(cats))
-	for i, c := range cats {
-		views := itemsByCat[c.ID]
-		if views == nil {
-			views = []dinerItemView{}
-		}
-		menu[i] = dinerCategoryView{ID: c.ID, Name: c.Name, Items: views}
-	}
 
 	openViews := make([]openRequestView, len(open))
 	for i, sr := range open {
@@ -192,8 +164,111 @@ func (h *handler) dinerEntry(w http.ResponseWriter, r *http.Request) {
 		},
 		"table":         map[string]any{"id": table.ID, "label": table.Label},
 		"theme":         dinerTheme(theme.ThemeJSON, rest.Name),
-		"menu":          menu,
+		"menus":         buildDinerMenus(menus, cats, items),
 		"open_requests": openViews,
+	})
+}
+
+type dinerMenuView struct {
+	ID         uuid.UUID           `json:"id"`
+	Slug       string              `json:"slug"`
+	Name       string              `json:"name"`
+	IsDefault  bool                `json:"is_default"`
+	Categories []dinerCategoryView `json:"categories"`
+}
+
+// buildDinerMenus groups categories (with their items) under menus,
+// ordered as the store returns them (default first, then position).
+func buildDinerMenus(menus []menudomain.Menu, cats []menudomain.Category, items []menudomain.MenuItem) []dinerMenuView {
+	itemsByCat := map[uuid.UUID][]dinerItemView{}
+	for _, it := range items {
+		itemsByCat[it.CategoryID] = append(itemsByCat[it.CategoryID], toDinerItemView(it))
+	}
+	catsByMenu := map[uuid.UUID][]dinerCategoryView{}
+	for _, c := range cats {
+		views := itemsByCat[c.ID]
+		if views == nil {
+			views = []dinerItemView{}
+		}
+		catsByMenu[c.MenuID] = append(catsByMenu[c.MenuID], dinerCategoryView{ID: c.ID, Name: c.Name, Items: views})
+	}
+	out := make([]dinerMenuView, len(menus))
+	for i, m := range menus {
+		categories := catsByMenu[m.ID]
+		if categories == nil {
+			categories = []dinerCategoryView{}
+		}
+		out[i] = dinerMenuView{ID: m.ID, Slug: m.Slug, Name: m.Name, IsDefault: m.IsDefault, Categories: categories}
+	}
+	return out
+}
+
+func toDinerItemView(it menudomain.MenuItem) dinerItemView {
+	groups := make([]dinerOptionGroupView, len(it.OptionGroups))
+	for i, g := range it.OptionGroups {
+		sel := "single"
+		if g.Multi {
+			sel = "multi"
+		}
+		opts := make([]dinerOptionView, len(g.Options))
+		for j, o := range g.Options {
+			opts[j] = dinerOptionView{ID: o.ID, Label: o.Label, PriceDeltaCents: o.PriceDeltaCents}
+		}
+		groups[i] = dinerOptionGroupView{ID: g.ID, Name: g.Name, Select: sel, Options: opts}
+	}
+	allergens := make([]string, len(it.Allergens))
+	for i, a := range it.Allergens {
+		allergens[i] = string(a)
+	}
+	return dinerItemView{
+		ID: it.ID, Name: it.Name, Description: it.Description, PriceCents: it.PriceCents,
+		ImageURL: optStr(it.ImageURL), Allergens: allergens, OptionGroups: groups,
+		Available: it.Available, SoldOutAt: nil, // 86-time not tracked yet
+	}
+}
+
+// GET /api/v1/m/{restaurantSlug}/{menuSlug} — public read-only browse of
+// one menu: no table, no session cookie, no ordering/service data.
+func (h *handler) dinerBrowseMenu(w http.ResponseWriter, r *http.Request) {
+	rest, err := h.Menu.RestaurantBySlug(r.Context(), r.PathValue("restaurantSlug"))
+	if writeAppErr(w, err) {
+		return
+	}
+	menu, err := h.MenuAdmin.MenuBySlug(r.Context(), rest.ID, r.PathValue("menuSlug"))
+	if writeAppErr(w, err) {
+		return
+	}
+	platformRest, err := h.Platform.RestaurantPublic(r.Context(), rest.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+	theme, err := h.Platform.Theme(r.Context(), rest.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+	cats, items, err := h.Menu.Menu(r.Context(), rest.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+
+	views := buildDinerMenus([]menudomain.Menu{menu}, cats, items)
+	hours := make([]dinerHoursRow, len(platformRest.Hours))
+	for i, hr := range platformRest.Hours {
+		hours[i] = dinerHoursRow{Label: hr.Label, Open: hr.Open, Close: hr.Close}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"restaurant": dinerRestaurantView{
+			Name: platformRest.Name, Slug: platformRest.Slug,
+			Hours:   hours,
+			Address: optStr(platformRest.Address),
+			MapURL:  optStr(platformRest.Contacts["map_url"]),
+			Phone:   optStr(platformRest.Contacts["phone"]), Instagram: optStr(platformRest.Contacts["instagram"]),
+		},
+		"theme": dinerTheme(theme.ThemeJSON, platformRest.Name),
+		"menu": map[string]any{
+			"id": menu.ID, "slug": menu.Slug, "name": menu.Name,
+			"categories": views[0].Categories,
+		},
 	})
 }
 

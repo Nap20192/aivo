@@ -55,6 +55,9 @@ Env vars (native `go run ./cmd/aivo-server` instead of docker-compose):
 | `S3_ENDPOINT` | no | e.g. `localhost:9000`; unset disables image uploads (503) |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` / `S3_PUBLIC_URL` | no | see `docker-compose.yml` for the dev values |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | no | legacy menu notification channel (optional) |
+| `THEME_GENERATOR` | no | `claudecli` enables AI theme proposals via the `claude` CLI; unset = endpoint 503s |
+| `ASSISTANT` | no | `claudecli` enables the admin AI assistant chat; unset = endpoints 503 |
+| `CLAUDE_BIN` | no | path to the `claude` binary (default `claude`), shared by both AI features |
 
 ## Commands
 
