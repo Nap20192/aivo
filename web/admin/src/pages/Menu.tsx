@@ -26,7 +26,7 @@ import {
 } from "../ui";
 import ItemEditor from "./ItemEditor";
 
-export default function Menu() {
+export function ItemsTab() {
   const restaurant = useRestaurant();
   const { data, setData, error, loading, reload } = useLoad(
     async () => {
@@ -52,11 +52,7 @@ export default function Menu() {
 
   if (loading) return <LoadingPage />;
   if (error || !data)
-    return (
-      <div className="content">
-        <ErrorBanner message={error ?? "Failed to load."} onRetry={reload} />
-      </div>
-    );
+    return <ErrorBanner message={error ?? "Failed to load."} onRetry={reload} />;
 
   const menus = [...data.menus].sort((a, b) => a.position - b.position);
   const activeMenu =
@@ -136,66 +132,36 @@ export default function Menu() {
   }
 
   return (
-    <div className="content">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Menu</h1>
-          <p className="page-sub">
-            Categories, items, options. Changes go live on the diner menu
-            immediately.
-          </p>
-        </div>
-        <button
-          className="btn btn-primary"
-          disabled={!activeCat}
-          onClick={() => setEditing("new")}
-        >
-          <Plus size={15} />
-          New item
-        </button>
-      </div>
-
+    <>
       {actionError && (
         <div style={{ marginBottom: "var(--gap-stack)" }}>
           <ErrorBanner message={actionError} />
         </div>
       )}
 
-      <div className="tabs" style={{ alignItems: "center" }}>
+      <div
+        className="row"
+        style={{ flexWrap: "wrap", marginBottom: "var(--gap-stack)" }}
+      >
         {menus.map((m) => (
           <button
             key={m.id}
-            className={"tab" + (activeMenu?.id === m.id ? " on" : "")}
+            className={"chip" + (activeMenu?.id === m.id ? " on" : "")}
             onClick={() => {
               setSelectedMenu(m.id);
               setSelectedCat(null);
             }}
           >
             {m.name}
-            {m.is_default && (
-              <span
-                style={{
-                  marginLeft: 6,
-                  font: "var(--type-eyebrow)",
-                  letterSpacing: "var(--tracking-caps)",
-                  textTransform: "uppercase",
-                  color: "var(--text-subtle)",
-                }}
-              >
-                default
-              </span>
-            )}
+            {m.is_default && <span className="chip-note">default</span>}
           </button>
         ))}
-        <button className="tab" onClick={() => setMenuModal("new")}>
+        <button className="chip" onClick={() => setMenuModal("new")}>
           <Plus size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} />
           New menu
         </button>
         {activeMenu && (
-          <span
-            className="row"
-            style={{ marginLeft: "auto", paddingBottom: 4 }}
-          >
+          <span className="row" style={{ marginLeft: "auto" }}>
             <button
               className="btn btn-ghost btn-sm"
               title={menuLink}
@@ -214,6 +180,14 @@ export default function Menu() {
             >
               <Settings2 size={14} />
               Menu settings
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              disabled={!activeCat}
+              onClick={() => setEditing("new")}
+            >
+              <Plus size={14} />
+              New item
             </button>
           </span>
         )}
@@ -537,7 +511,7 @@ export default function Menu() {
           </p>
         </Modal>
       )}
-    </div>
+    </>
   );
 }
 

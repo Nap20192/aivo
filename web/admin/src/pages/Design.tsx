@@ -33,7 +33,7 @@ function textToVars(text: string): Record<string, string> | null {
   return vars;
 }
 
-export default function Design() {
+export default function Design(props: { tab: "theme" | "design_md" }) {
   const restaurant = useRestaurant();
   const { data, error, loading, reload } = useLoad(
     async () => {
@@ -56,15 +56,12 @@ export default function Design() {
 
   if (loading) return <LoadingPage />;
   if (error || !data)
-    return (
-      <div className="content">
-        <ErrorBanner message={error ?? "Failed to load."} onRetry={reload} />
-      </div>
-    );
+    return <ErrorBanner message={error ?? "Failed to load."} onRetry={reload} />;
 
   return (
     <Editor
       key={restaurant.id}
+      tab={props.tab}
       initial={data.theme}
       categories={data.categories}
       items={data.items}
@@ -74,12 +71,13 @@ export default function Design() {
 }
 
 function Editor(props: {
+  tab: "theme" | "design_md";
   initial: Theme;
   categories: import("../api/types").Category[];
   items: import("../api/types").MenuItem[];
   restaurantId: string;
 }) {
-  const [tab, setTab] = useState<"theme" | "design_md">("theme");
+  const { tab } = props;
   const [theme, setTheme] = useState<Theme>(props.initial);
   const [saved, setSaved] = useState<Theme>(props.initial);
   const [varsText, setVarsText] = useState(varsToText(props.initial.css_vars));
@@ -190,15 +188,11 @@ function Editor(props: {
   }
 
   return (
-    <div className="content">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Menu design</h1>
-          <p className="page-sub">
-            What diners see when they scan the QR. The preview updates as you
-            edit — nothing goes live until you save.
-          </p>
-        </div>
+    <>
+      <div className="row-between" style={{ marginBottom: "var(--gap-stack)" }}>
+        <span style={{ font: "var(--type-body)", color: "var(--text-muted)" }}>
+          {dirty ? "Unsaved changes." : "Everything here is published."}
+        </span>
         <button
           className="btn btn-primary"
           disabled={!dirty || busy || !!varsError}
@@ -216,21 +210,6 @@ function Editor(props: {
 
       <div className="theme-layout">
         <div>
-          <div className="tabs">
-            <button
-              className={"tab" + (tab === "theme" ? " on" : "")}
-              onClick={() => setTab("theme")}
-            >
-              Theme
-            </button>
-            <button
-              className={"tab" + (tab === "design_md" ? " on" : "")}
-              onClick={() => setTab("design_md")}
-            >
-              design.md
-            </button>
-          </div>
-
           {tab === "theme" ? (
             <div className="stack">
               <div className="card stack">
@@ -438,7 +417,7 @@ function Editor(props: {
           items={props.items}
         />
       </div>
-    </div>
+    </>
   );
 }
 

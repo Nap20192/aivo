@@ -2,9 +2,9 @@ import {
   CreditCard,
   LayoutDashboard,
   LogOut,
-  Palette,
   QrCode,
   Settings,
+  Sparkles,
   UtensilsCrossed,
   Users,
 } from "lucide-react";
@@ -17,7 +17,7 @@ import { Badge } from "./ui";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/menu", label: "Menu", icon: UtensilsCrossed },
-  { to: "/design", label: "Menu design", icon: Palette },
+  { to: "/assistant", label: "Assistant", icon: Sparkles },
   { to: "/tables", label: "Tables & QR", icon: QrCode },
   { to: "/staff", label: "Staff", icon: Users },
   { to: "/settings", label: "Settings", icon: Settings },

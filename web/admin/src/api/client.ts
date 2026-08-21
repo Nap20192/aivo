@@ -3,6 +3,8 @@
 import { ApiError } from "./error";
 import { mockApi } from "./mock";
 import type {
+  AssistantApplyResult,
+  AssistantMessage,
   Category,
   Me,
   Menu,
@@ -304,6 +306,54 @@ export const api = {
     return withFallback(
       () => request("POST", `/restaurants/${id}/staff`, input),
       () => mockApi.inviteStaff(id, input),
+    );
+  },
+
+  listAssistantMessages(id: string): Promise<AssistantMessage[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/assistant/messages?limit=50`),
+      () => mockApi.listAssistantMessages(id),
+    );
+  },
+
+  sendAssistantMessage(
+    id: string,
+    text: string,
+    files: File[],
+  ): Promise<AssistantMessage> {
+    const form = new FormData();
+    form.append("text", text);
+    for (const f of files) form.append("files", f);
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/assistant/messages`, form),
+      () => mockApi.sendAssistantMessage(id, text, files),
+    );
+  },
+
+  applyAssistantActions(
+    id: string,
+    msgId: string,
+    indexes?: number[],
+  ): Promise<{ results: AssistantApplyResult[] }> {
+    return withFallback(
+      () =>
+        request(
+          "POST",
+          `/restaurants/${id}/assistant/messages/${msgId}/apply`,
+          indexes ? { action_indexes: indexes } : {},
+        ),
+      () => mockApi.applyAssistantActions(id, msgId, indexes),
+    );
+  },
+
+  discardAssistantActions(id: string, msgId: string): Promise<void> {
+    return withFallback(
+      () =>
+        request(
+          "POST",
+          `/restaurants/${id}/assistant/messages/${msgId}/discard`,
+        ),
+      () => mockApi.discardAssistantActions(id, msgId),
     );
   },
 

@@ -14,6 +14,9 @@ import {
   demoUser,
 } from "./fixtures";
 import type {
+  AssistantAction,
+  AssistantApplyResult,
+  AssistantMessage,
   Category,
   Me,
   Menu,
@@ -43,6 +46,7 @@ interface Db {
   tables: Table[];
   staff: StaffMember[];
   subscription: Subscription;
+  assistant: AssistantMessage[];
 }
 
 const KEY = "aivo-admin-mock";
@@ -61,6 +65,7 @@ function seed(): Db {
     tables: demoTables,
     staff: demoStaff,
     subscription: demoSubscription,
+    assistant: [],
   };
 }
 
@@ -77,6 +82,7 @@ function load(): Db {
         ];
         db.categories.forEach((c) => (c.menu_id = c.menu_id ?? "menu-default"));
       }
+      db.assistant = db.assistant ?? [];
       return db;
     }
   } catch {
@@ -459,6 +465,114 @@ export const mockApi = {
     return delay({ ...s });
   },
 
+  async listAssistantMessages(id: string): Promise<AssistantMessage[]> {
+    requireRestaurant(id);
+    return delay(db.assistant.map((m) => ({ ...m })));
+  },
+
+  async sendAssistantMessage(
+    id: string,
+    text: string,
+    files: File[],
+  ): Promise<AssistantMessage> {
+    requireRestaurant(id);
+    const attachments = await Promise.all(
+      files.map(
+        (f) =>
+          new Promise<{ name: string; url: string; mime: string }>(
+            (resolve, reject) => {
+              const r = new FileReader();
+              r.onload = () =>
+                resolve({ name: f.name, url: r.result as string, mime: f.type });
+              r.onerror = () =>
+                reject(new ApiError("upload_failed", "Could not read file.", 422));
+              r.readAsDataURL(f);
+            },
+          ),
+      ),
+    );
+    const userMsg: AssistantMessage = {
+      id: uid("amsg"),
+      role: "user",
+      text,
+      attachments,
+      actions: [],
+      action_status: null,
+      created_at: new Date().toISOString(),
+    };
+    db.assistant.push(userMsg);
+
+    // Canned proposal so the flow demos offline: one menu action, one theme
+    // action, grounded in the current state.
+    const defaultMenu = db.menus.find((m) => m.is_default) ?? db.menus[0];
+    const firstCat = db.categories
+      .filter((c) => c.menu_id === defaultMenu?.id)
+      .sort((a, b) => a.position - b.position)[0];
+    const actions: AssistantAction[] = [];
+    if (firstCat)
+      actions.push({
+        type: "create_item",
+        category_id: firstCat.id,
+        name: "Caesar salad",
+        description: "Gem lettuce, anchovy dressing, aged parmesan, croutons.",
+        price_cents: 1200,
+        allergens: ["fish", "milk", "gluten", "eggs"],
+      });
+    actions.push({ type: "update_theme", accent: "Wine", bold: db.theme.bold });
+    const reply: AssistantMessage = {
+      id: uid("amsg"),
+      role: "assistant",
+      text: `Here's what I'd do. I read your message${attachments.length ? ` and ${attachments.length} attachment${attachments.length === 1 ? "" : "s"}` : ""} against the current menu (${db.menus.length} menu${db.menus.length === 1 ? "" : "s"}, ${db.items.length} items). Two proposals below — nothing is applied until you confirm. Note: this is the demo assistant; the real one answers your actual request.`,
+      attachments: [],
+      actions,
+      action_status: null,
+      created_at: new Date().toISOString(),
+    };
+    db.assistant.push(reply);
+    save();
+    await new Promise((r) => setTimeout(r, 1600));
+    return { ...reply };
+  },
+
+  async applyAssistantActions(
+    id: string,
+    msgId: string,
+    indexes?: number[],
+  ): Promise<{ results: AssistantApplyResult[] }> {
+    requireRestaurant(id);
+    const msg = db.assistant.find((m) => m.id === msgId);
+    if (!msg) throw new ApiError("not_found", "Message not found.", 404);
+    if (msg.action_status)
+      throw new ApiError("conflict", "This proposal was already resolved.", 409);
+    const picked =
+      indexes ?? msg.actions.map((_, i) => i);
+    const results: AssistantApplyResult[] = picked.map((i) => {
+      const a = msg.actions[i];
+      if (!a) return { index: i, ok: false, detail: "No such action." };
+      try {
+        return { index: i, ok: true, detail: execAction(a) };
+      } catch (e) {
+        return {
+          index: i,
+          ok: false,
+          detail: e instanceof Error ? e.message : "Failed.",
+        };
+      }
+    });
+    msg.action_status = "applied";
+    save();
+    return delay({ results });
+  },
+
+  async discardAssistantActions(id: string, msgId: string): Promise<void> {
+    requireRestaurant(id);
+    const msg = db.assistant.find((m) => m.id === msgId);
+    if (!msg) throw new ApiError("not_found", "Message not found.", 404);
+    msg.action_status = "discarded";
+    save();
+    return delay(undefined);
+  },
+
   async getSubscription(): Promise<Subscription> {
     requireAuth();
     return delay({ ...db.subscription });
@@ -475,5 +589,95 @@ export const mockApi = {
     return delay({ ...db.subscription });
   },
 };
+
+// Executes one allowlisted assistant action against the mock db.
+// Returns a human-readable result line; throws on validation failure.
+function execAction(a: AssistantAction): string {
+  switch (a.type) {
+    case "create_category": {
+      if (!db.menus.some((m) => m.id === a.menu_id))
+        throw new Error("Menu not found.");
+      db.categories.push({
+        id: uid("cat"),
+        menu_id: a.menu_id,
+        name: a.name,
+        position: db.categories.filter((c) => c.menu_id === a.menu_id).length,
+      });
+      return `Created category "${a.name}".`;
+    }
+    case "rename_category": {
+      const c = db.categories.find((x) => x.id === a.id);
+      if (!c) throw new Error("Category not found.");
+      c.name = a.name;
+      return `Renamed category to "${a.name}".`;
+    }
+    case "delete_category": {
+      if (!db.categories.some((x) => x.id === a.id))
+        throw new Error("Category not found.");
+      db.categories = db.categories.filter((x) => x.id !== a.id);
+      db.items = db.items.filter((i) => i.category_id !== a.id);
+      return "Deleted category and its items.";
+    }
+    case "create_item": {
+      if (!db.categories.some((c) => c.id === a.category_id))
+        throw new Error("Category not found.");
+      if (!Number.isInteger(a.price_cents) || a.price_cents < 0)
+        throw new Error("Invalid price.");
+      db.items.push({
+        id: uid("item"),
+        category_id: a.category_id,
+        name: a.name,
+        description: a.description ?? "",
+        price_cents: a.price_cents,
+        image_url: a.image_url ?? "",
+        allergens: a.allergens ?? [],
+        option_groups: [],
+        available: true,
+      });
+      return `Created item "${a.name}".`;
+    }
+    case "update_item": {
+      const item = db.items.find((i) => i.id === a.id);
+      if (!item) throw new Error("Item not found.");
+      const { type: _, id: __, ...patch } = a;
+      if (
+        patch.price_cents !== undefined &&
+        (!Number.isInteger(patch.price_cents) || patch.price_cents < 0)
+      )
+        throw new Error("Invalid price.");
+      Object.assign(item, patch);
+      return `Updated item "${item.name}".`;
+    }
+    case "delete_item": {
+      const item = db.items.find((i) => i.id === a.id);
+      if (!item) throw new Error("Item not found.");
+      db.items = db.items.filter((i) => i.id !== a.id);
+      return `Deleted item "${item.name}".`;
+    }
+    case "set_item_available": {
+      const item = db.items.find((i) => i.id === a.id);
+      if (!item) throw new Error("Item not found.");
+      item.available = a.available;
+      return `${item.name}: ${a.available ? "back on the menu" : "86'd"}.`;
+    }
+    case "update_theme": {
+      const { type: _, ...patch } = a;
+      db.theme = { ...db.theme, ...patch };
+      return "Theme updated.";
+    }
+    case "create_menu": {
+      if (db.menus.some((m) => m.slug === a.slug))
+        throw new Error("A menu with that slug already exists.");
+      db.menus.push({
+        id: uid("menu"),
+        slug: a.slug,
+        name: a.name,
+        position: db.menus.length,
+        is_default: false,
+      });
+      return `Created menu "${a.name}".`;
+    }
+  }
+}
 
 export type MockApi = typeof mockApi;
