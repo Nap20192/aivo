@@ -67,6 +67,34 @@ type Store interface {
 	// claim). Returns ErrConflict if another restaurant holds it.
 	SetCustomDomain(ctx context.Context, restaurantID uuid.UUID, host string) error
 
+	// --- Customers (diner accounts; sessions fully separate from staff) ---
+
+	// CreateCustomer returns ErrConflict if the email is taken.
+	CreateCustomer(ctx context.Context, c domain.Customer) error
+	CustomerByEmail(ctx context.Context, email string) (domain.Customer, error)
+	CustomerByID(ctx context.Context, id uuid.UUID) (domain.Customer, error)
+	CreateCustomerSession(ctx context.Context, s domain.Session) error
+	// CustomerSession resolves an unexpired customer token hash. Staff
+	// session hashes never resolve here and vice versa (separate tables).
+	CustomerSession(ctx context.Context, tokenHash []byte) (domain.Customer, error)
+	DeleteCustomerSession(ctx context.Context, tokenHash []byte) error
+	// CustomerOrders is the customer's own cross-restaurant order
+	// history, newest first.
+	CustomerOrders(ctx context.Context, customerID uuid.UUID, limit int) ([]domain.CustomerOrder, error)
+
+	// --- CRM (restaurant-scoped; guest_profiles row = visibility) ---
+
+	// TouchGuestProfile lazily creates/updates the (restaurant, customer)
+	// row, bumping last_seen.
+	TouchGuestProfile(ctx context.Context, restaurantID, customerID uuid.UUID) error
+	// Guests lists the restaurant's guests (only those with a profile
+	// row), optionally filtered by a name/email substring.
+	Guests(ctx context.Context, restaurantID uuid.UUID, query string, limit int) ([]domain.GuestSummary, error)
+	// GuestProfile + the guest's orders AT THIS RESTAURANT only.
+	GuestProfile(ctx context.Context, restaurantID, customerID uuid.UUID) (domain.GuestProfile, domain.GuestSummary, error)
+	GuestOrders(ctx context.Context, restaurantID, customerID uuid.UUID) ([]domain.GuestOrder, error)
+	UpdateGuestProfile(ctx context.Context, p domain.GuestProfile) error
+
 	// AssistantThread returns the restaurant's chat thread ID, creating
 	// it on first use.
 	AssistantThread(ctx context.Context, restaurantID uuid.UUID) (uuid.UUID, error)

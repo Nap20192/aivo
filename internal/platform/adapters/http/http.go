@@ -117,9 +117,26 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("POST /api/v1/pos/requests/{id}/ack", h.pos(h.posAckRequest))
 	mux.HandleFunc("POST /api/v1/pos/requests/{id}/dismiss", h.pos(h.posDismissRequest))
 
+	// Customer accounts (diner logins, separate cookie/session store).
+	mux.HandleFunc("POST /api/v1/customer/register", h.customerRegister)
+	mux.HandleFunc("POST /api/v1/customer/login", h.customerLogin)
+	mux.HandleFunc("POST /api/v1/customer/logout", h.customerLogout)
+	mux.HandleFunc("GET /api/v1/customer/me", h.customerMe)
+
+	// CRM (manager+).
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/guests", h.restaurant(true, h.listGuests))
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/guests/{customerID}", h.restaurant(true, h.getGuest))
+	mux.HandleFunc("PATCH /api/v1/restaurants/{id}/guests/{customerID}", h.restaurant(true, h.patchGuest))
+
+	// POS handoff pickup.
+	mux.HandleFunc("GET /api/v1/pos/handoff/{code}", h.pos(h.posHandoffPreview))
+	mux.HandleFunc("POST /api/v1/pos/handoff/{code}/accept", h.pos(h.posHandoffAccept))
+
 	// Diner (table-token scoped, anonymous).
 	mux.HandleFunc("GET /api/v1/m/{restaurantSlug}/{menuSlug}", h.dinerBrowseMenu)
 	mux.HandleFunc("GET /api/v1/t/{token}", h.dinerEntry)
+	mux.HandleFunc("POST /api/v1/t/{token}/handoff", h.dinerHandoff)
+	mux.HandleFunc("GET /api/v1/t/{token}/handoff/qr", h.dinerHandoffQR)
 	mux.HandleFunc("POST /api/v1/t/{token}/orders", h.dinerOrder)
 	mux.HandleFunc("POST /api/v1/t/{token}/requests", h.dinerRequest)
 

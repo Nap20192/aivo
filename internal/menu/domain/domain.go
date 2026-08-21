@@ -215,6 +215,7 @@ type Order struct {
 	ID           uuid.UUID
 	RestaurantID uuid.UUID
 	TableID      uuid.UUID
+	CustomerID   *uuid.UUID // set when a logged-in customer ordered (see platform customers)
 	Lines        []OrderLine
 	Comment      string
 	CreatedAt    time.Time

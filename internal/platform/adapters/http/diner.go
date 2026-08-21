@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -314,15 +315,27 @@ func (h *handler) dinerOrder(w http.ResponseWriter, r *http.Request) {
 		lines[i] = menuapp.OrderLineInput{MenuItemID: l.MenuItemID, OptionIDs: optionIDs, Qty: l.Qty}
 	}
 
+	// Logged-in customer? Link the order (anonymous stays fine).
+	var customerID *uuid.UUID
+	if customer := h.customerFromRequest(r); customer != nil {
+		customerID = &customer.ID
+	}
+
 	_, err = h.MenuApp.Commands.SubmitOrder.Handle(r.Context(), menuapp.SubmitOrder{
 		RestaurantSlug: rest.Slug,
 		TableToken:     table.Token,
 		SessionID:      sessionID,
+		CustomerID:     customerID,
 		Lines:          lines,
 		Comment:        req.Note,
 	})
 	if writeAppErr(w, err) {
 		return
+	}
+	if customerID != nil {
+		if err := h.Platform.TouchGuest(r.Context(), rest.ID, *customerID); err != nil {
+			log.Printf("api: touch guest: %v", err)
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

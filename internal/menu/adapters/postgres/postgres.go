@@ -302,9 +302,9 @@ func (s *PostgresStore) CreateOrder(ctx context.Context, order domain.Order) (do
 	order.CreatedAt = time.Now().UTC()
 
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO orders (id, restaurant_id, table_id, comment, created_at)
-		 VALUES ($1, $2, $3, $4, $5)`,
-		order.ID, order.RestaurantID, order.TableID, order.Comment, order.CreatedAt,
+		`INSERT INTO orders (id, restaurant_id, table_id, customer_id, comment, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		order.ID, order.RestaurantID, order.TableID, order.CustomerID, order.Comment, order.CreatedAt,
 	)
 	if err != nil {
 		return domain.Order{}, fmt.Errorf("store: create order: insert order: %w", err)
