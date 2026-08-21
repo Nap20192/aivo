@@ -96,7 +96,11 @@ Platform (session cookie):
 - Staff: `GET/POST /api/v1/restaurants/{id}/staff` {email, role}
 
 POS (session cookie, waiter+):
-- `GET  /api/v1/pos/state` — restaurant, open shift, tables w/ tickets, requests
+- `GET  /api/v1/pos/state` — restaurant, open shift, tables w/ tickets, requests,
+  plus (pos-stream deviation, needs backend ack): `menu` (categories → items with
+  `price_cents`, optional `mods`), `till`, `cashier`, `other_till_shift` (for the
+  one-open-shift-per-till card); shift carries server-computed `expected_cents`.
+  Client types: `web/pos/src/types.ts`.
 - `POST /api/v1/pos/shifts` {opening_float_cents} / `POST /api/v1/pos/shifts/{id}/close` {declared_cents}
 - `POST /api/v1/pos/tables/{table_id}/lines` — add order lines (menu_item_id, qty, options)
 - `POST /api/v1/pos/tickets/{id}/fire`
