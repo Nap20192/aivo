@@ -37,12 +37,19 @@ export default function Design() {
   const restaurant = useRestaurant();
   const { data, error, loading, reload } = useLoad(
     async () => {
-      const [theme, categories, items] = await Promise.all([
+      const [theme, menus, categories, items] = await Promise.all([
         api.getTheme(restaurant.id),
+        api.listMenus(restaurant.id),
         api.listCategories(restaurant.id),
         api.listItems(restaurant.id),
       ]);
-      return { theme, categories, items };
+      // Preview shows what diners land on: the default menu.
+      const defaultMenu = menus.find((m) => m.is_default) ?? menus[0];
+      return {
+        theme,
+        categories: categories.filter((c) => c.menu_id === defaultMenu?.id),
+        items,
+      };
     },
     [restaurant.id],
   );

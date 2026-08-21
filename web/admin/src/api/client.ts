@@ -5,6 +5,7 @@ import { mockApi } from "./mock";
 import type {
   Category,
   Me,
+  Menu,
   MenuItem,
   Plan,
   Restaurant,
@@ -152,14 +153,53 @@ export const api = {
     );
   },
 
-  listCategories(id: string): Promise<Category[]> {
+  listMenus(id: string): Promise<Menu[]> {
     return withFallback(
-      () => request("GET", `/restaurants/${id}/categories`),
-      () => mockApi.listCategories(id),
+      () => request("GET", `/restaurants/${id}/menus`),
+      () => mockApi.listMenus(id),
     );
   },
 
-  createCategory(id: string, input: { name: string }): Promise<Category> {
+  createMenu(id: string, input: { name: string; slug: string }): Promise<Menu> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/menus`, input),
+      () => mockApi.createMenu(id, input),
+    );
+  },
+
+  updateMenu(id: string, menuId: string, patch: Partial<Menu>): Promise<Menu> {
+    return withFallback(
+      () => request("PATCH", `/restaurants/${id}/menus/${menuId}`, patch),
+      () => mockApi.updateMenu(id, menuId, patch),
+    );
+  },
+
+  deleteMenu(id: string, menuId: string, force = false): Promise<void> {
+    return withFallback(
+      () =>
+        request(
+          "DELETE",
+          `/restaurants/${id}/menus/${menuId}${force ? "?force=1" : ""}`,
+        ),
+      () => mockApi.deleteMenu(id, menuId, force),
+    );
+  },
+
+  listCategories(id: string, menuId?: string): Promise<Category[]> {
+    return withFallback(
+      () =>
+        request(
+          "GET",
+          `/restaurants/${id}/categories${menuId ? `?menu_id=${menuId}` : ""}`,
+        ),
+      () => mockApi.listCategories(id, menuId),
+    );
+  },
+
+  createCategory(
+    id: string,
+    input: { name: string; menu_id: string },
+  ): Promise<Category> {
     return withFallback(
       () => request("POST", `/restaurants/${id}/categories`, input),
       () => mockApi.createCategory(id, input),

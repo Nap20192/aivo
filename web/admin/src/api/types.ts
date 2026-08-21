@@ -48,8 +48,17 @@ export interface Theme {
   design_md: string;
 }
 
+export interface Menu {
+  id: string;
+  slug: string;
+  name: string;
+  position: number;
+  is_default: boolean;
+}
+
 export interface Category {
   id: string;
+  menu_id: string;
   name: string;
   position: number;
 }

@@ -1,6 +1,7 @@
 // Ember & Bone demo tenant — mirrors docs/prototypes/aivo-menu-prototype.dc.html.
 import type {
   Category,
+  Menu,
   MenuItem,
   Org,
   Restaurant,
@@ -58,11 +59,17 @@ Newsreader for dish names on detail screens, Hanken Grotesk for UI,
 JetBrains Mono for every price.`,
 };
 
+export const demoMenus: Menu[] = [
+  { id: "menu-dinner", slug: "dinner", name: "Dinner", position: 0, is_default: true },
+  { id: "menu-bar", slug: "bar", name: "Bar", position: 1, is_default: false },
+];
+
 export const demoCategories: Category[] = [
-  { id: "cat-starters", name: "Starters", position: 0 },
-  { id: "cat-grill", name: "From the grill", position: 1 },
-  { id: "cat-sides", name: "Sides", position: 2 },
-  { id: "cat-wine", name: "Wine", position: 3 },
+  { id: "cat-starters", menu_id: "menu-dinner", name: "Starters", position: 0 },
+  { id: "cat-grill", menu_id: "menu-dinner", name: "From the grill", position: 1 },
+  { id: "cat-sides", menu_id: "menu-dinner", name: "Sides", position: 2 },
+  { id: "cat-wine", menu_id: "menu-bar", name: "Wine", position: 0 },
+  { id: "cat-cocktails", menu_id: "menu-bar", name: "Cocktails", position: 1 },
 ];
 
 const doneness = {
@@ -259,6 +266,32 @@ export const demoItems: MenuItem[] = [
     available: true,
   },
 ];
+
+const cocktails: MenuItem[] = [
+  {
+    id: "item-negroni",
+    category_id: "cat-cocktails",
+    name: "Negroni, smoked",
+    description: "Gin, Campari, sweet vermouth, a whisper of vine smoke.",
+    price_cents: 1300,
+    image_url: "",
+    allergens: [],
+    option_groups: [],
+    available: true,
+  },
+  {
+    id: "item-sour",
+    category_id: "cat-cocktails",
+    name: "Amaro sour",
+    description: "Averna, lemon, egg white, charred rosemary.",
+    price_cents: 1200,
+    image_url: "",
+    allergens: ["eggs"],
+    option_groups: [],
+    available: true,
+  },
+];
+demoItems.push(...cocktails);
 
 export const demoTables: Table[] = [
   { id: "table-1", label: "Table 1", token: "xY82kq" },

@@ -3,6 +3,7 @@
 import {
   demoCategories,
   demoItems,
+  demoMenus,
   demoOrg,
   demoPassword,
   demoRestaurant,
@@ -15,6 +16,7 @@ import {
 import type {
   Category,
   Me,
+  Menu,
   MenuItem,
   Org,
   Plan,
@@ -35,6 +37,7 @@ interface Db {
   loggedIn: boolean;
   restaurant: Restaurant;
   theme: Theme;
+  menus: Menu[];
   categories: Category[];
   items: MenuItem[];
   tables: Table[];
@@ -52,6 +55,7 @@ function seed(): Db {
     loggedIn: false,
     restaurant: demoRestaurant,
     theme: demoTheme,
+    menus: demoMenus,
     categories: demoCategories,
     items: demoItems,
     tables: demoTables,
@@ -63,7 +67,18 @@ function seed(): Db {
 function load(): Db {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw) as Db;
+    if (raw) {
+      const db = JSON.parse(raw) as Db;
+      // Mirror of the backend migration: stored state from before multi-menu
+      // gets a default menu and its categories moved into it.
+      if (!db.menus) {
+        db.menus = [
+          { id: "menu-default", slug: "menu", name: "Menu", position: 0, is_default: true },
+        ];
+        db.categories.forEach((c) => (c.menu_id = c.menu_id ?? "menu-default"));
+      }
+      return db;
+    }
   } catch {
     // corrupted storage: reseed
   }
@@ -128,6 +143,10 @@ export const mockApi = {
       slug,
     };
     db.theme = { ...db.theme, brand_name: input.restaurant_name, design_md: "" };
+    // Provisioning auto-creates the default menu.
+    db.menus = [
+      { id: uid("menu"), slug: "menu", name: "Menu", position: 0, is_default: true },
+    ];
     db.categories = [];
     db.items = [];
     db.tables = [];
@@ -208,17 +227,108 @@ export const mockApi = {
     };
   },
 
-  async listCategories(id: string): Promise<Category[]> {
+  async listMenus(id: string): Promise<Menu[]> {
     requireRestaurant(id);
-    return delay([...db.categories].sort((a, b) => a.position - b.position));
+    return delay(
+      [...db.menus]
+        .sort((a, b) => a.position - b.position)
+        .map((m) => ({ ...m })),
+    );
   },
 
-  async createCategory(id: string, input: { name: string }): Promise<Category> {
+  async createMenu(
+    id: string,
+    input: { name: string; slug: string },
+  ): Promise<Menu> {
     requireRestaurant(id);
+    if (db.menus.some((m) => m.slug === input.slug))
+      throw new ApiError("conflict", "A menu with that slug already exists.", 422);
+    const menu: Menu = {
+      id: uid("menu"),
+      slug: input.slug,
+      name: input.name,
+      position: db.menus.length,
+      is_default: false,
+    };
+    db.menus.push(menu);
+    save();
+    return delay({ ...menu });
+  },
+
+  async updateMenu(
+    id: string,
+    menuId: string,
+    patch: Partial<Menu>,
+  ): Promise<Menu> {
+    requireRestaurant(id);
+    const menu = db.menus.find((m) => m.id === menuId);
+    if (!menu) throw new ApiError("not_found", "Menu not found.", 404);
+    if (
+      patch.slug !== undefined &&
+      db.menus.some((m) => m.id !== menuId && m.slug === patch.slug)
+    )
+      throw new ApiError("conflict", "A menu with that slug already exists.", 422);
+    if (patch.is_default === false && menu.is_default)
+      throw new ApiError(
+        "invalid",
+        "One menu must be the default — set another menu as default instead.",
+        422,
+      );
+    if (patch.is_default === true)
+      db.menus.forEach((m) => (m.is_default = m.id === menuId));
+    Object.assign(menu, patch, { id: menuId });
+    save();
+    return delay({ ...menu });
+  },
+
+  async deleteMenu(id: string, menuId: string, force = false): Promise<void> {
+    requireRestaurant(id);
+    const menu = db.menus.find((m) => m.id === menuId);
+    if (!menu) throw new ApiError("not_found", "Menu not found.", 404);
+    if (menu.is_default)
+      throw new ApiError("invalid", "The default menu can't be deleted.", 422);
+    if (db.menus.length === 1)
+      throw new ApiError("invalid", "The last menu can't be deleted.", 422);
+    const cats = db.categories.filter((c) => c.menu_id === menuId);
+    if (cats.length > 0 && !force)
+      throw new ApiError(
+        "menu_not_empty",
+        "The menu still has categories — delete with its contents to proceed.",
+        422,
+      );
+    const catIds = new Set(cats.map((c) => c.id));
+    db.items = db.items.filter((i) => !catIds.has(i.category_id));
+    db.categories = db.categories.filter((c) => c.menu_id !== menuId);
+    db.menus = db.menus.filter((m) => m.id !== menuId);
+    db.menus
+      .sort((a, b) => a.position - b.position)
+      .forEach((m, i) => (m.position = i));
+    save();
+    return delay(undefined);
+  },
+
+  async listCategories(id: string, menuId?: string): Promise<Category[]> {
+    requireRestaurant(id);
+    return delay(
+      db.categories
+        .filter((c) => !menuId || c.menu_id === menuId)
+        .sort((a, b) => a.position - b.position)
+        .map((c) => ({ ...c })),
+    );
+  },
+
+  async createCategory(
+    id: string,
+    input: { name: string; menu_id: string },
+  ): Promise<Category> {
+    requireRestaurant(id);
+    if (!db.menus.some((m) => m.id === input.menu_id))
+      throw new ApiError("not_found", "Menu not found.", 404);
     const cat: Category = {
       id: uid("cat"),
+      menu_id: input.menu_id,
       name: input.name,
-      position: db.categories.length,
+      position: db.categories.filter((c) => c.menu_id === input.menu_id).length,
     };
     db.categories.push(cat);
     save();
@@ -242,9 +352,11 @@ export const mockApi = {
     requireRestaurant(id);
     db.categories = db.categories.filter((c) => c.id !== catId);
     db.items = db.items.filter((i) => i.category_id !== catId);
-    db.categories
-      .sort((a, b) => a.position - b.position)
-      .forEach((c, i) => (c.position = i));
+    for (const m of db.menus)
+      db.categories
+        .filter((c) => c.menu_id === m.id)
+        .sort((a, b) => a.position - b.position)
+        .forEach((c, i) => (c.position = i));
     save();
     return delay(undefined);
   },
