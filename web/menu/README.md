@@ -1,10 +1,17 @@
 # AIVO diner menu
 
-Diner-facing SPA (Vite + React + TypeScript). A diner scans the table QR and
-lands on `/{restaurant_slug}/t/{table_token}`; the app loads the restaurant,
-table, theme, and menu from `GET /api/v1/t/{table_token}` and drives the
-Landing → Menu → Item → Cart → Sent → Service flow from
-`docs/prototypes/aivo-menu-prototype.dc.html`.
+Diner-facing SPA (Vite + React + TypeScript). Two entry modes:
+
+- `/{restaurant_slug}/t/{table_token}` — full ordering experience. Loads
+  restaurant, table, theme, and `menus` (multi-menu, default first) from
+  `GET /api/v1/t/{table_token}`; drives the Landing → Menu → Item → Cart →
+  Sent → Service flow from `docs/prototypes/aivo-menu-prototype.dc.html`.
+  A menu switcher pill row appears above the categories when the restaurant
+  has more than one menu.
+- `/{restaurant_slug}/m/{menu_slug}` — public browse mode (shareable link,
+  no table). Loads one menu from `GET /api/v1/m/{restaurant_slug}/{menu_slug}`;
+  menu is read-only: no cart, no ordering, no service buttons. Unknown slugs
+  render a not-found screen.
 
 ## Commands
 

@@ -1,10 +1,19 @@
+import type { CSSProperties } from "react";
 import { fmtCents } from "../format";
 import { hasFromPrice } from "../cart";
 import type { MenuItem, TableSession } from "../types";
 import { Badge, Button, Placeholder } from "../ui";
 
+const pillStyle = (selected: boolean): CSSProperties =>
+  selected
+    ? { flex: "none", padding: "8px 13px", borderRadius: 999, background: "var(--ink-900)", color: "var(--paper-0)", font: "var(--type-label)", cursor: "pointer" }
+    : { flex: "none", padding: "8px 13px", borderRadius: 999, background: "var(--paper-2)", border: "1px solid var(--border-default)", color: "var(--ink-700)", font: "var(--type-label)", cursor: "pointer" };
+
 export function MenuScreen({
   session,
+  browse,
+  menuIdx,
+  onPickMenu,
   cat,
   onPickCat,
   cartLabel,
@@ -14,6 +23,9 @@ export function MenuScreen({
   onService,
 }: {
   session: TableSession;
+  browse: boolean;
+  menuIdx: number;
+  onPickMenu: (i: number) => void;
   cat: number;
   onPickCat: (i: number) => void;
   cartLabel: string;
@@ -22,8 +34,9 @@ export function MenuScreen({
   onCart: () => void;
   onService: () => void;
 }) {
-  const { menu, table, theme } = session;
-  const items = (menu[cat] ?? menu[0])?.items ?? [];
+  const { menus, table, theme } = session;
+  const categories = (menus[menuIdx] ?? menus[0])?.categories ?? [];
+  const items = (categories[cat] ?? categories[0])?.items ?? [];
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <div style={{ flex: "none", padding: "12px 16px 10px", background: "var(--paper-0)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -34,21 +47,24 @@ export function MenuScreen({
           {theme.brand_name}
           <span style={{ color: "var(--accent-solid)" }}>.</span>
         </span>
-        <Badge tone="outline" uppercase>
-          {table.label}
-        </Badge>
+        {!browse && table.label ? (
+          <Badge tone="outline" uppercase>
+            {table.label}
+          </Badge>
+        ) : null}
       </div>
+      {menus.length > 1 ? (
+        <div style={{ flex: "none", display: "flex", gap: 6, padding: "0 16px 10px", background: "var(--paper-0)", overflowX: "auto" }}>
+          {menus.map((m, i) => (
+            <span key={m.id} onClick={() => onPickMenu(i)} style={pillStyle(i === menuIdx)}>
+              {m.name}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div style={{ flex: "none", display: "flex", gap: 6, padding: "0 16px 12px", background: "var(--paper-0)", borderBottom: "1px solid var(--border-default)", overflowX: "auto" }}>
-        {menu.map((c, i) => (
-          <span
-            key={c.id}
-            onClick={() => onPickCat(i)}
-            style={
-              i === cat
-                ? { flex: "none", padding: "8px 13px", borderRadius: 999, background: "var(--ink-900)", color: "var(--paper-0)", font: "var(--type-label)", cursor: "pointer" }
-                : { flex: "none", padding: "8px 13px", borderRadius: 999, background: "var(--paper-2)", border: "1px solid var(--border-default)", color: "var(--ink-700)", font: "var(--type-label)", cursor: "pointer" }
-            }
-          >
+        {categories.map((c, i) => (
+          <span key={c.id} onClick={() => onPickCat(i)} style={pillStyle(i === cat)}>
             {c.name}
           </span>
         ))}
@@ -104,17 +120,19 @@ export function MenuScreen({
           );
         })}
       </div>
-      <div style={{ flex: "none", display: "grid", gridTemplateColumns: "1fr 1fr 1.25fr", gap: 8, padding: "10px 14px 14px", background: "var(--paper-0)", borderTop: "1px solid var(--border-default)" }}>
-        <Button variant="secondary" size="touch" fullWidth iconLeft="bell" onClick={onService}>
-          Waiter
-        </Button>
-        <Button variant="secondary" size="touch" fullWidth iconLeft="receipt" onClick={onService}>
-          Bill
-        </Button>
-        <Button variant="primary" size="touch" fullWidth onClick={onCart}>
-          {cartLabel}
-        </Button>
-      </div>
+      {!browse ? (
+        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "1fr 1fr 1.25fr", gap: 8, padding: "10px 14px 14px", background: "var(--paper-0)", borderTop: "1px solid var(--border-default)" }}>
+          <Button variant="secondary" size="touch" fullWidth iconLeft="bell" onClick={onService}>
+            Waiter
+          </Button>
+          <Button variant="secondary" size="touch" fullWidth iconLeft="receipt" onClick={onService}>
+            Bill
+          </Button>
+          <Button variant="primary" size="touch" fullWidth onClick={onCart}>
+            {cartLabel}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

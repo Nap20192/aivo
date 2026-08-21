@@ -44,7 +44,13 @@ export const demoSession: TableSession = {
   table: { id: "table-12", label: "Table 12" },
   theme: { brand_name: "Ember & Bone", accent: "Blood red", bold: false },
   open_requests: [],
-  menu: [
+  menus: [
+    {
+      id: "menu-dinner",
+      slug: "dinner",
+      name: "Dinner",
+      is_default: true,
+      categories: [
     {
       id: "starters",
       name: "Starters",
@@ -209,6 +215,74 @@ export const demoSession: TableSession = {
           allergens: [],
           option_groups: [],
           available: true,
+        },
+      ],
+    },
+      ],
+    },
+    {
+      id: "menu-bar",
+      slug: "bar",
+      name: "Bar",
+      is_default: false,
+      categories: [
+        {
+          id: "cocktails",
+          name: "Cocktails",
+          items: [
+            {
+              id: "negroni",
+              name: "Negroni, barrel-aged",
+              description: "Six weeks in oak. Stirred, orange peel.",
+              price_cents: 1200,
+              allergens: [],
+              option_groups: [],
+              available: true,
+            },
+            {
+              id: "boulevardier",
+              name: "Boulevardier",
+              description: "Rye, Campari, sweet vermouth.",
+              price_cents: 1300,
+              allergens: [],
+              option_groups: [],
+              available: true,
+            },
+            {
+              id: "amaro",
+              name: "Amaro, after dinner",
+              description: "Rotating pour. Ask what's open.",
+              price_cents: 900,
+              allergens: [],
+              option_groups: [],
+              available: false,
+              sold_out_at: "21:15",
+            },
+          ],
+        },
+        {
+          id: "beer",
+          name: "Beer & cider",
+          items: [
+            {
+              id: "saison",
+              name: "Saison, 33 cl",
+              description: "Farmhouse, dry, local.",
+              price_cents: 700,
+              allergens: ["gluten"],
+              option_groups: [],
+              available: true,
+            },
+            {
+              id: "cider",
+              name: "Basque cider",
+              description: "Still, sharp, poured from height.",
+              price_cents: 800,
+              allergens: [],
+              option_groups: [],
+              available: true,
+            },
+          ],
         },
       ],
     },

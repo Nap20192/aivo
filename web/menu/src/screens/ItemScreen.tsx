@@ -137,10 +137,12 @@ function MultiGroup({
 
 export function ItemScreen({
   item,
+  browse,
   onAdd,
   onBack,
 }: {
   item: MenuItem;
+  browse: boolean;
   onAdd: (line: CartLine) => void;
   onBack: () => void;
 }) {
@@ -238,7 +240,7 @@ export function ItemScreen({
           </>
         ) : null}
       </div>
-      {!soldOut ? (
+      {browse ? null : !soldOut ? (
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px 16px", background: "var(--paper-0)", borderTop: "1px solid var(--border-default)" }}>
           <QtyStepper qty={qty} onDec={() => setQty(Math.max(1, qty - 1))} onInc={() => setQty(Math.min(9, qty + 1))} />
           <div style={{ flex: 1 }}>

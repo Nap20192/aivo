@@ -60,6 +60,14 @@ export interface Category {
   items: MenuItem[];
 }
 
+export interface Menu {
+  id: string;
+  slug: string;
+  name: string;
+  is_default: boolean;
+  categories: Category[];
+}
+
 export interface OpenRequest {
   type: "waiter" | "bill";
   created_at: string;
@@ -69,9 +77,17 @@ export interface TableSession {
   restaurant: Restaurant;
   table: { id: string; label: string };
   theme: Theme;
-  menu: Category[];
+  /** Ordered by position, default menu first. */
+  menus: Menu[];
   /** Open service requests for this table ("one open request per table" state). */
   open_requests: OpenRequest[];
+}
+
+/** GET /api/v1/m/{restaurant_slug}/{menu_slug} — public browse, no table. */
+export interface BrowseSession {
+  restaurant: Restaurant;
+  theme: Theme;
+  menu: Menu;
 }
 
 export interface OrderLineInput {

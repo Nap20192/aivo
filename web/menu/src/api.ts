@@ -1,5 +1,5 @@
 import { demoSession } from "./fixtures";
-import type { OpenRequest, OrderInput, TableSession } from "./types";
+import type { BrowseSession, OpenRequest, OrderInput, TableSession } from "./types";
 
 const COOLDOWN_MS = 90_000;
 
@@ -16,8 +16,20 @@ export class ApiError extends Error {
 
 export interface Client {
   getSession(token: string): Promise<TableSession>;
+  getBrowse(restaurantSlug: string, menuSlug: string): Promise<BrowseSession>;
   submitOrder(token: string, order: OrderInput): Promise<void>;
   submitRequest(token: string, type: "waiter" | "bill"): Promise<OpenRequest>;
+}
+
+/** Tolerate a backend that still returns the pre-multi-menu flat `menu`. */
+export function normalizeSession(raw: TableSession & { menu?: unknown }): TableSession {
+  if (!raw.menus && Array.isArray(raw.menu)) {
+    return {
+      ...raw,
+      menus: [{ id: "default", slug: "menu", name: "Menu", is_default: true, categories: raw.menu }],
+    };
+  }
+  return raw;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -50,7 +62,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const httpClient: Client = {
-  getSession: (token) => request(`/api/v1/t/${encodeURIComponent(token)}`),
+  getSession: async (token) =>
+    normalizeSession(await request(`/api/v1/t/${encodeURIComponent(token)}`)),
+  getBrowse: (restaurantSlug, menuSlug) =>
+    request(`/api/v1/m/${encodeURIComponent(restaurantSlug)}/${encodeURIComponent(menuSlug)}`),
   submitOrder: (token, order) =>
     request(`/api/v1/t/${encodeURIComponent(token)}/orders`, {
       method: "POST",
@@ -78,6 +93,14 @@ export const mockClient: Client = {
       if (at) open.push({ type, created_at: at });
     }
     return { ...demoSession, open_requests: open };
+  },
+  async getBrowse(restaurantSlug, menuSlug) {
+    const menu =
+      restaurantSlug === demoSession.restaurant.slug
+        ? demoSession.menus.find((m) => m.slug === menuSlug)
+        : undefined;
+    if (!menu) throw new ApiError("not_found", "Unknown menu", 404);
+    return { restaurant: demoSession.restaurant, theme: demoSession.theme, menu };
   },
   async submitOrder(token) {
     const last = Number(sessionStorage.getItem(mockKey(token, "order-at")));

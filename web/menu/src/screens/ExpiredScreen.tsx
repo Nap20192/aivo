@@ -1,5 +1,20 @@
 import { Button, EmptyState } from "../ui";
 
+/** Browse mode: unknown restaurant or menu slug. */
+export function NotFoundScreen() {
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, display: "grid", placeItems: "center", padding: 20 }}>
+        <EmptyState
+          icon="utensils"
+          title="This menu doesn't exist"
+          message="Check the link, or ask the restaurant for a fresh one."
+        />
+      </div>
+    </div>
+  );
+}
+
 export function ExpiredScreen() {
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
