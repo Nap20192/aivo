@@ -179,10 +179,12 @@ const (
 	RequestBill ServiceRequestKind = "request_bill"
 )
 
-// Service request lifecycle states.
+// Service request lifecycle states. Dismissed is the POS "not doing
+// this" exit, distinct from acknowledged ("handled").
 const (
 	ServiceRequestPending      = "pending"
 	ServiceRequestAcknowledged = "acknowledged"
+	ServiceRequestDismissed    = "dismissed"
 )
 
 // ServiceRequest is a diner-initiated action with no items, e.g. "call

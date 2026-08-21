@@ -1,0 +1,253 @@
+// Package postgres implements pos ports.Store against Postgres.
+package postgres
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+
+	"aivo/internal/pos/domain"
+	"aivo/internal/pos/ports"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
+)
+
+type Store struct {
+	db *sql.DB
+}
+
+var _ ports.Store = (*Store)(nil)
+
+func NewStore(db *sql.DB) *Store { return &Store{db: db} }
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+const shiftCols = `id, restaurant_id, opened_by, opened_at, opening_float_cents, closed_at, declared_cents, expected_cents, variance_cents`
+
+func scanShift(row interface{ Scan(...any) error }) (domain.Shift, error) {
+	var s domain.Shift
+	err := row.Scan(&s.ID, &s.RestaurantID, &s.OpenedBy, &s.OpenedAt, &s.OpeningFloatCents,
+		&s.ClosedAt, &s.DeclaredCents, &s.ExpectedCents, &s.VarianceCents)
+	return s, err
+}
+
+func (s *Store) OpenShift(ctx context.Context, sh domain.Shift) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO shifts (id, restaurant_id, opened_by, opening_float_cents) VALUES ($1, $2, $3, $4)`,
+		sh.ID, sh.RestaurantID, sh.OpenedBy, sh.OpeningFloatCents)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return fmt.Errorf("shift already open: %w", ports.ErrConflict)
+		}
+		return fmt.Errorf("pos store: open shift: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) OpenShiftFor(ctx context.Context, restaurantID uuid.UUID) (domain.Shift, error) {
+	sh, err := scanShift(s.db.QueryRowContext(ctx,
+		`SELECT `+shiftCols+` FROM shifts WHERE restaurant_id = $1 AND closed_at IS NULL`, restaurantID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Shift{}, ports.ErrNotFound
+	}
+	if err != nil {
+		return domain.Shift{}, fmt.Errorf("pos store: open shift for: %w", err)
+	}
+	return sh, nil
+}
+
+func (s *Store) ShiftByID(ctx context.Context, restaurantID, id uuid.UUID) (domain.Shift, error) {
+	sh, err := scanShift(s.db.QueryRowContext(ctx,
+		`SELECT `+shiftCols+` FROM shifts WHERE restaurant_id = $1 AND id = $2`, restaurantID, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Shift{}, ports.ErrNotFound
+	}
+	if err != nil {
+		return domain.Shift{}, fmt.Errorf("pos store: shift by id: %w", err)
+	}
+	return sh, nil
+}
+
+// CloseShift posts the closing figures. The WHERE closed_at IS NULL
+// guard is what makes a posted close immutable — a second close (or a
+// concurrent one) matches zero rows and returns ErrConflict.
+func (s *Store) CloseShift(ctx context.Context, sh domain.Shift) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE shifts SET closed_at = $1, declared_cents = $2, expected_cents = $3, variance_cents = $4
+		 WHERE restaurant_id = $5 AND id = $6 AND closed_at IS NULL`,
+		sh.ClosedAt, sh.DeclaredCents, sh.ExpectedCents, sh.VarianceCents, sh.RestaurantID, sh.ID)
+	if err != nil {
+		return fmt.Errorf("pos store: close shift: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("shift already closed or not found: %w", ports.ErrConflict)
+	}
+	return nil
+}
+
+func (s *Store) OpenTicketForTable(ctx context.Context, restaurantID, tableID uuid.UUID) (domain.Ticket, error) {
+	var t domain.Ticket
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, restaurant_id, shift_id, table_id, status, created_at
+		 FROM tickets WHERE restaurant_id = $1 AND table_id = $2 AND status = $3`,
+		restaurantID, tableID, domain.TicketOpen,
+	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Ticket{}, ports.ErrNotFound
+	}
+	if err != nil {
+		return domain.Ticket{}, fmt.Errorf("pos store: open ticket for table: %w", err)
+	}
+	if err := s.attachLines(ctx, []*domain.Ticket{&t}); err != nil {
+		return domain.Ticket{}, err
+	}
+	return t, nil
+}
+
+func (s *Store) CreateTicket(ctx context.Context, t domain.Ticket) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO tickets (id, restaurant_id, shift_id, table_id, status) VALUES ($1, $2, $3, $4, $5)`,
+		t.ID, t.RestaurantID, t.ShiftID, t.TableID, domain.TicketOpen)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return fmt.Errorf("table already has an open ticket: %w", ports.ErrConflict)
+		}
+		return fmt.Errorf("pos store: create ticket: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) AddLines(ctx context.Context, ticketID uuid.UUID, lines []domain.TicketLine) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("pos store: add lines: begin: %w", err)
+	}
+	defer tx.Rollback()
+
+	for _, l := range lines {
+		opts, err := json.Marshal(l.Options)
+		if err != nil {
+			return fmt.Errorf("pos store: add lines: encode options: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO ticket_lines (id, ticket_id, menu_item_id, name, unit_price_cents, qty, options)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			l.ID, ticketID, l.MenuItemID, l.Name, l.UnitPriceCents, l.Qty, opts); err != nil {
+			return fmt.Errorf("pos store: add lines: %w", err)
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) TicketByID(ctx context.Context, restaurantID, id uuid.UUID) (domain.Ticket, error) {
+	var t domain.Ticket
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, restaurant_id, shift_id, table_id, status, created_at
+		 FROM tickets WHERE restaurant_id = $1 AND id = $2`, restaurantID, id,
+	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Ticket{}, ports.ErrNotFound
+	}
+	if err != nil {
+		return domain.Ticket{}, fmt.Errorf("pos store: ticket by id: %w", err)
+	}
+	if err := s.attachLines(ctx, []*domain.Ticket{&t}); err != nil {
+		return domain.Ticket{}, err
+	}
+	return t, nil
+}
+
+func (s *Store) FireTicket(ctx context.Context, restaurantID, id uuid.UUID) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE ticket_lines SET fired_at = now()
+		 WHERE fired_at IS NULL AND ticket_id IN (
+		   SELECT id FROM tickets WHERE restaurant_id = $1 AND id = $2
+		 )`, restaurantID, id)
+	if err != nil {
+		return fmt.Errorf("pos store: fire ticket: %w", err)
+	}
+	_ = res // zero unfired lines is fine (idempotent fire)
+	return nil
+}
+
+func (s *Store) TicketsForShift(ctx context.Context, restaurantID, shiftID uuid.UUID) ([]domain.Ticket, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, restaurant_id, shift_id, table_id, status, created_at
+		 FROM tickets WHERE restaurant_id = $1 AND shift_id = $2 ORDER BY created_at ASC`,
+		restaurantID, shiftID)
+	if err != nil {
+		return nil, fmt.Errorf("pos store: tickets for shift: %w", err)
+	}
+	defer rows.Close()
+
+	tickets := []*domain.Ticket{}
+	for rows.Next() {
+		var t domain.Ticket
+		if err := rows.Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.CreatedAt); err != nil {
+			return nil, fmt.Errorf("pos store: tickets for shift: scan: %w", err)
+		}
+		tickets = append(tickets, &t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := s.attachLines(ctx, tickets); err != nil {
+		return nil, err
+	}
+	out := make([]domain.Ticket, len(tickets))
+	for i, t := range tickets {
+		out[i] = *t
+	}
+	return out, nil
+}
+
+func (s *Store) CloseTickets(ctx context.Context, restaurantID, shiftID uuid.UUID) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE tickets SET status = $1 WHERE restaurant_id = $2 AND shift_id = $3 AND status = $4`,
+		domain.TicketClosed, restaurantID, shiftID, domain.TicketOpen)
+	if err != nil {
+		return fmt.Errorf("pos store: close tickets: %w", err)
+	}
+	return nil
+}
+
+// attachLines fills Lines for each ticket.
+// ponytail: one query per ticket — a shift has at most a few dozen
+// tickets; batch with a uuid[] param if this ever shows up in profiles.
+func (s *Store) attachLines(ctx context.Context, tickets []*domain.Ticket) error {
+	for _, t := range tickets {
+		t.Lines = []domain.TicketLine{}
+		rows, err := s.db.QueryContext(ctx,
+			`SELECT id, ticket_id, menu_item_id, name, unit_price_cents, qty, options, fired_at, created_at
+			 FROM ticket_lines WHERE ticket_id = $1 ORDER BY created_at ASC`, t.ID)
+		if err != nil {
+			return fmt.Errorf("pos store: lines: %w", err)
+		}
+		for rows.Next() {
+			var l domain.TicketLine
+			var opts []byte
+			if err := rows.Scan(&l.ID, &l.TicketID, &l.MenuItemID, &l.Name, &l.UnitPriceCents, &l.Qty, &opts, &l.FiredAt, &l.CreatedAt); err != nil {
+				rows.Close()
+				return fmt.Errorf("pos store: lines: scan: %w", err)
+			}
+			if err := json.Unmarshal(opts, &l.Options); err != nil {
+				rows.Close()
+				return fmt.Errorf("pos store: lines: decode options: %w", err)
+			}
+			t.Lines = append(t.Lines, l)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return err
+		}
+		rows.Close()
+	}
+	return nil
+}
