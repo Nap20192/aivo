@@ -48,7 +48,7 @@ CREATE TABLE subscriptions (
 ALTER TABLE restaurants
     ADD COLUMN org_id   uuid REFERENCES organizations (id) ON DELETE CASCADE,
     ADD COLUMN address  text NOT NULL DEFAULT '',
-    ADD COLUMN hours    text NOT NULL DEFAULT '',
+    ADD COLUMN hours    jsonb NOT NULL DEFAULT '[]'::jsonb, -- [{label, open, close}]
     ADD COLUMN contacts jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX restaurants_org_id_idx ON restaurants (org_id);

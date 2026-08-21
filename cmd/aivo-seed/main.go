@@ -84,6 +84,20 @@ func run() error {
 		return fmt.Errorf("seed: waiter: %w", err)
 	}
 
+	// Settings matching the admin prototype fixtures.
+	address := "14 Rue des Bouchers"
+	phone := "02 512 33 74"
+	instagram := "@emberandbone"
+	hours := []platformdomain.HoursRow{
+		{Label: "Kitchen", Open: "17:00", Close: "22:30"},
+		{Label: "Bar", Open: "17:00", Close: "00:00"},
+	}
+	if _, err := platform.UpdateRestaurant(ctx, owner.OrgID, rest.ID, platformapp.RestaurantPatch{
+		Address: &address, Phone: &phone, Instagram: &instagram, Hours: &hours,
+	}); err != nil {
+		return fmt.Errorf("seed: restaurant settings: %w", err)
+	}
+
 	// Theme: the prototype's restaurant config (accent drives themeVars
 	// in the menu app).
 	theme, _ := json.Marshal(map[string]any{

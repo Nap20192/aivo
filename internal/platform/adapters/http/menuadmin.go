@@ -16,6 +16,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// Shapes here match the admin client (web/admin/src/api/types.ts): bare
+// arrays for lists, option groups as {name, type: single|multi, choices}.
+
 // --- Categories --------------------------------------------------------
 
 type categoryView struct {
@@ -33,12 +36,12 @@ func (h *handler) listCategories(w http.ResponseWriter, r *http.Request, _ domai
 	for i, c := range cats {
 		views[i] = categoryView{ID: c.ID, Name: c.Name, Position: c.Position}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"categories": views})
+	writeJSON(w, http.StatusOK, views)
 }
 
 type categoryRequest struct {
 	Name     string `json:"name"`
-	Position int    `json:"position"`
+	Position *int   `json:"position"`
 }
 
 func (h *handler) createCategory(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
@@ -50,7 +53,22 @@ func (h *handler) createCategory(w http.ResponseWriter, r *http.Request, _ domai
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", "name is required")
 		return
 	}
-	c := menudomain.Category{ID: uuid.New(), RestaurantID: rest.ID, Name: strings.TrimSpace(req.Name), Position: req.Position}
+	position := 0
+	if req.Position != nil {
+		position = *req.Position
+	} else {
+		// Default: append after the existing categories.
+		cats, _, err := h.Menu.Menu(r.Context(), rest.ID)
+		if writeAppErr(w, err) {
+			return
+		}
+		for _, c := range cats {
+			if c.Position >= position {
+				position = c.Position + 1
+			}
+		}
+	}
+	c := menudomain.Category{ID: uuid.New(), RestaurantID: rest.ID, Name: strings.TrimSpace(req.Name), Position: position}
 	if writeAppErr(w, h.MenuAdmin.CreateCategory(r.Context(), c)) {
 		return
 	}
@@ -63,19 +81,43 @@ func (h *handler) updateCategory(w http.ResponseWriter, r *http.Request, _ domai
 		writeErr(w, http.StatusNotFound, "not_found", "not found")
 		return
 	}
-	var req categoryRequest
+	// Partial patch: start from the current row.
+	cats, _, err := h.Menu.Menu(r.Context(), rest.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+	var current *menudomain.Category
+	for i := range cats {
+		if cats[i].ID == id {
+			current = &cats[i]
+			break
+		}
+	}
+	if current == nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	var req struct {
+		Name     *string `json:"name"`
+		Position *int    `json:"position"`
+	}
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if strings.TrimSpace(req.Name) == "" {
-		writeErr(w, http.StatusUnprocessableEntity, "invalid", "name is required")
+	if req.Name != nil {
+		if strings.TrimSpace(*req.Name) == "" {
+			writeErr(w, http.StatusUnprocessableEntity, "invalid", "name cannot be empty")
+			return
+		}
+		current.Name = strings.TrimSpace(*req.Name)
+	}
+	if req.Position != nil {
+		current.Position = *req.Position
+	}
+	if writeAppErr(w, h.MenuAdmin.UpdateCategory(r.Context(), *current)) {
 		return
 	}
-	c := menudomain.Category{ID: id, RestaurantID: rest.ID, Name: strings.TrimSpace(req.Name), Position: req.Position}
-	if writeAppErr(w, h.MenuAdmin.UpdateCategory(r.Context(), c)) {
-		return
-	}
-	writeJSON(w, http.StatusOK, categoryView{ID: c.ID, Name: c.Name, Position: c.Position})
+	writeJSON(w, http.StatusOK, categoryView{ID: current.ID, Name: current.Name, Position: current.Position})
 }
 
 func (h *handler) deleteCategory(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
@@ -87,88 +129,22 @@ func (h *handler) deleteCategory(w http.ResponseWriter, r *http.Request, _ domai
 	if writeAppErr(w, h.MenuAdmin.DeleteCategory(r.Context(), rest.ID, id)) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- Items -------------------------------------------------------------
 
-type optionRequest struct {
-	Label           string `json:"label"`
-	PriceDeltaCents int    `json:"price_delta_cents"`
-}
-
-type optionGroupRequest struct {
-	Name    string          `json:"name"`
-	Multi   bool            `json:"multi"`
-	Options []optionRequest `json:"options"`
-}
-
-type itemRequest struct {
-	CategoryID   uuid.UUID            `json:"category_id"`
-	Name         string               `json:"name"`
-	Description  string               `json:"description"`
-	PriceCents   int                  `json:"price_cents"`
-	ImageURL     string               `json:"image_url"`
-	Allergens    []string             `json:"allergens"`
-	OptionGroups []optionGroupRequest `json:"option_groups"`
-	Available    *bool                `json:"available"`
-}
-
-func (req itemRequest) toDomain(restaurantID, id uuid.UUID) (menudomain.MenuItem, error) {
-	if strings.TrimSpace(req.Name) == "" {
-		return menudomain.MenuItem{}, fmt.Errorf("name is required")
-	}
-	if req.CategoryID == uuid.Nil {
-		return menudomain.MenuItem{}, fmt.Errorf("category_id is required")
-	}
-	if req.PriceCents < 0 {
-		return menudomain.MenuItem{}, fmt.Errorf("price_cents must be >= 0")
-	}
-	allergens := make([]menudomain.Allergen, 0, len(req.Allergens))
-	for _, a := range req.Allergens {
-		al := menudomain.Allergen(a)
-		if !menudomain.ValidAllergen(al) {
-			return menudomain.MenuItem{}, fmt.Errorf("unknown allergen %q", a)
-		}
-		allergens = append(allergens, al)
-	}
-	groups := make([]menudomain.OptionGroup, 0, len(req.OptionGroups))
-	for _, g := range req.OptionGroups {
-		if strings.TrimSpace(g.Name) == "" {
-			return menudomain.MenuItem{}, fmt.Errorf("option group name is required")
-		}
-		opts := make([]menudomain.Option, 0, len(g.Options))
-		for _, o := range g.Options {
-			if strings.TrimSpace(o.Label) == "" {
-				return menudomain.MenuItem{}, fmt.Errorf("option label is required")
-			}
-			opts = append(opts, menudomain.Option{ID: uuid.New(), Label: o.Label, PriceDeltaCents: o.PriceDeltaCents})
-		}
-		groups = append(groups, menudomain.OptionGroup{ID: uuid.New(), Name: g.Name, Multi: g.Multi, Options: opts})
-	}
-	available := true
-	if req.Available != nil {
-		available = *req.Available
-	}
-	return menudomain.MenuItem{
-		ID: id, RestaurantID: restaurantID, CategoryID: req.CategoryID,
-		Name: strings.TrimSpace(req.Name), Description: req.Description,
-		PriceCents: req.PriceCents, ImageURL: req.ImageURL,
-		Allergens: allergens, Available: available, OptionGroups: groups,
-	}, nil
-}
-
-type optionView struct {
+type choiceView struct {
 	ID              uuid.UUID `json:"id"`
-	Label           string    `json:"label"`
+	Name            string    `json:"name"`
 	PriceDeltaCents int       `json:"price_delta_cents"`
 }
 
 type optionGroupView struct {
 	ID      uuid.UUID    `json:"id"`
 	Name    string       `json:"name"`
-	Multi   bool         `json:"multi"`
-	Options []optionView `json:"options"`
+	Type    string       `json:"type"` // "single" | "multi"
+	Choices []choiceView `json:"choices"`
 }
 
 type itemView struct {
@@ -179,8 +155,8 @@ type itemView struct {
 	PriceCents   int               `json:"price_cents"`
 	ImageURL     string            `json:"image_url"`
 	Allergens    []string          `json:"allergens"`
-	Available    bool              `json:"available"`
 	OptionGroups []optionGroupView `json:"option_groups"`
+	Available    bool              `json:"available"`
 }
 
 func toItemView(it menudomain.MenuItem) itemView {
@@ -190,17 +166,102 @@ func toItemView(it menudomain.MenuItem) itemView {
 	}
 	groups := make([]optionGroupView, len(it.OptionGroups))
 	for i, g := range it.OptionGroups {
-		opts := make([]optionView, len(g.Options))
-		for j, o := range g.Options {
-			opts[j] = optionView{ID: o.ID, Label: o.Label, PriceDeltaCents: o.PriceDeltaCents}
+		typ := "single"
+		if g.Multi {
+			typ = "multi"
 		}
-		groups[i] = optionGroupView{ID: g.ID, Name: g.Name, Multi: g.Multi, Options: opts}
+		choices := make([]choiceView, len(g.Options))
+		for j, o := range g.Options {
+			choices[j] = choiceView{ID: o.ID, Name: o.Label, PriceDeltaCents: o.PriceDeltaCents}
+		}
+		groups[i] = optionGroupView{ID: g.ID, Name: g.Name, Type: typ, Choices: choices}
 	}
 	return itemView{
 		ID: it.ID, CategoryID: it.CategoryID, Name: it.Name, Description: it.Description,
 		PriceCents: it.PriceCents, ImageURL: it.ImageURL, Allergens: allergens,
-		Available: it.Available, OptionGroups: groups,
+		OptionGroups: groups, Available: it.Available,
 	}
+}
+
+// itemPatch is Partial<MenuItem> from the admin client; nil = keep.
+type itemPatch struct {
+	CategoryID  *uuid.UUID `json:"category_id"`
+	Name        *string    `json:"name"`
+	Description *string    `json:"description"`
+	PriceCents  *int       `json:"price_cents"`
+	ImageURL    *string    `json:"image_url"`
+	Allergens   *[]string  `json:"allergens"`
+	OptionGroups *[]struct {
+		Name    string `json:"name"`
+		Type    string `json:"type"`
+		Choices []struct {
+			Name            string `json:"name"`
+			PriceDeltaCents int    `json:"price_delta_cents"`
+		} `json:"choices"`
+	} `json:"option_groups"`
+	Available *bool `json:"available"`
+}
+
+// apply merges the patch into it, validating as it goes.
+func (p itemPatch) apply(it *menudomain.MenuItem) error {
+	if p.CategoryID != nil {
+		if *p.CategoryID == uuid.Nil {
+			return fmt.Errorf("category_id is required")
+		}
+		it.CategoryID = *p.CategoryID
+	}
+	if p.Name != nil {
+		if strings.TrimSpace(*p.Name) == "" {
+			return fmt.Errorf("name cannot be empty")
+		}
+		it.Name = strings.TrimSpace(*p.Name)
+	}
+	if p.Description != nil {
+		it.Description = *p.Description
+	}
+	if p.PriceCents != nil {
+		if *p.PriceCents < 0 {
+			return fmt.Errorf("price_cents must be >= 0")
+		}
+		it.PriceCents = *p.PriceCents
+	}
+	if p.ImageURL != nil {
+		it.ImageURL = *p.ImageURL
+	}
+	if p.Allergens != nil {
+		allergens := make([]menudomain.Allergen, 0, len(*p.Allergens))
+		for _, a := range *p.Allergens {
+			al := menudomain.Allergen(a)
+			if !menudomain.ValidAllergen(al) {
+				return fmt.Errorf("unknown allergen %q", a)
+			}
+			allergens = append(allergens, al)
+		}
+		it.Allergens = allergens
+	}
+	if p.OptionGroups != nil {
+		groups := make([]menudomain.OptionGroup, 0, len(*p.OptionGroups))
+		for _, g := range *p.OptionGroups {
+			if strings.TrimSpace(g.Name) == "" {
+				return fmt.Errorf("option group name is required")
+			}
+			opts := make([]menudomain.Option, 0, len(g.Choices))
+			for _, c := range g.Choices {
+				if strings.TrimSpace(c.Name) == "" {
+					return fmt.Errorf("option choice name is required")
+				}
+				opts = append(opts, menudomain.Option{ID: uuid.New(), Label: c.Name, PriceDeltaCents: c.PriceDeltaCents})
+			}
+			groups = append(groups, menudomain.OptionGroup{
+				ID: uuid.New(), Name: g.Name, Multi: g.Type == "multi", Options: opts,
+			})
+		}
+		it.OptionGroups = groups
+	}
+	if p.Available != nil {
+		it.Available = *p.Available
+	}
+	return nil
 }
 
 func (h *handler) listItems(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
@@ -212,17 +273,21 @@ func (h *handler) listItems(w http.ResponseWriter, r *http.Request, _ domain.Use
 	for i, it := range items {
 		views[i] = toItemView(it)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": views})
+	writeJSON(w, http.StatusOK, views)
 }
 
 func (h *handler) createItem(w http.ResponseWriter, r *http.Request, u domain.User, rest domain.Restaurant) {
-	var req itemRequest
-	if !decodeJSON(w, r, &req) {
+	var patch itemPatch
+	if !decodeJSON(w, r, &patch) {
 		return
 	}
-	it, err := req.toDomain(rest.ID, uuid.New())
-	if err != nil {
+	it := menudomain.MenuItem{ID: uuid.New(), RestaurantID: rest.ID, Available: true}
+	if err := patch.apply(&it); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
+		return
+	}
+	if it.Name == "" || it.CategoryID == uuid.Nil {
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", "name and category_id are required")
 		return
 	}
 
@@ -254,12 +319,15 @@ func (h *handler) updateItem(w http.ResponseWriter, r *http.Request, _ domain.Us
 		writeErr(w, http.StatusNotFound, "not_found", "not found")
 		return
 	}
-	var req itemRequest
-	if !decodeJSON(w, r, &req) {
+	it, err := h.MenuAdmin.MenuItemByID(r.Context(), rest.ID, id)
+	if writeAppErr(w, err) {
 		return
 	}
-	it, err := req.toDomain(rest.ID, id)
-	if err != nil {
+	var patch itemPatch
+	if !decodeJSON(w, r, &patch) {
+		return
+	}
+	if err := patch.apply(&it); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
 		return
 	}
@@ -278,7 +346,7 @@ func (h *handler) deleteItem(w http.ResponseWriter, r *http.Request, _ domain.Us
 	if writeAppErr(w, h.MenuAdmin.DeleteMenuItem(r.Context(), rest.ID, id)) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- Tables ------------------------------------------------------------
@@ -318,7 +386,7 @@ func (h *handler) listTables(w http.ResponseWriter, r *http.Request, _ domain.Us
 	for i, t := range tables {
 		views[i] = h.toTableView(rest, t)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tables": views})
+	writeJSON(w, http.StatusOK, views)
 }
 
 func (h *handler) createTable(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {

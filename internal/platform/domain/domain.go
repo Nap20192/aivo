@@ -148,6 +148,14 @@ func (s *Subscription) Transition(next SubscriptionStatus) error {
 	return fmt.Errorf("%w: %s -> %s", ErrInvalidTransition, s.Status, next)
 }
 
+// HoursRow is one opening-hours line (e.g. Kitchen 17:00–22:30). Shape
+// matches the admin client (web/admin/src/api/types.ts).
+type HoursRow struct {
+	Label string `json:"label"`
+	Open  string `json:"open"`
+	Close string `json:"close"`
+}
+
 // Restaurant is the platform view of an operational tenant: provisioning
 // and settings. The Menu context holds its own narrower view of the same
 // row (id, slug, name).
@@ -157,8 +165,8 @@ type Restaurant struct {
 	Slug      string
 	Name      string
 	Address   string
-	Hours     string
-	Contacts  map[string]string // e.g. "phone", "email", "instagram"
+	Hours     []HoursRow
+	Contacts  map[string]string // e.g. "phone", "instagram", "map_url"
 	CreatedAt time.Time
 }
 

@@ -60,6 +60,18 @@ type Store interface {
 	Theme(ctx context.Context, restaurantID uuid.UUID) (domain.Theme, error)
 	SaveTheme(ctx context.Context, t domain.Theme) error
 
+	// CustomDomainForRestaurant returns the restaurant's custom domain,
+	// "" if none.
+	CustomDomainForRestaurant(ctx context.Context, restaurantID uuid.UUID) (string, error)
+	// SetCustomDomain claims host for the restaurant ("" removes the
+	// claim). Returns ErrConflict if another restaurant holds it.
+	SetCustomDomain(ctx context.Context, restaurantID uuid.UUID, host string) error
+
+	// RestaurantByID is the org-unscoped lookup for server-side
+	// composition of public pages (diner entry) — never expose it on an
+	// org-authenticated path; those use Restaurant(orgID, id).
+	RestaurantByID(ctx context.Context, id uuid.UUID) (domain.Restaurant, error)
+
 	// RestaurantIDByDomain resolves a verified custom domain to its
 	// restaurant, for Host-header routing.
 	RestaurantIDByDomain(ctx context.Context, host string) (uuid.UUID, error)

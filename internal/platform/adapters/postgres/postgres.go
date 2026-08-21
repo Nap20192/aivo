@@ -223,10 +223,13 @@ const restCols = `id, org_id, slug, name, address, hours, contacts, created_at`
 
 func scanRestaurant(row interface{ Scan(...any) error }) (domain.Restaurant, error) {
 	var r domain.Restaurant
-	var contacts []byte
-	err := row.Scan(&r.ID, &r.OrgID, &r.Slug, &r.Name, &r.Address, &r.Hours, &contacts, &r.CreatedAt)
+	var hours, contacts []byte
+	err := row.Scan(&r.ID, &r.OrgID, &r.Slug, &r.Name, &r.Address, &hours, &contacts, &r.CreatedAt)
 	if err != nil {
 		return r, err
+	}
+	if err := json.Unmarshal(hours, &r.Hours); err != nil {
+		return r, fmt.Errorf("decode hours: %w", err)
 	}
 	if err := json.Unmarshal(contacts, &r.Contacts); err != nil {
 		return r, fmt.Errorf("decode contacts: %w", err)
@@ -234,15 +237,26 @@ func scanRestaurant(row interface{ Scan(...any) error }) (domain.Restaurant, err
 	return r, nil
 }
 
+func encodeHours(h []domain.HoursRow) ([]byte, error) {
+	if h == nil {
+		h = []domain.HoursRow{}
+	}
+	return json.Marshal(h)
+}
+
 func (s *Store) CreateRestaurant(ctx context.Context, r domain.Restaurant) error {
 	contacts, err := json.Marshal(orEmpty(r.Contacts))
 	if err != nil {
 		return fmt.Errorf("store: create restaurant: encode contacts: %w", err)
 	}
+	hours, err := encodeHours(r.Hours)
+	if err != nil {
+		return fmt.Errorf("store: create restaurant: encode hours: %w", err)
+	}
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO restaurants (id, org_id, slug, name, address, hours, contacts)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		r.ID, r.OrgID, r.Slug, r.Name, r.Address, r.Hours, contacts)
+		r.ID, r.OrgID, r.Slug, r.Name, r.Address, hours, contacts)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return fmt.Errorf("slug taken: %w", ports.ErrConflict)
@@ -290,15 +304,32 @@ func (s *Store) Restaurant(ctx context.Context, orgID, id uuid.UUID) (domain.Res
 	return r, nil
 }
 
+func (s *Store) RestaurantByID(ctx context.Context, id uuid.UUID) (domain.Restaurant, error) {
+	r, err := scanRestaurant(s.db.QueryRowContext(ctx,
+		`SELECT id, COALESCE(org_id, '00000000-0000-0000-0000-000000000000'), slug, name, address, hours, contacts, created_at
+		 FROM restaurants WHERE id = $1`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Restaurant{}, ports.ErrNotFound
+	}
+	if err != nil {
+		return domain.Restaurant{}, fmt.Errorf("store: restaurant by id: %w", err)
+	}
+	return r, nil
+}
+
 func (s *Store) UpdateRestaurant(ctx context.Context, r domain.Restaurant) error {
 	contacts, err := json.Marshal(orEmpty(r.Contacts))
 	if err != nil {
 		return fmt.Errorf("store: update restaurant: encode contacts: %w", err)
 	}
+	hours, err := encodeHours(r.Hours)
+	if err != nil {
+		return fmt.Errorf("store: update restaurant: encode hours: %w", err)
+	}
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE restaurants SET slug = $1, name = $2, address = $3, hours = $4, contacts = $5
 		 WHERE org_id = $6 AND id = $7`,
-		r.Slug, r.Name, r.Address, r.Hours, contacts, r.OrgID, r.ID)
+		r.Slug, r.Name, r.Address, hours, contacts, r.OrgID, r.ID)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return fmt.Errorf("slug taken: %w", ports.ErrConflict)
@@ -346,6 +377,43 @@ func (s *Store) SaveTheme(ctx context.Context, t domain.Theme) error {
 		t.RestaurantID, []byte(t.ThemeJSON), t.DesignMD)
 	if err != nil {
 		return fmt.Errorf("store: save theme: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) CustomDomainForRestaurant(ctx context.Context, restaurantID uuid.UUID) (string, error) {
+	var d string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT domain FROM custom_domains WHERE restaurant_id = $1 ORDER BY created_at DESC LIMIT 1`,
+		restaurantID).Scan(&d)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("store: custom domain: %w", err)
+	}
+	return d, nil
+}
+
+// SetCustomDomain claims host for the restaurant, replacing any previous
+// claim. verified_at is set immediately — v1 has no DNS verification or
+// cert automation (documented stub, see docs/PLATFORM.md).
+func (s *Store) SetCustomDomain(ctx context.Context, restaurantID uuid.UUID, host string) error {
+	if _, err := s.db.ExecContext(ctx,
+		`DELETE FROM custom_domains WHERE restaurant_id = $1`, restaurantID); err != nil {
+		return fmt.Errorf("store: set custom domain: clear: %w", err)
+	}
+	if host == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO custom_domains (domain, restaurant_id, verified_at) VALUES ($1, $2, now())`,
+		host, restaurantID)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return fmt.Errorf("domain taken: %w", ports.ErrConflict)
+		}
+		return fmt.Errorf("store: set custom domain: %w", err)
 	}
 	return nil
 }

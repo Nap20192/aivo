@@ -299,6 +299,27 @@ func (s *PostgresStore) PendingServiceRequests(ctx context.Context, restaurantID
 	return reqs, rows.Err()
 }
 
+func (s *PostgresStore) PendingServiceRequestsForTable(ctx context.Context, restaurantID, tableID uuid.UUID) ([]domain.ServiceRequest, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, restaurant_id, table_id, kind, status, created_at
+		 FROM service_requests WHERE restaurant_id = $1 AND table_id = $2 AND status = $3
+		 ORDER BY created_at ASC`, restaurantID, tableID, domain.ServiceRequestPending)
+	if err != nil {
+		return nil, fmt.Errorf("store: pending requests for table: %w", err)
+	}
+	defer rows.Close()
+
+	reqs := []domain.ServiceRequest{}
+	for rows.Next() {
+		var r domain.ServiceRequest
+		if err := rows.Scan(&r.ID, &r.RestaurantID, &r.TableID, &r.Kind, &r.Status, &r.CreatedAt); err != nil {
+			return nil, fmt.Errorf("store: pending requests for table: scan: %w", err)
+		}
+		reqs = append(reqs, r)
+	}
+	return reqs, rows.Err()
+}
+
 func (s *PostgresStore) SetServiceRequestStatus(ctx context.Context, restaurantID, id uuid.UUID, status string) error {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE service_requests SET status = $1 WHERE id = $2 AND restaurant_id = $3`,

@@ -15,8 +15,12 @@ import (
 // periodic sweep (or an LRU cap) if that ever shows up as real memory
 // growth.
 
+// OrderDebounceSeconds is the diner order cooldown, exported so the HTTP
+// layer can emit Retry-After / retry_after_seconds on 429s.
+const OrderDebounceSeconds = 30
+
 const (
-	orderDebounce     = 30 * time.Second
+	orderDebounce     = OrderDebounceSeconds * time.Second
 	serviceRequestTTL = 2 * time.Minute
 	ipWindow          = time.Minute
 	ipLimit           = 20

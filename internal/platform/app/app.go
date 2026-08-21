@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
+	"regexp"
 	"strings"
 	"time"
 
@@ -316,14 +317,19 @@ func (a *App) CreateRestaurant(ctx context.Context, orgID uuid.UUID, name, slug 
 	return a.store.Restaurant(ctx, orgID, r.ID)
 }
 
-// UpdateRestaurant patches settings; zero-value fields in patch keep the
-// current value (the HTTP adapter passes only what the client sent).
+// RestaurantPatch carries a partial update; nil fields keep the current
+// value (the HTTP adapter passes only what the client sent). Phone and
+// Instagram live in the contacts map but patch as flat fields, matching
+// the admin client's Restaurant shape.
 type RestaurantPatch struct {
-	Slug     *string
-	Name     *string
-	Address  *string
-	Hours    *string
-	Contacts map[string]string
+	Slug         *string
+	Name         *string
+	Address      *string
+	Hours        *[]domain.HoursRow
+	Phone        *string
+	Instagram    *string
+	Contacts     map[string]string
+	CustomDomain *string
 }
 
 func (a *App) UpdateRestaurant(ctx context.Context, orgID, id uuid.UUID, patch RestaurantPatch) (domain.Restaurant, error) {
@@ -347,15 +353,56 @@ func (a *App) UpdateRestaurant(ctx context.Context, orgID, id uuid.UUID, patch R
 		r.Address = *patch.Address
 	}
 	if patch.Hours != nil {
+		if len(*patch.Hours) > 20 {
+			return domain.Restaurant{}, fmt.Errorf("%w: too many hours rows", ErrInvalid)
+		}
 		r.Hours = *patch.Hours
 	}
 	if patch.Contacts != nil {
 		r.Contacts = patch.Contacts
 	}
+	if r.Contacts == nil {
+		r.Contacts = map[string]string{}
+	}
+	if patch.Phone != nil {
+		r.Contacts["phone"] = *patch.Phone
+	}
+	if patch.Instagram != nil {
+		r.Contacts["instagram"] = *patch.Instagram
+	}
 	if err := a.store.UpdateRestaurant(ctx, r); err != nil {
 		return domain.Restaurant{}, err
 	}
+	if patch.CustomDomain != nil {
+		host := strings.ToLower(strings.TrimSpace(*patch.CustomDomain))
+		if host != "" && !validHostname(host) {
+			return domain.Restaurant{}, fmt.Errorf("%w: invalid custom domain", ErrInvalid)
+		}
+		if err := a.store.SetCustomDomain(ctx, r.ID, host); err != nil {
+			return domain.Restaurant{}, err
+		}
+	}
 	return r, nil
+}
+
+var hostnameRe = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`)
+
+func validHostname(h string) bool { return len(h) <= 253 && hostnameRe.MatchString(h) }
+
+// CustomDomain returns the restaurant's claimed custom domain, "" if none.
+func (a *App) CustomDomain(ctx context.Context, restaurantID uuid.UUID) (string, error) {
+	return a.store.CustomDomainForRestaurant(ctx, restaurantID)
+}
+
+// RestaurantPublic is the org-unscoped lookup for public composition
+// (diner entry). Never use it on org-authenticated paths.
+func (a *App) RestaurantPublic(ctx context.Context, id uuid.UUID) (domain.Restaurant, error) {
+	return a.store.RestaurantByID(ctx, id)
+}
+
+// User resolves a user by ID (POS cashier display).
+func (a *App) User(ctx context.Context, id uuid.UUID) (domain.User, error) {
+	return a.store.UserByID(ctx, id)
 }
 
 // --- Theme -------------------------------------------------------------
@@ -384,13 +431,23 @@ func (a *App) Staff(ctx context.Context, orgID, restaurantID uuid.UUID) ([]domai
 }
 
 // AddStaff creates a manager/waiter account scoped to the restaurant.
-// (Owners are created only via Register.)
+// (Owners are created only via Register.) An empty password creates an
+// "invited" account with an unguessable random password — no invite
+// email exists yet, so the owner shares credentials out of band or the
+// account stays unusable until a future invite/reset flow.
 func (a *App) AddStaff(ctx context.Context, orgID, restaurantID uuid.UUID, email, password string, role domain.Role) (domain.User, error) {
 	if role != domain.RoleManager && role != domain.RoleWaiter {
 		return domain.User{}, fmt.Errorf("%w: role must be manager or waiter", ErrInvalid)
 	}
 	if !validEmail(email) {
 		return domain.User{}, fmt.Errorf("%w: invalid email", ErrInvalid)
+	}
+	if password == "" {
+		random, err := newToken()
+		if err != nil {
+			return domain.User{}, err
+		}
+		password = random
 	}
 	if len(password) < 8 {
 		return domain.User{}, fmt.Errorf("%w: password must be at least 8 characters", ErrInvalid)

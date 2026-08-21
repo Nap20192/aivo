@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"aivo/internal/platform/app"
@@ -90,13 +91,45 @@ func setSessionCookie(w http.ResponseWriter, token string, ttl time.Duration) {
 type userView struct {
 	ID           uuid.UUID  `json:"id"`
 	OrgID        uuid.UUID  `json:"org_id"`
+	Name         string     `json:"name"` // display name: email local part (no name field yet)
 	Email        string     `json:"email"`
 	Role         string     `json:"role"`
 	RestaurantID *uuid.UUID `json:"restaurant_id"`
 }
 
 func toUserView(u domain.User) userView {
-	return userView{ID: u.ID, OrgID: u.OrgID, Email: u.Email, Role: string(u.Role), RestaurantID: u.RestaurantID}
+	return userView{ID: u.ID, OrgID: u.OrgID, Name: displayName(u.Email), Email: u.Email, Role: string(u.Role), RestaurantID: u.RestaurantID}
+}
+
+// displayName derives a human label from an email until users get a
+// real name field ("owner@ember.test" -> "owner").
+func displayName(email string) string {
+	if i := strings.Index(email, "@"); i > 0 {
+		return email[:i]
+	}
+	return email
+}
+
+// meResponse is the auth payload: a superset of the admin client's Me
+// ({user, org, restaurants}) and the POS client's Me ({user, restaurant}).
+func (h *handler) meResponse(r *http.Request, u domain.User) (map[string]any, error) {
+	org, err := h.Platform.Organization(r.Context(), u.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	rests, err := h.restaurantViews(r, u)
+	if err != nil {
+		return nil, err
+	}
+	resp := map[string]any{
+		"user":        toUserView(u),
+		"org":         map[string]any{"id": org.ID, "name": org.Name},
+		"restaurants": rests,
+	}
+	if len(rests) > 0 {
+		resp["restaurant"] = map[string]any{"id": rests[0].ID, "name": rests[0].Name}
+	}
+	return resp, nil
 }
 
 // --- Handlers ----------------------------------------------------------
@@ -116,7 +149,11 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setSessionCookie(w, token, app.SessionTTL)
-	writeJSON(w, http.StatusCreated, map[string]any{"user": toUserView(u)})
+	resp, err := h.meResponse(r, u)
+	if writeAppErr(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 func (h *handler) login(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +169,11 @@ func (h *handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setSessionCookie(w, token, app.SessionTTL)
-	writeJSON(w, http.StatusOK, map[string]any{"user": toUserView(u)})
+	resp, err := h.meResponse(r, u)
+	if writeAppErr(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *handler) logout(w http.ResponseWriter, r *http.Request) {
@@ -147,5 +188,9 @@ func (h *handler) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) me(w http.ResponseWriter, r *http.Request, u domain.User) {
-	writeJSON(w, http.StatusOK, map[string]any{"user": toUserView(u)})
+	resp, err := h.meResponse(r, u)
+	if writeAppErr(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
 }

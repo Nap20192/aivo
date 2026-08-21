@@ -10,6 +10,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 
 	menuapp "aivo/internal/menu/app"
 	menudomain "aivo/internal/menu/domain"
@@ -18,6 +19,7 @@ import (
 	platformports "aivo/internal/platform/ports"
 	posapp "aivo/internal/pos/app"
 	posports "aivo/internal/pos/ports"
+	"aivo/pkg/session"
 )
 
 // SessionCookie is the platform login cookie (HttpOnly, server-side
@@ -106,8 +108,9 @@ func NewMux(d Deps) http.Handler {
 // --- JSON + error helpers ----------------------------------------------
 
 type apiError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code              string `json:"code"`
+	Message           string `json:"message"`
+	RetryAfterSeconds int    `json:"retry_after_seconds,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -159,9 +162,15 @@ func writeAppErr(w http.ResponseWriter, err error) bool {
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
 	case errors.Is(err, posapp.ErrNoOpenShift):
 		writeErr(w, http.StatusUnprocessableEntity, "no_open_shift", err.Error())
-	case errors.Is(err, menuapp.ErrOrderRateLimited),
-		errors.Is(err, menuapp.ErrServiceRequestAlreadyOpen):
-		writeErr(w, http.StatusTooManyRequests, "rate_limited", err.Error())
+	case errors.Is(err, menuapp.ErrServiceRequestAlreadyOpen):
+		// Duplicate open request for the table: 409 per the menu client
+		// contract (it renders the existing open-request state).
+		writeErr(w, http.StatusConflict, "already_open", err.Error())
+	case errors.Is(err, menuapp.ErrOrderRateLimited):
+		w.Header().Set("Retry-After", strconv.Itoa(session.OrderDebounceSeconds))
+		writeJSON(w, http.StatusTooManyRequests, map[string]apiError{"error": {
+			Code: "rate_limited", Message: err.Error(), RetryAfterSeconds: session.OrderDebounceSeconds,
+		}})
 	default:
 		log.Printf("api: %v", err)
 		writeErr(w, http.StatusInternalServerError, "internal", "internal error")

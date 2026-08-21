@@ -92,6 +92,22 @@ func (s *Store) CloseShift(ctx context.Context, sh domain.Shift) error {
 	return nil
 }
 
+func (s *Store) ShiftSequence(ctx context.Context, restaurantID, shiftID uuid.UUID) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT count(*) FROM shifts
+		 WHERE restaurant_id = $1
+		   AND opened_at <= (SELECT opened_at FROM shifts WHERE restaurant_id = $1 AND id = $2)`,
+		restaurantID, shiftID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("pos store: shift sequence: %w", err)
+	}
+	if n == 0 {
+		return 0, ports.ErrNotFound
+	}
+	return n, nil
+}
+
 func (s *Store) OpenTicketForTable(ctx context.Context, restaurantID, tableID uuid.UUID) (domain.Ticket, error) {
 	var t domain.Ticket
 	err := s.db.QueryRowContext(ctx,

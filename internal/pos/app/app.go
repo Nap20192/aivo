@@ -34,9 +34,14 @@ func New(store ports.Store, menu ports.Menu) *App {
 // table with its open ticket (nil if none), and pending service
 // requests. Polled by the POS app every ~5s.
 type State struct {
-	Shift    *domain.Shift
-	Tables   []TableState
-	Requests []menudomain.ServiceRequest
+	Shift *domain.Shift
+	// ShiftNumber is the open shift's 1-based ordinal (display "shift-N");
+	// ShiftExpectedCents its running expected cash (opening float + all
+	// ticket totals so far). Both zero when Shift is nil.
+	ShiftNumber        int
+	ShiftExpectedCents int
+	Tables             []TableState
+	Requests           []menudomain.ServiceRequest
 }
 
 type TableState struct {
@@ -51,6 +56,17 @@ func (a *App) State(ctx context.Context, restaurantID uuid.UUID) (State, error) 
 	switch {
 	case err == nil:
 		st.Shift = &shift
+		if st.ShiftNumber, err = a.store.ShiftSequence(ctx, restaurantID, shift.ID); err != nil {
+			return State{}, err
+		}
+		tickets, err := a.store.TicketsForShift(ctx, restaurantID, shift.ID)
+		if err != nil {
+			return State{}, err
+		}
+		st.ShiftExpectedCents = shift.OpeningFloatCents
+		for _, t := range tickets {
+			st.ShiftExpectedCents += t.TotalCents()
+		}
 	case errors.Is(err, ports.ErrNotFound):
 		// no open shift — still show tables/requests
 	default:
@@ -131,11 +147,19 @@ func (a *App) CloseShift(ctx context.Context, restaurantID, shiftID uuid.UUID, d
 	return sh, nil
 }
 
-// LineInput is one line a waiter adds: item + chosen option IDs + qty.
+// ShiftNumber is the shift's display ordinal ("shift-N").
+func (a *App) ShiftNumber(ctx context.Context, restaurantID, shiftID uuid.UUID) (int, error) {
+	return a.store.ShiftSequence(ctx, restaurantID, shiftID)
+}
+
+// LineInput is one line a waiter adds: item + chosen options + qty.
+// Options may arrive as IDs or as labels (the POS client sends labels);
+// labels resolve against the item's option groups.
 type LineInput struct {
-	MenuItemID uuid.UUID
-	OptionIDs  []uuid.UUID
-	Qty        int
+	MenuItemID   uuid.UUID
+	OptionIDs    []uuid.UUID
+	OptionLabels []string
+	Qty          int
 }
 
 // AddLines appends snapshot lines to the table's open ticket, creating
@@ -166,7 +190,15 @@ func (a *App) AddLines(ctx context.Context, restaurantID, tableID uuid.UUID, inp
 		if err != nil {
 			return domain.Ticket{}, err
 		}
-		snap, err := menudomain.NewOrderLine(item, in.OptionIDs, in.Qty)
+		optionIDs := in.OptionIDs
+		for _, label := range in.OptionLabels {
+			id, ok := optionIDByLabel(item, label)
+			if !ok {
+				return domain.Ticket{}, fmt.Errorf("%w: unknown option %q", ErrInvalid, label)
+			}
+			optionIDs = append(optionIDs, id)
+		}
+		snap, err := menudomain.NewOrderLine(item, optionIDs, in.Qty)
 		if err != nil {
 			return domain.Ticket{}, fmt.Errorf("%w: %v", ErrInvalid, err)
 		}
@@ -198,6 +230,17 @@ func (a *App) AddLines(ctx context.Context, restaurantID, tableID uuid.UUID, inp
 		return domain.Ticket{}, err
 	}
 	return a.store.TicketByID(ctx, restaurantID, ticket.ID)
+}
+
+func optionIDByLabel(item menudomain.MenuItem, label string) (uuid.UUID, bool) {
+	for _, g := range item.OptionGroups {
+		for _, o := range g.Options {
+			if o.Label == label {
+				return o.ID, true
+			}
+		}
+	}
+	return uuid.Nil, false
 }
 
 // Fire stamps fired_at on every unfired line of the ticket. Idempotent.

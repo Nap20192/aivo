@@ -51,6 +51,9 @@ type AdminStore interface {
 	CountMenuItems(ctx context.Context, restaurantID uuid.UUID) (int, error)
 
 	PendingServiceRequests(ctx context.Context, restaurantID uuid.UUID) ([]domain.ServiceRequest, error)
+	// PendingServiceRequestsForTable narrows to one table (the diner
+	// "one open request per table" state).
+	PendingServiceRequestsForTable(ctx context.Context, restaurantID, tableID uuid.UUID) ([]domain.ServiceRequest, error)
 	// SetServiceRequestStatus transitions a request (acknowledged or
 	// dismissed), scoped to restaurantID; ErrNotFound on wrong tenant.
 	SetServiceRequestStatus(ctx context.Context, restaurantID, id uuid.UUID, status string) error

@@ -35,6 +35,9 @@ type Store interface {
 	// shift. Only rows with closed_at IS NULL are updated (immutability);
 	// returns ErrConflict if the row was already closed.
 	CloseShift(ctx context.Context, s domain.Shift) error
+	// ShiftSequence returns the shift's 1-based ordinal within its
+	// restaurant (by opened_at), for display numbers like "shift-121".
+	ShiftSequence(ctx context.Context, restaurantID, shiftID uuid.UUID) (int, error)
 
 	// OpenTicketForTable returns the table's open ticket with lines,
 	// ErrNotFound if none.
