@@ -19,6 +19,10 @@ import (
 // or ticket lines still reference the item.
 var ErrItemReferenced = errors.New("store: menu item referenced by past orders; mark unavailable instead")
 
+// ErrConflict is returned on caller-fixable unique violations (taken
+// menu slug).
+var ErrConflict = errors.New("store: conflict")
+
 // AdminStore methods are all tenant-scoped by restaurantID in the query
 // itself, same rule as Store.
 type AdminStore interface {
@@ -34,6 +38,23 @@ type AdminStore interface {
 	// invalidating the old link immediately.
 	RegenerateTableToken(ctx context.Context, restaurantID, id uuid.UUID, newToken string) error
 
+	// Menus returns the restaurant's menus, default first then by
+	// position. Every restaurant has at least one (the default).
+	Menus(ctx context.Context, restaurantID uuid.UUID) ([]domain.Menu, error)
+	MenuBySlug(ctx context.Context, restaurantID uuid.UUID, slug string) (domain.Menu, error)
+	// CreateMenu returns ErrConflict-wrapping error on a taken slug.
+	CreateMenu(ctx context.Context, m domain.Menu) error
+	// UpdateMenu persists name/slug/position/is_default; setting
+	// IsDefault=true clears the previous default atomically. Clearing the
+	// default's flag directly (IsDefault=false on the default menu) is
+	// rejected — pick a new default instead.
+	UpdateMenu(ctx context.Context, m domain.Menu) error
+	// DeleteMenu enforces domain.CanDeleteMenu (never default/last;
+	// non-empty only with force — categories and items cascade).
+	DeleteMenu(ctx context.Context, restaurantID, id uuid.UUID, force bool) error
+
+	// CreateCategory persists c under c.MenuID (must belong to the same
+	// restaurant).
 	CreateCategory(ctx context.Context, c domain.Category) error
 	UpdateCategory(ctx context.Context, c domain.Category) error
 	DeleteCategory(ctx context.Context, restaurantID, id uuid.UUID) error

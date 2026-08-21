@@ -156,6 +156,24 @@ func seedMenu(ctx context.Context, store *menupg.PostgresStore, restaurantID uui
 		{"Béarnaise", 300}, {"Bone marrow butter", 400}, {"Peppercorn sauce", 300},
 	}}
 
+	// Default menu is auto-provisioned on registration; Wine moves to a
+	// second "Bar" menu (exercises the multi-menu contract).
+	menus, err := store.Menus(ctx, restaurantID)
+	if err != nil || len(menus) == 0 {
+		return fmt.Errorf("seed: menus: %v", err)
+	}
+	defaultMenuID := menus[0].ID // default first per store ordering
+	barMenu := menudomain.Menu{ID: uuid.New(), RestaurantID: restaurantID, Slug: "bar", Name: "Bar", Position: 1}
+	if err := store.CreateMenu(ctx, barMenu); err != nil {
+		return fmt.Errorf("seed: bar menu: %w", err)
+	}
+	menuFor := func(category string) uuid.UUID {
+		if category == "Wine" {
+			return barMenu.ID
+		}
+		return defaultMenuID
+	}
+
 	// Fixtures from docs/prototypes/aivo-menu-prototype.dc.html (prices
 	// there are dollars; integer cents here).
 	menu := []struct {
@@ -189,7 +207,7 @@ func seedMenu(ctx context.Context, store *menupg.PostgresStore, restaurantID uui
 	}
 
 	for pos, c := range menu {
-		cat := menudomain.Category{ID: uuid.New(), RestaurantID: restaurantID, Name: c.category, Position: pos}
+		cat := menudomain.Category{ID: uuid.New(), RestaurantID: restaurantID, MenuID: menuFor(c.category), Name: c.category, Position: pos}
 		if err := store.CreateCategory(ctx, cat); err != nil {
 			return fmt.Errorf("seed: category %s: %w", c.category, err)
 		}

@@ -128,7 +128,7 @@ func (s *PostgresStore) Menu(ctx context.Context, restaurantID uuid.UUID) ([]dom
 
 func (s *PostgresStore) categories(ctx context.Context, restaurantID uuid.UUID) ([]domain.Category, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, restaurant_id, name, position
+		`SELECT id, restaurant_id, menu_id, name, position
 		 FROM categories WHERE restaurant_id = $1 ORDER BY position ASC`,
 		restaurantID,
 	)
@@ -140,7 +140,7 @@ func (s *PostgresStore) categories(ctx context.Context, restaurantID uuid.UUID) 
 	categories := []domain.Category{}
 	for rows.Next() {
 		var c domain.Category
-		if err := rows.Scan(&c.ID, &c.RestaurantID, &c.Name, &c.Position); err != nil {
+		if err := rows.Scan(&c.ID, &c.RestaurantID, &c.MenuID, &c.Name, &c.Position); err != nil {
 			return nil, fmt.Errorf("store: categories: scan: %w", err)
 		}
 		categories = append(categories, c)

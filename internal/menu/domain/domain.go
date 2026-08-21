@@ -33,10 +33,47 @@ type Table struct {
 	CreatedAt    time.Time
 }
 
-// Category is a named grouping of Menu items within a Restaurant's Menu.
+// Menu is one of a Restaurant's 1..N menus (dinner, lunch, bar...).
+// Exactly one Menu per Restaurant is the default; a default menu is
+// auto-created on provisioning. Slug is unique per Restaurant and used
+// in the public browse link /{restaurant_slug}/m/{menu_slug}.
+type Menu struct {
+	ID           uuid.UUID
+	RestaurantID uuid.UUID
+	Slug         string
+	Name         string
+	Position     int
+	IsDefault    bool
+}
+
+// Menu-deletion rule errors (caller-fixable, HTTP 422).
+var (
+	ErrDefaultMenuDelete = errors.New("cannot delete the default menu")
+	ErrLastMenuDelete    = errors.New("cannot delete the only menu")
+	ErrMenuNotEmpty      = errors.New("menu has categories; pass force=1 to delete them too")
+)
+
+// CanDeleteMenu enforces the deletion rules: never the default, never
+// the last menu, and a non-empty menu only with force.
+func CanDeleteMenu(m Menu, totalMenus, categoryCount int, force bool) error {
+	if m.IsDefault {
+		return ErrDefaultMenuDelete
+	}
+	if totalMenus <= 1 {
+		return ErrLastMenuDelete
+	}
+	if categoryCount > 0 && !force {
+		return ErrMenuNotEmpty
+	}
+	return nil
+}
+
+// Category is a named grouping of Menu items within one of a
+// Restaurant's Menus.
 type Category struct {
 	ID           uuid.UUID
 	RestaurantID uuid.UUID
+	MenuID       uuid.UUID
 	Name         string
 	Position     int // display order within the Menu
 }

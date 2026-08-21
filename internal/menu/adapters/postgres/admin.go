@@ -109,11 +109,17 @@ func (s *PostgresStore) RegenerateTableToken(ctx context.Context, restaurantID, 
 }
 
 func (s *PostgresStore) CreateCategory(ctx context.Context, c domain.Category) error {
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO categories (id, restaurant_id, name, position) VALUES ($1, $2, $3, $4)`,
-		c.ID, c.RestaurantID, c.Name, c.Position)
+	// menu_id is written via a scoped subquery so a category can never
+	// land under another restaurant's menu.
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO categories (id, restaurant_id, menu_id, name, position)
+		 SELECT $1, $2, m.id, $4, $5 FROM menus m WHERE m.id = $3 AND m.restaurant_id = $2`,
+		c.ID, c.RestaurantID, c.MenuID, c.Name, c.Position)
 	if err != nil {
 		return fmt.Errorf("store: create category: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ports.ErrNotFound // menu_id not under this restaurant
 	}
 	return nil
 }

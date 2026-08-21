@@ -79,9 +79,14 @@ service with a phone POS for waiters.
 ## API surface (JSON, `/api/v1`)
 
 Public (diner, table-token scoped — existing menu handlers keep their shapes):
-- `GET  /api/v1/t/{table_token}` → restaurant, table, theme (flat), menu
-  (categories with nested items), `open_requests` (menu-stream extension,
-  implemented). Client types: `web/menu/src/types.ts`.
+- `GET  /api/v1/t/{table_token}` → restaurant, table, theme (flat),
+  `menus`: `[{id, slug, name, is_default, categories: [...]}]` (default
+  first, then position — replaces the old flat `menu` array),
+  `open_requests`. Client types: `web/menu/src/types.ts`.
+- `GET  /api/v1/m/{restaurant_slug}/{menu_slug}` — public read-only
+  browse of one menu (no table, no session): `{restaurant, theme, menu:
+  {id, slug, name, categories}}`, 404 unknown. Served by the diner SPA
+  at `/{restaurant_slug}/m/{menu_slug}` in browse mode.
 - `POST /api/v1/t/{table_token}/orders` — 204 on success; 429 with
   `error.retry_after_seconds` + `Retry-After` header on the order cooldown
 - `POST /api/v1/t/{table_token}/requests` {type: waiter|bill} → {request};
@@ -109,7 +114,15 @@ Platform (session cookie):
   validated (accent enum, `--name` css var keys, value injection guard,
   banner_url always kept from the current theme); proposals are logged
   server-side.
-- CRUD `/api/v1/restaurants/{id}/categories`, `/api/v1/restaurants/{id}/items`
+- Menus (1..N per restaurant, exactly one default, auto-created on
+  provisioning as "menu"/"Menu"): `GET/POST /api/v1/restaurants/{id}/menus`,
+  `PATCH/DELETE .../menus/{menu_id}` `{name, slug, position, is_default}` —
+  promoting a menu clears the old default atomically; deleting the default
+  or last menu is 422; deleting a non-empty menu needs `?force=1`
+  (categories + items cascade).
+- CRUD `/api/v1/restaurants/{id}/categories` (categories belong to a menu:
+  `menu_id` field on create — default menu when omitted — and `?menu_id=`
+  filter on list), `/api/v1/restaurants/{id}/items`
   (items: name, desc, price cents, image_url, allergens[], option_groups[], available)
 - `GET/POST /api/v1/restaurants/{id}/tables`, `POST .../tables/{id}/regenerate` (token), `GET .../tables/{id}/qr`
 - `POST /api/v1/restaurants/{id}/images` — multipart upload → S3, returns URL
@@ -118,7 +131,9 @@ Platform (session cookie):
 POS (session cookie, waiter+):
 - `GET  /api/v1/pos/state` — restaurant, open shift, tables w/ tickets, requests,
   plus (pos-stream extension, implemented by backend): `menu` (categories →
-  items with `price_cents`, optional `mods` = single-select option labels),
+  items with `price_cents`, optional `mods` = single-select option labels;
+  union of every menu's categories, labels prefixed "Dinner · Starters"
+  when the restaurant has more than one menu),
   `till` (always 1 in v1), `cashier`, `other_till_shift` (always null in v1 —
   one till per restaurant); shift carries server-computed running
   `expected_cents` and a display `number` ("shift-N"). Display times are

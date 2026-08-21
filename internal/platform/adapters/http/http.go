@@ -69,6 +69,12 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("PUT /api/v1/restaurants/{id}/theme", h.restaurant(true, h.putTheme))
 	mux.HandleFunc("POST /api/v1/restaurants/{id}/theme/generate", h.restaurant(true, h.generateTheme))
 
+	// Menus (1..N per restaurant).
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/menus", h.restaurant(false, h.listMenus))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/menus", h.restaurant(true, h.createMenu))
+	mux.HandleFunc("PATCH /api/v1/restaurants/{id}/menus/{menuID}", h.restaurant(true, h.updateMenu))
+	mux.HandleFunc("DELETE /api/v1/restaurants/{id}/menus/{menuID}", h.restaurant(true, h.deleteMenu))
+
 	// Menu content (categories, items).
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/categories", h.restaurant(false, h.listCategories))
 	mux.HandleFunc("POST /api/v1/restaurants/{id}/categories", h.restaurant(true, h.createCategory))
@@ -100,6 +106,7 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("POST /api/v1/pos/requests/{id}/dismiss", h.pos(h.posDismissRequest))
 
 	// Diner (table-token scoped, anonymous).
+	mux.HandleFunc("GET /api/v1/m/{restaurantSlug}/{menuSlug}", h.dinerBrowseMenu)
 	mux.HandleFunc("GET /api/v1/t/{token}", h.dinerEntry)
 	mux.HandleFunc("POST /api/v1/t/{token}/orders", h.dinerOrder)
 	mux.HandleFunc("POST /api/v1/t/{token}/requests", h.dinerRequest)
@@ -152,8 +159,12 @@ func writeAppErr(w http.ResponseWriter, err error) bool {
 		errors.Is(err, posports.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "not_found", "not found")
 	case errors.Is(err, platformports.ErrConflict), errors.Is(err, posports.ErrConflict),
-		errors.Is(err, posdomain.ErrShiftClosed):
+		errors.Is(err, menuports.ErrConflict), errors.Is(err, posdomain.ErrShiftClosed):
 		writeErr(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, menudomain.ErrDefaultMenuDelete),
+		errors.Is(err, menudomain.ErrLastMenuDelete),
+		errors.Is(err, menudomain.ErrMenuNotEmpty):
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
 	case errors.Is(err, menuports.ErrItemReferenced):
 		writeErr(w, http.StatusConflict, "referenced", err.Error())
 	case errors.Is(err, app.ErrInvalid), errors.Is(err, posapp.ErrInvalid),

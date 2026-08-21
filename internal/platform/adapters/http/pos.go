@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	menudomain "aivo/internal/menu/domain"
 	"aivo/internal/platform/domain"
 	posapp "aivo/internal/pos/app"
 	posdomain "aivo/internal/pos/domain"
@@ -162,6 +163,56 @@ type posMenuCategoryView struct {
 	Items []posMenuItemView `json:"items"`
 }
 
+// posMenu builds the add-line sheet: available items only, mods = the
+// labels of the item's first single-select group (the prototype's
+// doneness picker); multi-select groups still work by label via
+// POST .../lines. POS takes orders from every menu — categories are the
+// union of all menus, with the menu name prefixed on the category label
+// when the restaurant has more than one menu ("Dinner · Starters").
+func posMenu(menus []menudomain.Menu, cats []menudomain.Category, items []menudomain.MenuItem) []posMenuCategoryView {
+	itemsByCat := map[uuid.UUID][]posMenuItemView{}
+	for _, it := range items {
+		if !it.Available {
+			continue
+		}
+		var mods []string
+		for _, g := range it.OptionGroups {
+			if !g.Multi {
+				for _, o := range g.Options {
+					mods = append(mods, o.Label)
+				}
+				break // first single-select group only
+			}
+		}
+		itemsByCat[it.CategoryID] = append(itemsByCat[it.CategoryID], posMenuItemView{
+			ID: it.ID, Name: it.Name, PriceCents: it.PriceCents, Mods: mods,
+		})
+	}
+	menuName := map[uuid.UUID]string{}
+	for _, m := range menus {
+		menuName[m.ID] = m.Name
+	}
+	out := []posMenuCategoryView{}
+	// Iterate menus (default first) so categories group by menu order.
+	for _, m := range menus {
+		for _, c := range cats {
+			if c.MenuID != m.ID {
+				continue
+			}
+			its := itemsByCat[c.ID]
+			if len(its) == 0 {
+				continue
+			}
+			label := c.Name
+			if len(menus) > 1 {
+				label = m.Name + " · " + c.Name
+			}
+			out = append(out, posMenuCategoryView{ID: c.ID, Name: label, Items: its})
+		}
+	}
+	return out
+}
+
 // --- Handlers ----------------------------------------------------------
 
 func (h *handler) posState(w http.ResponseWriter, r *http.Request, u domain.User, restaurantID uuid.UUID) {
@@ -213,34 +264,11 @@ func (h *handler) posState(w http.ResponseWriter, r *http.Request, u domain.User
 		}
 	}
 
-	// Menu for the add-line sheet: available items only, mods = the
-	// labels of the item's single-select groups (the prototype's
-	// doneness picker). Multi-select groups still work by label via
-	// POST .../lines.
-	itemsByCat := map[uuid.UUID][]posMenuItemView{}
-	for _, it := range items {
-		if !it.Available {
-			continue
-		}
-		var mods []string
-		for _, g := range it.OptionGroups {
-			if !g.Multi {
-				for _, o := range g.Options {
-					mods = append(mods, o.Label)
-				}
-				break // first single-select group only
-			}
-		}
-		itemsByCat[it.CategoryID] = append(itemsByCat[it.CategoryID], posMenuItemView{
-			ID: it.ID, Name: it.Name, PriceCents: it.PriceCents, Mods: mods,
-		})
+	menus, err := h.MenuAdmin.Menus(r.Context(), restaurantID)
+	if writeAppErr(w, err) {
+		return
 	}
-	menu := []posMenuCategoryView{}
-	for _, c := range cats {
-		if its := itemsByCat[c.ID]; len(its) > 0 {
-			menu = append(menu, posMenuCategoryView{ID: c.ID, Name: c.Name, Items: its})
-		}
-	}
+	menu := posMenu(menus, cats, items)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"restaurant":       map[string]any{"id": rest.ID, "slug": rest.Slug, "name": rest.Name},
