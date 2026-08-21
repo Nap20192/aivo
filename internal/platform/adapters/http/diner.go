@@ -177,10 +177,15 @@ func (h *handler) dinerEntry(w http.ResponseWriter, r *http.Request) {
 		openViews[i] = openRequestView{Type: requestType(sr.Kind), CreatedAt: sr.CreatedAt.Format(time.RFC3339)}
 	}
 
+	hours := make([]dinerHoursRow, len(rest.Hours))
+	for i, hr := range rest.Hours {
+		hours[i] = dinerHoursRow{Label: hr.Label, Open: hr.Open, Close: hr.Close}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"restaurant": dinerRestaurantView{
 			Name: rest.Name, Slug: rest.Slug,
-			Hours:   []dinerHoursRow{}, // structured hours not stored yet (free text only)
+			Hours:   hours,
 			Address: optStr(rest.Address),
 			MapURL:  optStr(rest.Contacts["map_url"]),
 			Phone:   optStr(rest.Contacts["phone"]), Instagram: optStr(rest.Contacts["instagram"]),

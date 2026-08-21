@@ -79,16 +79,26 @@ service with a phone POS for waiters.
 ## API surface (JSON, `/api/v1`)
 
 Public (diner, table-token scoped — existing menu handlers keep their shapes):
-- `GET  /api/v1/t/{table_token}` → restaurant, table, theme, menu
-- `POST /api/v1/t/{table_token}/orders`
-- `POST /api/v1/t/{table_token}/requests` (waiter|bill)
+- `GET  /api/v1/t/{table_token}` → restaurant, table, theme (flat), menu
+  (categories with nested items), `open_requests` (menu-stream extension,
+  implemented). Client types: `web/menu/src/types.ts`.
+- `POST /api/v1/t/{table_token}/orders` — 204 on success; 429 with
+  `error.retry_after_seconds` + `Retry-After` header on the order cooldown
+- `POST /api/v1/t/{table_token}/requests` {type: waiter|bill} → {request};
+  409 `already_open` for a duplicate open request on the table
 
 Platform (session cookie):
 - `POST /api/v1/auth/register` {org_name, restaurant_name, email, password} → creates org+owner+restaurant+slug, starts `free`
 - `POST /api/v1/auth/login` / `POST /api/v1/auth/logout` / `GET /api/v1/auth/me`
 - `GET/PATCH /api/v1/org` — org settings, `GET /api/v1/org/subscription`, `POST /api/v1/org/subscription` {plan}
-- `GET/POST /api/v1/restaurants`, `GET/PATCH /api/v1/restaurants/{id}` (slug, name, hours, address, contacts)
-- `GET/PUT  /api/v1/restaurants/{id}/theme` — theme JSON + design_md
+- `GET/POST /api/v1/restaurants`, `GET/PATCH /api/v1/restaurants/{id}` —
+  admin-stream shapes (implemented): `hours` is `[{label, open, close}]`,
+  `phone`/`instagram`/`custom_domain` are flat fields; lists are bare
+  arrays; auth responses are `{user, org, restaurants}` (+ `restaurant`
+  for POS). Client types: `web/admin/src/api/types.ts`.
+- `GET/PUT  /api/v1/restaurants/{id}/theme` — flat Theme object
+  `{brand_name, accent, bold, banner_url, css_vars, design_md}` (stored
+  as theme JSON + design_md text)
 - CRUD `/api/v1/restaurants/{id}/categories`, `/api/v1/restaurants/{id}/items`
   (items: name, desc, price cents, image_url, allergens[], option_groups[], available)
 - `GET/POST /api/v1/restaurants/{id}/tables`, `POST .../tables/{id}/regenerate` (token), `GET .../tables/{id}/qr`
@@ -96,7 +106,16 @@ Platform (session cookie):
 - Staff: `GET/POST /api/v1/restaurants/{id}/staff` {email, role}
 
 POS (session cookie, waiter+):
-- `GET  /api/v1/pos/state` — restaurant, open shift, tables w/ tickets, requests
+- `GET  /api/v1/pos/state` — restaurant, open shift, tables w/ tickets, requests,
+  plus (pos-stream extension, implemented by backend): `menu` (categories →
+  items with `price_cents`, optional `mods` = single-select option labels),
+  `till` (always 1 in v1), `cashier`, `other_till_shift` (always null in v1 —
+  one till per restaurant); shift carries server-computed running
+  `expected_cents` and a display `number` ("shift-N"). Display times are
+  local "HH:MM" strings. Line `options` are labels; `unit_price_cents`
+  includes option deltas. Client types: `web/pos/src/types.ts`.
+  Close returns the PostedShift shape (`number`, `expected_cents`,
+  `declared_cents`, `variance_cents`, `posted_at`, `gl_lines`).
 - `POST /api/v1/pos/shifts` {opening_float_cents} / `POST /api/v1/pos/shifts/{id}/close` {declared_cents}
 - `POST /api/v1/pos/tables/{table_id}/lines` — add order lines (menu_item_id, qty, options)
 - `POST /api/v1/pos/tickets/{id}/fire`

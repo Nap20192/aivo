@@ -18,6 +18,7 @@ import (
 	"aivo/internal/platform/app"
 	platformports "aivo/internal/platform/ports"
 	posapp "aivo/internal/pos/app"
+	posdomain "aivo/internal/pos/domain"
 	posports "aivo/internal/pos/ports"
 	"aivo/pkg/session"
 )
@@ -149,7 +150,8 @@ func writeAppErr(w http.ResponseWriter, err error) bool {
 		errors.Is(err, menuports.ErrNotFound),
 		errors.Is(err, posports.ErrNotFound):
 		writeErr(w, http.StatusNotFound, "not_found", "not found")
-	case errors.Is(err, platformports.ErrConflict), errors.Is(err, posports.ErrConflict):
+	case errors.Is(err, platformports.ErrConflict), errors.Is(err, posports.ErrConflict),
+		errors.Is(err, posdomain.ErrShiftClosed):
 		writeErr(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, menuports.ErrItemReferenced):
 		writeErr(w, http.StatusConflict, "referenced", err.Error())

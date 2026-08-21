@@ -269,7 +269,8 @@ func (a *App) ChangePlan(ctx context.Context, orgID uuid.UUID, plan domain.Plan)
 	if err := a.store.SaveSubscription(ctx, sub); err != nil {
 		return domain.Subscription{}, err
 	}
-	return sub, nil
+	// Re-read so UpdatedAt reflects the store's now().
+	return a.store.Subscription(ctx, orgID)
 }
 
 // --- Restaurants -------------------------------------------------------
