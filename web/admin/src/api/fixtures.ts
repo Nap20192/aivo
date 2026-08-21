@@ -1,6 +1,7 @@
 // Ember & Bone demo tenant — mirrors docs/prototypes/aivo-menu-prototype.dc.html.
 import type {
   Category,
+  GuestDetail,
   Menu,
   MenuItem,
   Org,
@@ -318,6 +319,111 @@ export const demoStaff: StaffMember[] = [
     email: "jules@emberandbone.example",
     role: "waiter",
     status: "invited",
+  },
+];
+
+export const demoGuests: GuestDetail[] = [
+  {
+    customer: {
+      id: "cust-guest",
+      name: "Ada Verne",
+      email: "guest@ember.test",
+      phone: "+32 470 11 22 33",
+    },
+    visits: 2,
+    total_spent_cents: 0, // derived from orders at load
+    first_seen: "2026-07-18T19:12:00Z",
+    last_seen: "2026-08-14T20:41:00Z",
+    notes: "Prefers the counter seats. Asked about the vine-wood sourcing.",
+    tags: ["regular", "wine list"],
+    orders: [
+      {
+        created_at: "2026-08-14T20:41:00Z",
+        table_label: "Table 3",
+        total_cents: 8700,
+        lines: [
+          { name: "Dry-aged ribeye", qty: 1, total_cents: 5800 },
+          { name: "Triple-cooked chips", qty: 1, total_cents: 900 },
+          { name: "Malbec, glass", qty: 2, total_cents: 2000 },
+        ],
+      },
+      {
+        created_at: "2026-07-18T19:12:00Z",
+        table_label: "Table 12",
+        total_cents: 4400,
+        lines: [
+          { name: "Beef tartare, cured yolk", qty: 1, total_cents: 1800 },
+          { name: "Bavette, chimichurri", qty: 1, total_cents: 2600 },
+        ],
+      },
+    ],
+  },
+  {
+    customer: {
+      id: "cust-marlow",
+      name: "Jun Marlow",
+      email: "jun.marlow@example.net",
+      phone: null,
+    },
+    visits: 1,
+    total_spent_cents: 0,
+    first_seen: "2026-08-02T18:05:00Z",
+    last_seen: "2026-08-02T18:05:00Z",
+    notes: "",
+    tags: ["birthday 08-02"],
+    orders: [
+      {
+        created_at: "2026-08-02T18:05:00Z",
+        table_label: "Table 1",
+        total_cents: 6200,
+        lines: [
+          { name: "Lamb shoulder, 6 hours", qty: 1, total_cents: 4600 },
+          { name: "Hispi cabbage", qty: 2, total_cents: 1600 },
+        ],
+      },
+    ],
+  },
+  {
+    customer: {
+      id: "cust-okoye",
+      name: "Sasha Okoye",
+      email: "s.okoye@example.org",
+      phone: "+32 486 99 10 04",
+    },
+    visits: 3,
+    total_spent_cents: 0,
+    first_seen: "2026-06-30T19:30:00Z",
+    last_seen: "2026-08-20T21:03:00Z",
+    notes: "Sulphite-sensitive — steer to the gamay when asked.",
+    tags: ["regular", "allergy"],
+    orders: [
+      {
+        created_at: "2026-08-20T21:03:00Z",
+        table_label: "Table 2",
+        total_cents: 4000,
+        lines: [
+          { name: "Half chicken, brined", qty: 1, total_cents: 2800 },
+          { name: "Gamay, Beaujolais", qty: 1, total_cents: 1200 },
+        ],
+      },
+      {
+        created_at: "2026-07-25T20:15:00Z",
+        table_label: "Table 12",
+        total_cents: 3300,
+        lines: [
+          { name: "Charred leeks, olive oil", qty: 1, total_cents: 1200 },
+          { name: "Flatbread, beef fat", qty: 1, total_cents: 800 },
+          { name: "Green salad", qty: 1, total_cents: 700 },
+          { name: "Hispi cabbage", qty: 1, total_cents: 600 },
+        ],
+      },
+      {
+        created_at: "2026-06-30T19:30:00Z",
+        table_label: "Table 1",
+        total_cents: 2600,
+        lines: [{ name: "Bavette, chimichurri", qty: 1, total_cents: 2600 }],
+      },
+    ],
   },
 ];
 

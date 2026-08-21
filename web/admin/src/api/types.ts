@@ -161,3 +161,43 @@ export interface AssistantApplyResult {
   ok: boolean;
   detail: string;
 }
+
+// Light CRM (manager+). Email/phone are manager-only server-side.
+export interface GuestCustomer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+}
+
+export interface GuestSummary {
+  customer: GuestCustomer;
+  visits: number;
+  total_spent_cents: number;
+  last_seen: string;
+  tags: string[];
+}
+
+export interface GuestOrderLine {
+  name: string;
+  qty: number;
+  total_cents: number;
+}
+
+export interface GuestOrder {
+  created_at: string;
+  table_label: string;
+  total_cents: number;
+  lines: GuestOrderLine[];
+}
+
+export interface GuestDetail {
+  customer: GuestCustomer;
+  visits: number;
+  total_spent_cents: number;
+  first_seen: string;
+  last_seen: string;
+  notes: string;
+  tags: string[];
+  orders: GuestOrder[];
+}

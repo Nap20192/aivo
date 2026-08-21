@@ -6,6 +6,8 @@ import type {
   AssistantApplyResult,
   AssistantMessage,
   Category,
+  GuestDetail,
+  GuestSummary,
   Me,
   Menu,
   MenuItem,
@@ -354,6 +356,32 @@ export const api = {
           `/restaurants/${id}/assistant/messages/${msgId}/discard`,
         ),
       () => mockApi.discardAssistantActions(id, msgId),
+    );
+  },
+
+  listGuests(id: string, query?: string): Promise<GuestSummary[]> {
+    const qs = query ? `?query=${encodeURIComponent(query)}&limit=100` : "?limit=100";
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/guests${qs}`),
+      () => mockApi.listGuests(id, query),
+    );
+  },
+
+  getGuest(id: string, customerId: string): Promise<GuestDetail> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/guests/${customerId}`),
+      () => mockApi.getGuest(id, customerId),
+    );
+  },
+
+  patchGuest(
+    id: string,
+    customerId: string,
+    patch: { notes?: string; tags?: string[] },
+  ): Promise<GuestDetail> {
+    return withFallback(
+      () => request("PATCH", `/restaurants/${id}/guests/${customerId}`, patch),
+      () => mockApi.patchGuest(id, customerId, patch),
     );
   },
 
