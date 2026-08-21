@@ -67,6 +67,7 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("PATCH /api/v1/restaurants/{id}", h.restaurant(true, h.patchRestaurant))
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/theme", h.restaurant(false, h.getTheme))
 	mux.HandleFunc("PUT /api/v1/restaurants/{id}/theme", h.restaurant(true, h.putTheme))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/theme/generate", h.restaurant(true, h.generateTheme))
 
 	// Menu content (categories, items).
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/categories", h.restaurant(false, h.listCategories))
@@ -162,6 +163,13 @@ func writeAppErr(w http.ResponseWriter, err error) bool {
 		errors.Is(err, menudomain.ErrUnknownOption),
 		errors.Is(err, menuapp.ErrUnknownMenuItem):
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
+	case errors.Is(err, app.ErrGeneratorUnavailable):
+		writeErr(w, http.StatusServiceUnavailable, "generator_unconfigured", err.Error())
+	case errors.Is(err, app.ErrNoDesignMD):
+		writeErr(w, http.StatusConflict, "no_design_md", err.Error())
+	case errors.Is(err, platformports.ErrThemeGeneration):
+		log.Printf("api: %v", err)
+		writeErr(w, http.StatusBadGateway, "generation_failed", "theme generation failed; try again")
 	case errors.Is(err, posapp.ErrNoOpenShift):
 		writeErr(w, http.StatusUnprocessableEntity, "no_open_shift", err.Error())
 	case errors.Is(err, menuapp.ErrServiceRequestAlreadyOpen):

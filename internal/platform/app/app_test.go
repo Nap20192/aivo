@@ -162,7 +162,7 @@ var _ ports.Store = (*fakeStore)(nil)
 
 func newTestApp() (*App, *fakeStore) {
 	st := newFakeStore()
-	return New(st, billing.NewFake()), st
+	return New(st, billing.NewFake(), nil), st
 }
 
 func TestRegisterAndLogin(t *testing.T) {

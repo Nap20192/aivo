@@ -99,6 +99,16 @@ Platform (session cookie):
 - `GET/PUT  /api/v1/restaurants/{id}/theme` — flat Theme object
   `{brand_name, accent, bold, banner_url, css_vars, design_md}` (stored
   as theme JSON + design_md text)
+- `POST /api/v1/restaurants/{id}/theme/generate` (manager+) — AI theme
+  proposal from the stored design_md: `{proposal: <Theme>, based_on:
+  "design_md"}`. Never saves — applying is the PUT above. 409
+  `no_design_md` when the brief is empty; 503 `generator_unconfigured`
+  unless the server runs with `THEME_GENERATOR=claudecli` (shells out to
+  the `claude` CLI, `CLAUDE_BIN` overrides the binary path); 502
+  `generation_failed` on CLI/validation failure. Model output is strictly
+  validated (accent enum, `--name` css var keys, value injection guard,
+  banner_url always kept from the current theme); proposals are logged
+  server-side.
 - CRUD `/api/v1/restaurants/{id}/categories`, `/api/v1/restaurants/{id}/items`
   (items: name, desc, price cents, image_url, allergens[], option_groups[], available)
 - `GET/POST /api/v1/restaurants/{id}/tables`, `POST .../tables/{id}/regenerate` (token), `GET .../tables/{id}/qr`

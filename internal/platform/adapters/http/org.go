@@ -269,6 +269,20 @@ func (h *handler) putTheme(w http.ResponseWriter, r *http.Request, _ domain.User
 	writeJSON(w, http.StatusOK, toThemeView(t, rest.Name))
 }
 
+// generateTheme proposes a theme from the stored design_md WITHOUT
+// saving it — applying stays the explicit PUT above (AI must not
+// silently control, per AGENTS.md).
+func (h *handler) generateTheme(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+	proposal, err := h.Platform.GenerateTheme(r.Context(), rest.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"proposal": toThemeView(proposal, rest.Name),
+		"based_on": "design_md",
+	})
+}
+
 // --- Staff -------------------------------------------------------------
 
 // staffView matches the admin client's StaffMember.

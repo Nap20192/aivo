@@ -185,12 +185,12 @@ func toItemView(it menudomain.MenuItem) itemView {
 
 // itemPatch is Partial<MenuItem> from the admin client; nil = keep.
 type itemPatch struct {
-	CategoryID  *uuid.UUID `json:"category_id"`
-	Name        *string    `json:"name"`
-	Description *string    `json:"description"`
-	PriceCents  *int       `json:"price_cents"`
-	ImageURL    *string    `json:"image_url"`
-	Allergens   *[]string  `json:"allergens"`
+	CategoryID   *uuid.UUID `json:"category_id"`
+	Name         *string    `json:"name"`
+	Description  *string    `json:"description"`
+	PriceCents   *int       `json:"price_cents"`
+	ImageURL     *string    `json:"image_url"`
+	Allergens    *[]string  `json:"allergens"`
 	OptionGroups *[]struct {
 		Name    string `json:"name"`
 		Type    string `json:"type"`

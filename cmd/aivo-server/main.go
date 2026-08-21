@@ -26,6 +26,7 @@ import (
 	"aivo/internal/menu/adapters/telegram"
 	menuapp "aivo/internal/menu/app"
 	"aivo/internal/platform/adapters/billing"
+	"aivo/internal/platform/adapters/claudecli"
 	platformhttp "aivo/internal/platform/adapters/http"
 	platformpg "aivo/internal/platform/adapters/postgres"
 	"aivo/internal/platform/adapters/s3"
@@ -82,7 +83,21 @@ func run() error {
 	posStore := pospg.NewStore(db)
 
 	menuApplication := menuapp.NewApplication(menuStore, telegram.New(), key, baseURL)
-	platformApplication := platformapp.New(platformStore, billing.NewFake())
+
+	// AI theme generation: opt-in via THEME_GENERATOR=claudecli. Off by
+	// default so prod without the CLI fails clean (endpoint answers 503).
+	var themeGen platformports.ThemeGenerator
+	switch gen := os.Getenv("THEME_GENERATOR"); gen {
+	case "claudecli":
+		themeGen = claudecli.New(os.Getenv("CLAUDE_BIN"))
+		log.Print("server: theme generator: claudecli")
+	case "":
+		log.Print("server: THEME_GENERATOR not set, theme generation disabled")
+	default:
+		return fmt.Errorf("server: unknown THEME_GENERATOR %q (want claudecli)", gen)
+	}
+
+	platformApplication := platformapp.New(platformStore, billing.NewFake(), themeGen)
 	posApplication := posapp.New(posStore, menubridge.New(menuStore))
 
 	var images platformports.ImageStore

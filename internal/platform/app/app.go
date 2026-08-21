@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/mail"
 	"regexp"
 	"strings"
@@ -41,12 +42,44 @@ var ErrForbidden = errors.New("forbidden")
 var ErrPlanLimit = errors.New("plan limit reached")
 
 type App struct {
-	store   ports.Store
-	billing ports.BillingProvider
+	store    ports.Store
+	billing  ports.BillingProvider
+	themeGen ports.ThemeGenerator // nil = generation not configured
 }
 
-func New(store ports.Store, billing ports.BillingProvider) *App {
-	return &App{store: store, billing: billing}
+func New(store ports.Store, billing ports.BillingProvider, themeGen ports.ThemeGenerator) *App {
+	return &App{store: store, billing: billing, themeGen: themeGen}
+}
+
+// Theme-generation errors (HTTP: 503 / 409).
+var (
+	ErrGeneratorUnavailable = errors.New("theme generator not configured")
+	ErrNoDesignMD           = errors.New("design_md is empty; paste a design brief first")
+)
+
+// GenerateTheme proposes a theme from the restaurant's stored design_md.
+// Never saves — applying is the explicit PUT .../theme. The proposal is
+// logged (AGENTS.md: log AI-generated recommendations).
+func (a *App) GenerateTheme(ctx context.Context, restaurantID uuid.UUID) (domain.Theme, error) {
+	if a.themeGen == nil {
+		return domain.Theme{}, ErrGeneratorUnavailable
+	}
+	current, err := a.store.Theme(ctx, restaurantID)
+	if err != nil {
+		return domain.Theme{}, err
+	}
+	if strings.TrimSpace(current.DesignMD) == "" {
+		return domain.Theme{}, ErrNoDesignMD
+	}
+	proposal, err := a.themeGen.Generate(ctx, current.DesignMD, current)
+	if err != nil {
+		return domain.Theme{}, err
+	}
+	slog.Info("ai theme proposal generated",
+		"restaurant_id", restaurantID,
+		"based_on", "design_md",
+		"proposal", string(proposal.ThemeJSON))
+	return proposal, nil
 }
 
 // hashToken is the storage form of a session token: SHA-256, so a DB

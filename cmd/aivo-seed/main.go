@@ -68,7 +68,7 @@ func run() error {
 	}
 
 	menuStore := menupg.NewPostgresStoreFromDB(db)
-	platform := platformapp.New(platformpg.NewStore(db), billing.NewFake())
+	platform := platformapp.New(platformpg.NewStore(db), billing.NewFake(), nil)
 
 	owner, _, err := platform.Register(ctx, "Ember & Bone", "Ember & Bone", "owner@ember.test", "embertest1")
 	if err != nil {

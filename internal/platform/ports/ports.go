@@ -77,6 +77,18 @@ type Store interface {
 	RestaurantIDByDomain(ctx context.Context, host string) (uuid.UUID, error)
 }
 
+// ErrThemeGeneration wraps any theme-generation failure (CLI error, bad
+// JSON, validation reject). Callers get this or a valid Theme, never a
+// half-parsed one.
+var ErrThemeGeneration = errors.New("theme generation failed")
+
+// ThemeGenerator turns a design.md brief into a PROPOSED Theme. It never
+// saves — applying stays an explicit PUT by the user (AGENTS.md: AI must
+// not silently control).
+type ThemeGenerator interface {
+	Generate(ctx context.Context, designMD string, current domain.Theme) (domain.Theme, error)
+}
+
 // BillingProvider is the payment side of subscriptions. v1 ships only a
 // fake in-memory implementation; a Stripe adapter comes later.
 type BillingProvider interface {
