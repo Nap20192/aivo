@@ -39,6 +39,12 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 	return &PostgresStore{db: db}, nil
 }
 
+// NewPostgresStoreFromDB wraps an already-opened handle, so one process
+// can share a single pool across contexts (see cmd/aivo-server).
+func NewPostgresStoreFromDB(db *sql.DB) *PostgresStore {
+	return &PostgresStore{db: db}
+}
+
 func (s *PostgresStore) RestaurantBySlug(ctx context.Context, slug string) (domain.Restaurant, error) {
 	var r domain.Restaurant
 	err := s.db.QueryRowContext(ctx,

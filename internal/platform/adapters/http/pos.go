@@ -1,0 +1,366 @@
+package http
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"aivo/internal/platform/domain"
+	posapp "aivo/internal/pos/app"
+	posdomain "aivo/internal/pos/domain"
+
+	"github.com/google/uuid"
+)
+
+// Shapes here match the POS client (web/pos/src/types.ts): display
+// times as "HH:MM" strings, options as labels, unit prices inclusive of
+// option deltas. v1 models a single till per restaurant: till is always
+// 1 and other_till_shift always null.
+
+// posFunc runs with the session user and the restaurant the POS session
+// operates on.
+type posFunc func(w http.ResponseWriter, r *http.Request, u domain.User, restaurantID uuid.UUID)
+
+// pos is auth + POS restaurant resolution: restaurant-scoped staff act
+// on their own restaurant; org-wide users (owners) act on the org's
+// first restaurant or pass ?restaurant_id= to pick one.
+func (h *handler) pos(next posFunc) http.HandlerFunc {
+	return h.auth(func(w http.ResponseWriter, r *http.Request, u domain.User) {
+		if u.RestaurantID != nil {
+			next(w, r, u, *u.RestaurantID)
+			return
+		}
+		if q := r.URL.Query().Get("restaurant_id"); q != "" {
+			id, err := uuid.Parse(q)
+			if err != nil {
+				writeErr(w, http.StatusNotFound, "not_found", "not found")
+				return
+			}
+			// Org scope check: must be one of the org's restaurants.
+			if _, err := h.Platform.Restaurant(r.Context(), u.OrgID, id); writeAppErr(w, err) {
+				return
+			}
+			next(w, r, u, id)
+			return
+		}
+		rests, err := h.Platform.Restaurants(r.Context(), u.OrgID)
+		if writeAppErr(w, err) {
+			return
+		}
+		if len(rests) == 0 {
+			writeErr(w, http.StatusNotFound, "not_found", "org has no restaurants")
+			return
+		}
+		next(w, r, u, rests[0].ID)
+	})
+}
+
+// --- Views -------------------------------------------------------------
+
+func hhmm(t time.Time) string { return t.Local().Format("15:04") }
+
+type posShiftView struct {
+	ID                uuid.UUID `json:"id"`
+	Number            string    `json:"number"` // "shift-121"
+	Till              int       `json:"till"`
+	Cashier           string    `json:"cashier"`
+	OpenedAt          string    `json:"opened_at"` // "16:04"
+	OpeningFloatCents int       `json:"opening_float_cents"`
+	ExpectedCents     int       `json:"expected_cents"`
+}
+
+func (h *handler) toPosShiftView(ctx context.Context, s posdomain.Shift, number, expectedCents int) posShiftView {
+	cashier := ""
+	if u, err := h.Platform.User(ctx, s.OpenedBy); err == nil {
+		cashier = displayName(u.Email)
+	}
+	return posShiftView{
+		ID: s.ID, Number: fmt.Sprintf("shift-%d", number), Till: 1, Cashier: cashier,
+		OpenedAt: hhmm(s.OpenedAt), OpeningFloatCents: s.OpeningFloatCents, ExpectedCents: expectedCents,
+	}
+}
+
+type posLineView struct {
+	ID             uuid.UUID `json:"id"`
+	MenuItemID     uuid.UUID `json:"menu_item_id"`
+	Name           string    `json:"name"`
+	Qty            int       `json:"qty"`
+	Options        []string  `json:"options"`
+	UnitPriceCents int       `json:"unit_price_cents"` // base + option deltas
+}
+
+type posTicketView struct {
+	ID       uuid.UUID     `json:"id"`
+	Lines    []posLineView `json:"lines"`
+	Note     *string       `json:"note"`
+	Source   string        `json:"source"`
+	PlacedAt *string       `json:"placed_at"`
+	FiredAt  *string       `json:"fired_at"`
+	// Extras beyond the client type, harmless and useful for debugging.
+	TableID    uuid.UUID `json:"table_id"`
+	ShiftID    uuid.UUID `json:"shift_id"`
+	Status     string    `json:"status"`
+	TotalCents int       `json:"total_cents"`
+}
+
+func toPosTicketView(t posdomain.Ticket) posTicketView {
+	lines := make([]posLineView, len(t.Lines))
+	var lastFired *time.Time
+	for i, l := range t.Lines {
+		unit := l.UnitPriceCents
+		labels := []string{}
+		for _, o := range l.Options {
+			unit += o.PriceDeltaCents
+			labels = append(labels, o.Label)
+		}
+		lines[i] = posLineView{ID: l.ID, MenuItemID: l.MenuItemID, Name: l.Name, Qty: l.Qty, Options: labels, UnitPriceCents: unit}
+		if l.FiredAt != nil && (lastFired == nil || l.FiredAt.After(*lastFired)) {
+			lastFired = l.FiredAt
+		}
+	}
+	placed := hhmm(t.CreatedAt)
+	var fired *string
+	if lastFired != nil {
+		f := hhmm(*lastFired)
+		fired = &f
+	}
+	return posTicketView{
+		ID: t.ID, Lines: lines, Note: nil,
+		Source: "at the till · " + placed, PlacedAt: &placed, FiredAt: fired,
+		TableID: t.TableID, ShiftID: t.ShiftID, Status: t.Status, TotalCents: t.TotalCents(),
+	}
+}
+
+type posTableView struct {
+	ID     uuid.UUID      `json:"id"`
+	Number string         `json:"number"`
+	Covers *int           `json:"covers"` // not tracked in v1
+	Ticket *posTicketView `json:"ticket"`
+}
+
+type posRequestView struct {
+	ID             uuid.UUID `json:"id"`
+	TableID        uuid.UUID `json:"table_id"`
+	TableNumber    string    `json:"table_number"`
+	Kind           string    `json:"kind"` // "waiter" | "bill"
+	AskedAt        string    `json:"asked_at"`
+	CreatedAt      int64     `json:"created_at"` // epoch ms
+	OpenTotalCents *int      `json:"open_total_cents"`
+}
+
+type posMenuItemView struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	PriceCents int       `json:"price_cents"`
+	Mods       []string  `json:"mods,omitempty"` // single-select option labels (e.g. doneness)
+}
+
+type posMenuCategoryView struct {
+	ID    uuid.UUID         `json:"id"`
+	Name  string            `json:"name"`
+	Items []posMenuItemView `json:"items"`
+}
+
+// --- Handlers ----------------------------------------------------------
+
+func (h *handler) posState(w http.ResponseWriter, r *http.Request, u domain.User, restaurantID uuid.UUID) {
+	st, err := h.Pos.State(r.Context(), restaurantID)
+	if writeAppErr(w, err) {
+		return
+	}
+	rest, err := h.Platform.RestaurantPublic(r.Context(), restaurantID)
+	if writeAppErr(w, err) {
+		return
+	}
+	cats, items, err := h.Menu.Menu(r.Context(), restaurantID)
+	if writeAppErr(w, err) {
+		return
+	}
+
+	var shift *posShiftView
+	if st.Shift != nil {
+		v := h.toPosShiftView(r.Context(), *st.Shift, st.ShiftNumber, st.ShiftExpectedCents)
+		shift = &v
+	}
+
+	tables := make([]posTableView, len(st.Tables))
+	ticketTotalByTable := map[uuid.UUID]int{}
+	for i, ts := range st.Tables {
+		tv := posTableView{ID: ts.Table.ID, Number: ts.Table.Label}
+		if ts.Ticket != nil {
+			v := toPosTicketView(*ts.Ticket)
+			tv.Ticket = &v
+			ticketTotalByTable[ts.Table.ID] = v.TotalCents
+		}
+		tables[i] = tv
+	}
+
+	labelByTable := map[uuid.UUID]string{}
+	for _, ts := range st.Tables {
+		labelByTable[ts.Table.ID] = ts.Table.Label
+	}
+	requests := make([]posRequestView, len(st.Requests))
+	for i, sr := range st.Requests {
+		var openTotal *int
+		if total, ok := ticketTotalByTable[sr.TableID]; ok {
+			openTotal = &total
+		}
+		requests[i] = posRequestView{
+			ID: sr.ID, TableID: sr.TableID, TableNumber: labelByTable[sr.TableID],
+			Kind: requestType(sr.Kind), AskedAt: hhmm(sr.CreatedAt),
+			CreatedAt: sr.CreatedAt.UnixMilli(), OpenTotalCents: openTotal,
+		}
+	}
+
+	// Menu for the add-line sheet: available items only, mods = the
+	// labels of the item's single-select groups (the prototype's
+	// doneness picker). Multi-select groups still work by label via
+	// POST .../lines.
+	itemsByCat := map[uuid.UUID][]posMenuItemView{}
+	for _, it := range items {
+		if !it.Available {
+			continue
+		}
+		var mods []string
+		for _, g := range it.OptionGroups {
+			if !g.Multi {
+				for _, o := range g.Options {
+					mods = append(mods, o.Label)
+				}
+				break // first single-select group only
+			}
+		}
+		itemsByCat[it.CategoryID] = append(itemsByCat[it.CategoryID], posMenuItemView{
+			ID: it.ID, Name: it.Name, PriceCents: it.PriceCents, Mods: mods,
+		})
+	}
+	menu := []posMenuCategoryView{}
+	for _, c := range cats {
+		if its := itemsByCat[c.ID]; len(its) > 0 {
+			menu = append(menu, posMenuCategoryView{ID: c.ID, Name: c.Name, Items: its})
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"restaurant":       map[string]any{"id": rest.ID, "slug": rest.Slug, "name": rest.Name},
+		"till":             1,
+		"cashier":          displayName(u.Email),
+		"shift":            shift,
+		"other_till_shift": nil,
+		"tables":           tables,
+		"requests":         requests,
+		"menu":             menu,
+	})
+}
+
+func (h *handler) posOpenShift(w http.ResponseWriter, r *http.Request, u domain.User, restaurantID uuid.UUID) {
+	var req struct {
+		OpeningFloatCents int `json:"opening_float_cents"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	sh, err := h.Pos.OpenShift(r.Context(), restaurantID, u.ID, req.OpeningFloatCents)
+	if writeAppErr(w, err) {
+		return
+	}
+	number, err := h.Pos.ShiftNumber(r.Context(), restaurantID, sh.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, h.toPosShiftView(r.Context(), sh, number, sh.OpeningFloatCents))
+}
+
+// posCloseShift responds with the POS client's PostedShift shape.
+func (h *handler) posCloseShift(w http.ResponseWriter, r *http.Request, _ domain.User, restaurantID uuid.UUID) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	var req struct {
+		DeclaredCents int `json:"declared_cents"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	sh, err := h.Pos.CloseShift(r.Context(), restaurantID, id, req.DeclaredCents)
+	if writeAppErr(w, err) {
+		return
+	}
+	number, err := h.Pos.ShiftNumber(r.Context(), restaurantID, sh.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"number":         fmt.Sprintf("shift-%d", number),
+		"expected_cents": *sh.ExpectedCents,
+		"declared_cents": *sh.DeclaredCents,
+		"variance_cents": *sh.VarianceCents,
+		"posted_at":      hhmm(*sh.ClosedAt),
+		// Fake GL posting: one cash line + one sales line.
+		"gl_lines": 2,
+	})
+}
+
+func (h *handler) posAddLines(w http.ResponseWriter, r *http.Request, _ domain.User, restaurantID uuid.UUID) {
+	tableID, err := uuid.Parse(r.PathValue("tableID"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	var req struct {
+		Lines []struct {
+			MenuItemID uuid.UUID   `json:"menu_item_id"`
+			OptionIDs  []uuid.UUID `json:"option_ids"`
+			Options    []string    `json:"options"` // labels, POS client shape
+			Qty        int         `json:"qty"`
+		} `json:"lines"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	inputs := make([]posapp.LineInput, len(req.Lines))
+	for i, l := range req.Lines {
+		inputs[i] = posapp.LineInput{MenuItemID: l.MenuItemID, OptionIDs: l.OptionIDs, OptionLabels: l.Options, Qty: l.Qty}
+	}
+	ticket, err := h.Pos.AddLines(r.Context(), restaurantID, tableID, inputs)
+	if writeAppErr(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, toPosTicketView(ticket))
+}
+
+func (h *handler) posFire(w http.ResponseWriter, r *http.Request, _ domain.User, restaurantID uuid.UUID) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	ticket, err := h.Pos.Fire(r.Context(), restaurantID, id)
+	if writeAppErr(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, toPosTicketView(ticket))
+}
+
+func (h *handler) posAckRequest(w http.ResponseWriter, r *http.Request, _ domain.User, restaurantID uuid.UUID) {
+	h.posRequestAction(w, r, restaurantID, h.Pos.AckRequest)
+}
+
+func (h *handler) posDismissRequest(w http.ResponseWriter, r *http.Request, _ domain.User, restaurantID uuid.UUID) {
+	h.posRequestAction(w, r, restaurantID, h.Pos.DismissRequest)
+}
+
+func (h *handler) posRequestAction(w http.ResponseWriter, r *http.Request, restaurantID uuid.UUID, act func(ctx context.Context, restaurantID, id uuid.UUID) error) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	if writeAppErr(w, act(r.Context(), restaurantID, id)) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}

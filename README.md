@@ -1,87 +1,82 @@
-# <img src="docs/assets/icon.svg" alt="aivo" width="28"/> Menu
+# <img src="docs/assets/icon.svg" alt="aivo" width="28"/> AIVO RMS
 
-The `web-menu` satellite service: the diner-facing digital menu, ordering,
-and landing page for a single restaurant, reached via a per-table link. See
-the wayfinder map ([issue #12](https://github.com/Nap20192/aivo/issues/12))
-for how this fits the rest of AIVO RMS, and `CONTEXT.md` for the domain
-glossary (Restaurant, Table, Menu, Order, Service request, etc.) used
-throughout this codebase.
+Multi-tenant restaurant management SaaS: restaurants self-register, build
+a digital menu, manage it from an admin panel, and run service with a
+phone POS. One Go binary (`cmd/aivo-server`) serves the whole platform —
+see `docs/PLATFORM.md` for the build contract and `internal/menu/CONTEXT.md`
+for the menu domain glossary.
+
+## Layout
+
+- `internal/platform` — organizations, users/auth (bcrypt + Postgres
+  sessions), subscriptions (fake billing), restaurant provisioning,
+  themes, custom domains.
+- `internal/menu` — diner menu, orders, service requests (existing
+  context, now tenant-scoped under the platform).
+- `internal/pos` — shifts, per-table tickets, kitchen firing; talks to
+  the menu context via in-process Go interfaces.
+- `cmd/aivo-server` — the API (`/api/v1`), legacy menu API, and static
+  SPAs (`/admin`, `/pos`, tenant menu routes `/{slug}`, `/{slug}/t/{token}`).
+- `cmd/aivo-seed` — demo tenant "Ember & Bone".
 
 ## Running locally
 
-1. Start infra + the server (Postgres, MinIO for image storage, and
-   `menu-server` itself, built from the root `Dockerfile`):
+1. Start infra + the server (Postgres, MinIO, `aivo-server`):
 
    ```bash
    docker-compose up -d --build
    ```
 
-   `menu-server` will be up but empty — run the migration and seed step
-   below against it before it's useful. Env vars for the containerized
-   server live in `docker-compose.yml` (dev-only values, safe to commit);
-   see the table below if running `go run` natively instead.
+   The server applies all SQL migrations itself on startup (tracked in
+   `schema_migrations`); no manual `psql` step.
 
-2. Set environment variables (only needed if running natively, i.e. not
-   via `docker-compose`):
-
-   | Var | Required | Notes |
-   |---|---|---|
-   | `DATABASE_URL` | yes | e.g. `postgres://aivo_menu:aivo_menu@localhost:5432/aivo_menu?sslmode=disable` (matches `docker-compose.yml`) |
-   | `TOKEN_ENCRYPTION_KEY` | yes | base64-encoded 32 random bytes (AES-256), e.g. `openssl rand -base64 32` |
-   | `TELEGRAM_BOT_TOKEN` | no | for the seed script's demo `NotificationChannel`; skipped with a warning if unset |
-   | `TELEGRAM_CHAT_ID` | no | see above |
-   | `BASE_URL` | no | defaults to `http://localhost:8080`; used to print the table link |
-   | `PORT` | no | defaults to `8080` |
-
-3. Run the migration:
+2. Seed the demo tenant:
 
    ```bash
-   psql "$DATABASE_URL" -f internal/menu/adapters/postgres/migrations/0001_init.sql
+   DATABASE_URL=postgres://aivo:aivo@localhost:5432/aivo?sslmode=disable go run ./cmd/aivo-seed
    ```
 
-4. Seed a demo restaurant (there is no admin API/UI in this MVP — see
-   `AGENTS.md` — so this is the only way to get data in):
+   Prints the table links. Demo logins: `owner@ember.test` /
+   `embertest1`, `waiter@ember.test` / `embertest1`. Not idempotent —
+   re-running fails on the owner email unique constraint.
 
-   ```bash
-   go run ./cmd/menu-seed
-   ```
+3. Open `http://localhost:8080/admin` (admin), `/pos` (POS), or a printed
+   table link (diner menu). SPA routes answer 503 until the corresponding
+   `web/<app>/dist` exists (`npm run build` in each app).
 
-   Not idempotent — re-running against an already-seeded database fails on
-   the `restaurants.slug` unique constraint.
+Env vars (native `go run ./cmd/aivo-server` instead of docker-compose):
 
-5. Run the server (skip if you started it via `docker-compose` in step 1):
+| Var | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | yes | e.g. `postgres://aivo:aivo@localhost:5432/aivo?sslmode=disable` |
+| `TOKEN_ENCRYPTION_KEY` | yes | base64-encoded 32 random bytes (AES-256), e.g. `openssl rand -base64 32` |
+| `BASE_URL` | no | defaults to `http://localhost:8080`; used in table links/QRs |
+| `PORT` | no | defaults to `8080` |
+| `S3_ENDPOINT` | no | e.g. `localhost:9000`; unset disables image uploads (503) |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` / `S3_PUBLIC_URL` | no | see `docker-compose.yml` for the dev values |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | no | legacy menu notification channel (optional) |
 
-   ```bash
-   go run ./cmd/menu-server
-   ```
+## Commands
 
-6. Open the table link the seed script printed (`Table link: ...`) in a
-   browser.
+```bash
+go build ./... && go vet ./... && go test ./...   # build + checks
+go run ./cmd/aivo-server                          # run the server
+go run ./cmd/aivo-seed                            # seed Ember & Bone
+```
 
 ## Image storage
 
-`docker-compose.yml` provisions MinIO (S3-compatible) with a public-read
-bucket, `aivo-menu-images`, at `http://localhost:9000` (console:
-`http://localhost:9001`, `aivo_menu` / `aivo_menu_minio`) — diners' browsers
-load images directly from it, no signed URLs. `domain.MenuItem.ImageURL`
-and Landing banner blocks are already just URL strings, so pointing one at
-`http://localhost:9000/aivo-menu-images/<key>` works today. There is no
-upload endpoint yet (nothing in the app writes to the bucket) — this only
-provisions where those URLs will eventually point; building an actual
-upload path is future work, not speculated on here.
+MinIO (S3-compatible) with a public-read bucket `aivo-menu-images` at
+`http://localhost:9000` (console `:9001`, `aivo` / `aivo_minio`).
+`POST /api/v1/restaurants/{id}/images` (multipart field `image`) uploads
+and returns the public URL.
 
-## What's not done
+## Not done / stubs
 
-- Never run end-to-end against real infra: no live Postgres or Telegram bot
-  was available in the build sandbox, so the migration, seed script, and
-  server have not actually been exercised together.
-- No admin API/UI — the seed script is the only way to populate a
-  Restaurant, per the wayfinder map's decision.
-- No gRPC/proto layer — deferred per the `ponytail:` note near `main.go`
-  (see root `docs/adr/0001`) until a second internal service needs to call
-  this one.
-- Currency/locale is still "Not yet specified" in the wayfinder map.
-- Image *storage* is provisioned (MinIO, see "Image storage" above) but
-  there's no upload endpoint — images still have to land in the bucket by
-  hand (or via the S3 API directly) and get their URL pasted into
-  `ImageURL`/banner data manually.
+- Billing is a fake in-memory provider (no real payments); Stripe slots
+  in behind `platform/ports.BillingProvider`.
+- Custom domains route by Host header only — no DNS verification or
+  certificate automation (v1 stub per `docs/PLATFORM.md`).
+- Staff invited without a password get an unguessable random one; there
+  is no invite email/reset flow yet.
+- No gRPC — contexts talk in-process (root `docs/adr/0001`).

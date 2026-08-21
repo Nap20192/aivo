@@ -62,6 +62,18 @@ const (
 	AllergenMolluscs    Allergen = "molluscs"
 )
 
+// ValidAllergen reports whether a is one of the 14 EU allergen codes.
+func ValidAllergen(a Allergen) bool {
+	switch a {
+	case AllergenCereals, AllergenCrustaceans, AllergenEggs, AllergenFish,
+		AllergenPeanuts, AllergenSoybeans, AllergenMilk, AllergenNuts,
+		AllergenCelery, AllergenMustard, AllergenSesame, AllergenSulphites,
+		AllergenLupin, AllergenMolluscs:
+		return true
+	}
+	return false
+}
+
 // Option is one choice within an OptionGroup, with a label and a price
 // delta applied on top of the Menu item's base price.
 type Option struct {
@@ -179,10 +191,12 @@ const (
 	RequestBill ServiceRequestKind = "request_bill"
 )
 
-// Service request lifecycle states.
+// Service request lifecycle states. Dismissed is the POS "not doing
+// this" exit, distinct from acknowledged ("handled").
 const (
 	ServiceRequestPending      = "pending"
 	ServiceRequestAcknowledged = "acknowledged"
+	ServiceRequestDismissed    = "dismissed"
 )
 
 // ServiceRequest is a diner-initiated action with no items, e.g. "call
