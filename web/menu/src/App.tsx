@@ -4,7 +4,7 @@ import { loadCart, loadSentAt, saveCart, saveSentAt, type CartLine } from "./car
 import { countdownStr, hhmm } from "./format";
 import { fmtCents } from "./format";
 import { CartScreen } from "./screens/CartScreen";
-import { ExpiredScreen } from "./screens/ExpiredScreen";
+import { ExpiredScreen, NotFoundScreen } from "./screens/ExpiredScreen";
 import { ItemScreen } from "./screens/ItemScreen";
 import { Landing } from "./screens/Landing";
 import { MenuScreen } from "./screens/MenuScreen";
@@ -23,21 +23,30 @@ export interface SentOrder {
   time: string;
 }
 
-/** Diner entry: /{restaurant_slug}/t/{table_token} */
-function parseLink(): { slug: string; token: string } | null {
-  const m = location.pathname.match(/^\/([^/]+)\/t\/([^/]+)/);
-  return m ? { slug: m[1], token: m[2] } : null;
+type Link =
+  | { mode: "table"; slug: string; token: string }
+  | { mode: "browse"; slug: string; menuSlug: string };
+
+/** Diner entry /{restaurant_slug}/t/{table_token}, or public browse /{restaurant_slug}/m/{menu_slug}. */
+function parseLink(): Link | null {
+  let m = location.pathname.match(/^\/([^/]+)\/t\/([^/]+)/);
+  if (m) return { mode: "table", slug: m[1], token: m[2] };
+  m = location.pathname.match(/^\/([^/]+)\/m\/([^/]+)/);
+  if (m) return { mode: "browse", slug: m[1], menuSlug: m[2] };
+  return null;
 }
 
 export default function App() {
   const link = useMemo(parseLink, []);
+  const browse = link?.mode === "browse";
   // In mock mode a bare URL still demos with the fixture tenant.
-  const token = link?.token ?? (preferMock ? "demo" : null);
+  const token = link?.mode === "table" ? link.token : !link && preferMock ? "demo" : null;
 
   const [client, setClient] = useState<Client>(() => (preferMock ? mockClient : httpClient));
-  const [phase, setPhase] = useState<"loading" | "ready" | "expired">("loading");
+  const [phase, setPhase] = useState<"loading" | "ready" | "expired" | "notfound">("loading");
   const [session, setSession] = useState<TableSession | null>(null);
   const [screen, setScreen] = useState<Screen>("landing");
+  const [menuIdx, setMenuIdx] = useState(0);
   const [cat, setCat] = useState(0);
   const [itemId, setItemId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartLine[]>(() => (token ? loadCart(token) : []));
@@ -56,13 +65,25 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!token) {
+    if (!browse && !token) {
       setPhase("expired");
       return;
     }
     let live = true;
-    client
-      .getSession(token)
+    const load =
+      link?.mode === "browse"
+        ? // Browse mode reuses the table-session shape with a single menu and no table.
+          client.getBrowse(link.slug, link.menuSlug).then(
+            (b): TableSession => ({
+              restaurant: b.restaurant,
+              table: { id: "", label: "" },
+              theme: b.theme,
+              menus: [b.menu],
+              open_requests: [],
+            }),
+          )
+        : client.getSession(token!);
+    load
       .then((s) => {
         if (!live) return;
         setSession(s);
@@ -79,13 +100,13 @@ export default function App() {
           console.warn("AIVO menu: API unreachable, falling back to mock fixtures");
           setClient(mockClient); // effect reruns with the mock
         } else {
-          setPhase("expired");
+          setPhase(browse ? "notfound" : "expired");
         }
       });
     return () => {
       live = false;
     };
-  }, [token, client]);
+  }, [token, client, link, browse]);
 
   useEffect(() => {
     if (token) saveCart(token, cart);
@@ -155,7 +176,13 @@ export default function App() {
   const vars = theme ? themeVars(theme) : {};
   const cartCount = cart.reduce((t, l) => t + l.qty, 0);
   const cartTotal = cart.reduce((t, l) => t + l.unitCents * l.qty, 0);
-  const item = itemId && session ? session.menu.flatMap((c) => c.items).find((i) => i.id === itemId) : null;
+  const item =
+    itemId && session
+      ? session.menus
+          .flatMap((m) => m.categories)
+          .flatMap((c) => c.items)
+          .find((i) => i.id === itemId)
+      : null;
 
   let body;
   if (phase === "loading") {
@@ -164,14 +191,17 @@ export default function App() {
         Loading the menu…
       </div>
     );
+  } else if (phase === "notfound") {
+    body = <NotFoundScreen />;
   } else if (phase === "expired" || !session) {
     body = <ExpiredScreen />;
   } else if (screen === "landing") {
-    body = <Landing session={session} onMenu={() => setScreen("menu")} />;
+    body = <Landing session={session} browse={browse} onMenu={() => setScreen("menu")} />;
   } else if (screen === "item" && item) {
     body = (
       <ItemScreen
         item={item}
+        browse={browse}
         onBack={() => setScreen("menu")}
         onAdd={(line) => {
           setCart([...cart, line]);
@@ -221,6 +251,12 @@ export default function App() {
     body = (
       <MenuScreen
         session={session}
+        browse={browse}
+        menuIdx={menuIdx}
+        onPickMenu={(i) => {
+          setMenuIdx(i);
+          setCat(0);
+        }}
         cat={cat}
         onPickCat={setCat}
         cartLabel={cartCount ? "Cart · " + fmtCents(cartTotal) : "Cart"}

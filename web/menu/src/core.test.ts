@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { mockClient, normalizeSession } from "./api";
 import { hasFromPrice, lineDetail, lineOptions, unitPriceCents } from "./cart";
 import { demoSession } from "./fixtures";
 import { countdownStr, fmtCents } from "./format";
 import { themeVars } from "./theme";
+import type { TableSession } from "./types";
 
-const ribeye = demoSession.menu[1].items[0];
+const dinner = demoSession.menus[0];
+const ribeye = dinner.categories[1].items[0];
 
 describe("money", () => {
   it("formats integer cents", () => {
@@ -42,8 +45,33 @@ describe("item pricing", () => {
   });
   it("from-price only when a single-select group raises the base", () => {
     expect(hasFromPrice(ribeye)).toBe(true);
-    const bavette = demoSession.menu[1].items[1];
+    const bavette = dinner.categories[1].items[1];
     expect(hasFromPrice(bavette)).toBe(false); // doneness free, sauces are multi
+  });
+});
+
+describe("multi-menu contract", () => {
+  it("fixtures: default menu first, unique slugs", () => {
+    expect(demoSession.menus[0].is_default).toBe(true);
+    expect(demoSession.menus.map((m) => m.slug)).toEqual(["dinner", "bar"]);
+  });
+  it("normalizeSession wraps a legacy flat menu into a default menu", () => {
+    const legacy = {
+      ...demoSession,
+      menus: undefined,
+      menu: dinner.categories,
+    } as unknown as TableSession;
+    const s = normalizeSession(legacy);
+    expect(s.menus).toHaveLength(1);
+    expect(s.menus[0].is_default).toBe(true);
+    expect(s.menus[0].categories).toBe(dinner.categories);
+  });
+  it("mock browse returns one menu by slug, 404 otherwise", async () => {
+    const b = await mockClient.getBrowse("ember-and-bone", "bar");
+    expect(b.menu.name).toBe("Bar");
+    expect(b.restaurant.slug).toBe("ember-and-bone");
+    await expect(mockClient.getBrowse("ember-and-bone", "brunch")).rejects.toMatchObject({ status: 404 });
+    await expect(mockClient.getBrowse("nope", "dinner")).rejects.toMatchObject({ status: 404 });
   });
 });
 
