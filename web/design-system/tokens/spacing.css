@@ -1,0 +1,8 @@
+:root{
+--space-0:0;--space-1:2px;--space-2:4px;--space-3:6px;--space-4:8px;--space-5:12px;--space-6:16px;--space-7:20px;--space-8:24px;--space-9:32px;--space-10:40px;--space-11:56px;--space-12:72px;
+
+--gutter-page:32px;--gutter-page-tight:20px;--pad-card:20px;--pad-card-tight:14px;--pad-cell-x:14px;--pad-cell-y:11px;--gap-stack:12px;--gap-inline:8px;--gap-section:24px;
+
+--control-h-sm:30px;--control-h-md:36px;--control-h-lg:44px;--control-h-touch:56px;
+--sidebar-w:236px;--sidebar-w-collapsed:64px;--topbar-h:60px;--content-max:1180px;--reading-max:68ch;
+}

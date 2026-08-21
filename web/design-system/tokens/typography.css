@@ -1,0 +1,21 @@
+:root{
+--font-display:"Newsreader",ui-serif,Georgia,serif;
+--font-sans:"Hanken Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,sans-serif;
+--font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+
+--text-display-xl:44px;--text-display-lg:34px;--text-display-md:27px;
+--text-title-lg:22px;--text-title-md:18px;--text-title-sm:16px;
+--text-body-lg:15px;--text-body-md:14px;--text-body-sm:13px;--text-caption:12px;--text-micro:11px;
+
+--leading-tight:1.12;--leading-snug:1.28;--leading-normal:1.5;--leading-relaxed:1.62;
+--weight-light:300;--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-bold:700;
+--tracking-tight:-0.02em;--tracking-snug:-0.01em;--tracking-normal:0;--tracking-wide:0.04em;--tracking-caps:0.07em;
+
+/* Semantic type roles */
+--type-page-title:var(--weight-regular) var(--text-display-md)/var(--leading-snug) var(--font-display);
+--type-section-title:var(--weight-semibold) var(--text-title-sm)/var(--leading-snug) var(--font-sans);
+--type-body:var(--weight-regular) var(--text-body-md)/var(--leading-normal) var(--font-sans);
+--type-label:var(--weight-medium) var(--text-body-sm)/var(--leading-snug) var(--font-sans);
+--type-eyebrow:var(--weight-semibold) var(--text-micro)/1.2 var(--font-sans);
+--type-numeric:var(--weight-medium) var(--text-body-md)/1.3 var(--font-mono);
+}

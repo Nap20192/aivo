@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/aivo-design-system-3d538f2a-aed8-41e5-9994-fd22d8bc2bee/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/aivo-design-system-3d538f2a-aed8-41e5-9994-fd22d8bc2bee/tokens/colors.css">
+<link rel="stylesheet" href="_ds/aivo-design-system-3d538f2a-aed8-41e5-9994-fd22d8bc2bee/tokens/typography.css">
+<link rel="stylesheet" href="_ds/aivo-design-system-3d538f2a-aed8-41e5-9994-fd22d8bc2bee/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/aivo-design-system-3d538f2a-aed8-41e5-9994-fd22d8bc2bee/tokens/elevation.css">
+<link rel="stylesheet" href="_ds/aivo-design-system-3d538f2a-aed8-41e5-9994-fd22d8bc2bee/tokens/themes.css">
+<link rel="stylesheet" href="_ds/aivo-design-system-3d538f2a-aed8-41e5-9994-fd22d8bc2bee/tokens/base.css">
+<link rel="stylesheet" href="_ds/aivo-design-system-3d538f2a-aed8-41e5-9994-fd22d8bc2bee/styles.css">
+<script src="_ds/aivo-design-system-3d538f2a-aed8-41e5-9994-fd22d8bc2bee/_ds_bundle.js"></script>
+<style>
+  body { margin: 0; background: var(--paper-2); }
+  a { color: var(--text-link); text-decoration: none; }
+  a:hover { color: var(--text-link-hover); text-decoration: underline; }
+</style>
+</helmet>
+
+<section style="padding: 56px 56px 0; display: flex; flex-direction: column; gap: 56px; font-family: var(--font-sans)">
+
+  <div id="2a">
+    <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: 8px">
+      <span style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--paper-0); background: var(--ink-900); padding: 5px 9px; border-radius: 999px">2a</span>
+      <h1 style="margin: 0; font: var(--weight-regular) 34px/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Waiter POS on a phone</h1>
+    </div>
+    <p style="margin: 0 0 40px; max-width: 760px; font: var(--type-body); color: var(--ink-600); text-wrap: pretty">Staff-facing, one-handed, worn in an apron. Same tokens as the backoffice, sized for touch: every control 44–56px. Domain words as upstream — shift, till, cashier, fire, expected cash, declared cash, variance.</p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 32px">
+
+      <div data-screen-label="Waiter · open shift" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Open shift · one per till, one per cashier</div>
+        <div style="width: 390px; height: 700px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--ink-900); font: 500 11px/1 var(--font-mono); color: var(--paper-3)"><span>16:52</span><span>aivo · waiter</span></div>
+          <div style="flex: 1; padding: 22px 18px; display: flex; flex-direction: column">
+            <h2 style="margin: 0; font: var(--weight-regular) 27px/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Open a shift</h2>
+            <p style="margin: 8px 0 20px; font: var(--weight-regular) 14px/1.5 var(--font-sans); color: var(--ink-600)">Nothing can be ordered or tendered until a shift is open on your till.</p>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 16px; margin-bottom: 12px">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Cashier</span><span style="font: var(--type-label); color: var(--ink-900)">Yana P.</span></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Till</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="outline" uppercase="{{ true }}" hint-size="60px,22px">Till 1</x-import></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0"><span style="font: var(--type-body); color: var(--ink-600)">Opening float</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.MoneyAmount" value="{{ 150 }}" size="md" strong="{{ true }}" hint-size="80px,20px"></x-import></div>
+            </div>
+            <div style="background: var(--paper-2); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px">
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="lock" size="{{ 15 }}" hint-size="15px,15px"></x-import>
+                <span style="font: 600 13px/1.2 var(--font-sans); color: var(--ink-800)">Till 2 already has an open shift</span>
+              </div>
+              <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">shift-117, opened 16:04 by Marek. One open shift per till and per cashier.</div>
+            </div>
+          </div>
+          <div style="flex: none; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Open shift on till 1</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Waiter · floor" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Floor · tables and open requests</div>
+        <div style="width: 390px; height: 700px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--ink-900); font: 500 11px/1 var(--font-mono); color: var(--paper-3)"><span>20:15</span><span>shift-121 · till 1</span></div>
+          <div style="flex: none; padding: 14px 18px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default); display: flex; align-items: center; justify-content: space-between">
+            <h2 style="margin: 0; font: var(--weight-regular) 22px/1.1 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Floor</h2>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.StatusPill" status="open" label="shift open" dot="{{ true }}" hint-size="96px,22px"></x-import>
+          </div>
+          <div style="flex: 1; overflow: hidden; padding: 14px 16px 0; display: flex; flex-direction: column; gap: 10px">
+            <div style="background: var(--paper-0); border: 1px solid var(--orange-200); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px">
+              <span style="width: 44px; height: 44px; flex: none; border-radius: 8px; background: var(--orange-100); display: grid; place-items: center; font: 600 15px/1 var(--font-mono); color: var(--orange-700)">12</span>
+              <div style="flex: 1; min-width: 0">
+                <div style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">Waiter called · 20:14</div>
+                <div style="font: var(--weight-regular) 13px/1.4 var(--font-sans); color: var(--ink-500)">4 covers · order sent 20:16 · $79.00</div>
+              </div>
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="bell-ring" size="{{ 18 }}" hint-size="18px,18px"></x-import>
+            </div>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px">
+              <span style="width: 44px; height: 44px; flex: none; border-radius: 8px; background: var(--paper-2); display: grid; place-items: center; font: 600 15px/1 var(--font-mono); color: var(--ink-700)">04</span>
+              <div style="flex: 1; min-width: 0">
+                <div style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">Bill requested · 20:11</div>
+                <div style="font: var(--weight-regular) 13px/1.4 var(--font-sans); color: var(--ink-500)">2 covers · $128.00 open</div>
+              </div>
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="receipt" size="{{ 18 }}" hint-size="18px,18px"></x-import>
+            </div>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px">
+              <span style="width: 44px; height: 44px; flex: none; border-radius: 8px; background: var(--paper-2); display: grid; place-items: center; font: 600 15px/1 var(--font-mono); color: var(--ink-700)">07</span>
+              <div style="flex: 1; min-width: 0">
+                <div style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">Ordering</div>
+                <div style="font: var(--weight-regular) 13px/1.4 var(--font-sans); color: var(--ink-500)">3 covers · nothing fired yet</div>
+              </div>
+            </div>
+            <div style="background: var(--paper-1); border: 1px dashed var(--border-strong); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; opacity: 0.7">
+              <span style="width: 44px; height: 44px; flex: none; border-radius: 8px; background: var(--paper-2); display: grid; place-items: center; font: 600 15px/1 var(--font-mono); color: var(--ink-400)">09</span>
+              <div style="flex: 1; font: var(--type-body); color: var(--ink-500)">Free</div>
+            </div>
+          </div>
+          <div style="flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="bell" hint-size="100%,48px">Requests · 2</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" hint-size="100%,48px">New order</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Waiter · ticket" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Table ticket · diner order arrives here</div>
+        <div style="width: 390px; height: 700px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--ink-900); font: 500 11px/1 var(--font-mono); color: var(--paper-3)"><span>20:17</span><span>table 12</span></div>
+          <div style="flex: none; padding: 14px 18px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default); display: flex; align-items: center; justify-content: space-between">
+            <div>
+              <div style="font: var(--weight-regular) 22px/1.1 var(--font-display); color: var(--ink-900)">Table 12</div>
+              <div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500); margin-top: 2px">from the diner's phone · 20:16</div>
+            </div>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.StatusPill" status="closed" label="to fire" hint-size="70px,22px"></x-import>
+          </div>
+          <div style="flex: 1; overflow: hidden; padding: 14px 16px 0; display: flex; flex-direction: column; gap: 10px">
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 14px">
+              <div style="padding: 12px 0; border-bottom: 1px dashed var(--border-default)">
+                <div style="display: flex; justify-content: space-between; gap: 10px"><span style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">1 × Dry-aged ribeye</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$61.00</span></div>
+                <div style="font: var(--weight-regular) 13px/1.45 var(--font-sans); color: var(--ink-500); margin-top: 3px">400 g · medium rare · béarnaise</div>
+              </div>
+              <div style="padding: 12px 0">
+                <div style="display: flex; justify-content: space-between; gap: 10px"><span style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">2 × Triple-cooked chips</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$18.00</span></div>
+              </div>
+            </div>
+            <div style="background: var(--yellow-100); border: 1px solid var(--yellow-200); border-radius: 10px; padding: 13px 15px">
+              <div style="font: 600 12px/1.2 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--yellow-800); margin-bottom: 5px">Note from the table</div>
+              <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-800)">Severe nut allergy — no hazelnut on the table. Ribeye after the starters.</div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 4px">
+              <span style="font: var(--type-label); color: var(--ink-600)">Open on this table</span>
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.MoneyAmount" value="{{ 79 }}" size="lg" strong="{{ true }}" hint-size="90px,24px"></x-import>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="plus" hint-size="100%,48px">Add item</x-import>
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="split" hint-size="100%,48px">Split</x-import>
+            </div>
+          </div>
+          <div style="flex: none; display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Tender</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" icon-left="flame" hint-size="100%,48px">Fire to kitchen</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Waiter · requests" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Requests · what the diner's buttons produce</div>
+        <div style="width: 390px; height: 700px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--ink-900); font: 500 11px/1 var(--font-mono); color: var(--paper-3)"><span>20:15</span><span>service requests</span></div>
+          <div style="flex: none; padding: 14px 18px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default)">
+            <div style="font: var(--weight-regular) 22px/1.1 var(--font-display); color: var(--ink-900)">Requests</div>
+            <div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500); margin-top: 2px">Also pushed to the Telegram group. Clearing here clears it for everyone.</div>
+          </div>
+          <div style="flex: 1; overflow: hidden; padding: 14px 16px 0; display: flex; flex-direction: column; gap: 10px">
+            <div style="background: var(--paper-0); border: 1px solid var(--orange-200); border-radius: 10px; padding: 15px 16px">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px">
+                <span style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">Table 12 · waiter</span>
+                <span style="font: var(--type-numeric); font-size: 12px; color: var(--orange-700)">waiting 1 min</span>
+              </div>
+              <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600); margin-bottom: 12px">Asked at 20:14. No reason given.</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Dismiss</x-import>
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" hint-size="100%,48px">On my way</x-import>
+              </div>
+            </div>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 15px 16px">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px">
+                <span style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">Table 04 · bill</span>
+                <span style="font: var(--type-numeric); font-size: 12px; color: var(--ink-500)">waiting 4 min</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px"><span style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">Open total</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.MoneyAmount" value="{{ 128 }}" size="md" strong="{{ true }}" hint-size="80px,20px"></x-import></div>
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" icon-left="receipt" hint-size="100%,48px">Print and take over</x-import>
+            </div>
+            <div style="background: var(--paper-1); border: 1px dashed var(--border-strong); border-radius: 10px; padding: 13px 15px; font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500)">One open request per table. A second tap from the same table does not create a second card.</div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Waiter · close shift" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Close shift · variance before accept</div>
+        <div style="width: 390px; height: 700px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--ink-900); font: 500 11px/1 var(--font-mono); color: var(--paper-3)"><span>23:12</span><span>shift-121</span></div>
+          <div style="flex: 1; padding: 20px 18px; display: flex; flex-direction: column">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px">
+              <h2 style="margin: 0; font: var(--weight-regular) 24px/1.1 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Close shift</h2>
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.StatusPill" status="closed" label="cash frozen" hint-size="100px,22px"></x-import>
+            </div>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 16px; margin-bottom: 12px">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Expected cash</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.MoneyAmount" value="{{ 1284.5 }}" size="md" hint-size="100px,20px"></x-import></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Declared cash</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.MoneyAmount" value="{{ 1279.5 }}" size="md" hint-size="100px,20px"></x-import></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 13px 0"><span style="font: var(--type-label); color: var(--ink-800)">Variance</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.MoneyAmount" value="{{ -5 }}" size="md" signed="{{ true }}" strong="{{ true }}" hint-size="90px,20px"></x-import></div>
+            </div>
+            <div style="background: var(--paper-2); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px">
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="lock" size="{{ 15 }}" hint-size="15px,15px"></x-import>
+                <span style="font: 600 13px/1.2 var(--font-sans); color: var(--ink-800)">Posting is immutable</span>
+              </div>
+              <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">An accepted shift cannot be cancelled or reopened. A manager accepts variances over $10.00.</div>
+            </div>
+          </div>
+          <div style="flex: none; display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Recount</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" icon-left="check" hint-size="100%,48px">Accept and post</x-import>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="2b">
+    <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: 8px">
+      <span style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--paper-0); background: var(--ink-900); padding: 5px 9px; border-radius: 999px">2b</span>
+      <h1 style="margin: 0; font: var(--weight-regular) 34px/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Same code, four restaurants</h1>
+    </div>
+    <p style="margin: 0 0 40px; max-width: 760px; font: var(--type-body); color: var(--ink-600); text-wrap: pretty">What a restaurant configures for itself: accent, theme, item density, whether photos are used, and which landing blocks are on. No layout is hand-built per tenant — these are the same three components under different settings.</p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 32px">
+
+      <div data-screen-label="Config · steakhouse" style="width: 300px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Blood red · photos · tabs</div>
+        <div style="width: 300px; height: 470px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="flex: none; padding: 14px 14px 10px; background: var(--paper-0); display: flex; align-items: center; justify-content: space-between">
+            <span style="font: 600 14px/1 var(--font-sans); color: var(--ink-900)">Ember &amp; Bone<span style="color: #bd1220">.</span></span>
+            <span style="font: 500 10px/1 var(--font-mono); color: var(--ink-500)">TABLE 12</span>
+          </div>
+          <div style="flex: none; display: flex; gap: 5px; padding: 0 14px 10px; background: var(--paper-0); border-bottom: 1px solid var(--border-default)">
+            <span style="padding: 6px 11px; border-radius: 999px; background: var(--ink-900); color: var(--paper-0); font: 500 12px/1.2 var(--font-sans)">Grill</span>
+            <span style="padding: 6px 11px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--border-default); color: var(--ink-700); font: 500 12px/1.2 var(--font-sans)">Sides</span>
+            <span style="padding: 6px 11px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--border-default); color: var(--ink-700); font: 500 12px/1.2 var(--font-sans)">Wine</span>
+          </div>
+          <div style="flex: 1; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; gap: 10px; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 10px">
+              <div style="width: 64px; height: 64px; flex: none; border-radius: 8px; background: var(--paper-3)"></div>
+              <div style="flex: 1; min-width: 0"><div style="display: flex; justify-content: space-between"><span style="font: 600 13px/1.3 var(--font-sans); color: var(--ink-900)">Dry-aged ribeye</span><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$46</span></div><div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500); margin-top: 3px">45 days, vine wood.</div></div>
+            </div>
+            <div style="display: flex; gap: 10px; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 10px">
+              <div style="width: 64px; height: 64px; flex: none; border-radius: 8px; background: var(--paper-3)"></div>
+              <div style="flex: 1; min-width: 0"><div style="display: flex; justify-content: space-between"><span style="font: 600 13px/1.3 var(--font-sans); color: var(--ink-900)">Bavette</span><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$34</span></div><div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500); margin-top: 3px">Chimichurri, embers.</div></div>
+            </div>
+          </div>
+          <div style="flex: none; padding: 10px 12px 12px; background: var(--paper-0); border-top: 1px solid var(--border-default); display: grid; grid-template-columns: 1fr 1fr; gap: 6px">
+            <div style="height: 40px; border: 1px solid var(--border-default); border-radius: 6px; display: grid; place-items: center; font: 500 12px/1 var(--font-sans); color: var(--ink-700)">Waiter</div>
+            <div style="height: 40px; background: #bd1220; border-radius: 6px; display: grid; place-items: center; font: 500 12px/1 var(--font-sans); color: #fff">Cart · $79</div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Config · cafe" style="width: 300px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Olive · no photos · dense list</div>
+        <div style="width: 300px; height: 470px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="flex: none; padding: 14px 14px 10px; background: var(--paper-0); display: flex; align-items: center; justify-content: space-between">
+            <span style="font: 600 14px/1 var(--font-sans); color: var(--ink-900)">Cantine Verte<span style="color: #6b7a2f">.</span></span>
+            <span style="font: 500 10px/1 var(--font-mono); color: var(--ink-500)">TABLE 03</span>
+          </div>
+          <div style="flex: none; display: flex; gap: 5px; padding: 0 14px 10px; background: var(--paper-0); border-bottom: 1px solid var(--border-default)">
+            <span style="padding: 6px 11px; border-radius: 999px; background: #6b7a2f; color: #fff; font: 500 12px/1.2 var(--font-sans)">All day</span>
+            <span style="padding: 6px 11px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--border-default); color: var(--ink-700); font: 500 12px/1.2 var(--font-sans)">Coffee</span>
+            <span style="padding: 6px 11px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--border-default); color: var(--ink-700); font: 500 12px/1.2 var(--font-sans)">Pastry</span>
+          </div>
+          <div style="flex: 1; padding: 6px 14px; display: flex; flex-direction: column">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px dashed var(--border-default)"><div><div style="font: 600 13px/1.3 var(--font-sans); color: var(--ink-900)">Green shakshuka</div><div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500)">chard, feta, sourdough</div></div><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$16</span></div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px dashed var(--border-default)"><div><div style="font: 600 13px/1.3 var(--font-sans); color: var(--ink-900)">Lentil bowl</div><div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500)">preserved lemon, herbs</div></div><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$14</span></div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px dashed var(--border-default); opacity: 0.42"><div><div style="font: 600 13px/1.3 var(--font-sans); color: var(--ink-900)">Almond croissant</div><div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500)">sold out 11:20</div></div><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$5</span></div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0"><div><div style="font: 600 13px/1.3 var(--font-sans); color: var(--ink-900)">Flat white</div><div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500)">oat, decaf on request</div></div><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$4</span></div>
+          </div>
+          <div style="flex: none; padding: 10px 12px 12px; background: var(--paper-0); border-top: 1px solid var(--border-default); display: grid; grid-template-columns: 1fr 1fr; gap: 6px">
+            <div style="height: 40px; border: 1px solid var(--border-default); border-radius: 6px; display: grid; place-items: center; font: 500 12px/1 var(--font-sans); color: var(--ink-700)">Waiter</div>
+            <div style="height: 40px; background: #6b7a2f; border-radius: 6px; display: grid; place-items: center; font: 500 12px/1 var(--font-sans); color: #fff">Cart · $34</div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Config · wine bar" style="width: 300px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Wine · bold theme · sticky index</div>
+        <div class="theme-bold" style="width: 300px; height: 470px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="flex: none; padding: 14px 14px 10px; background: var(--paper-0); display: flex; align-items: center; justify-content: space-between">
+            <span style="font: 600 14px/1 var(--font-sans); color: var(--ink-900)">Sediment<span style="color: #7d1a49">.</span></span>
+            <span style="font: 500 10px/1 var(--font-mono); color: var(--ink-500)">BAR 02</span>
+          </div>
+          <div style="flex: 1; display: flex; border-top: 1px solid var(--border-default)">
+            <div style="flex: 1; padding: 12px 12px; display: flex; flex-direction: column; gap: 8px">
+              <div style="font: var(--weight-regular) 16px/1.1 var(--font-display); color: var(--ink-900)">Orange</div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font: 600 12px/1.3 var(--font-sans); color: var(--ink-900)">Ribolla, 2021</span><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$13</span></div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font: 600 12px/1.3 var(--font-sans); color: var(--ink-900)">Rkatsiteli</span><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$15</span></div>
+              <div style="font: var(--weight-regular) 16px/1.1 var(--font-display); color: var(--ink-900); border-top: 1px dashed var(--border-default); padding-top: 8px">Red</div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font: 600 12px/1.3 var(--font-sans); color: var(--ink-900)">Gamay, Beaujolais</span><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$12</span></div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font: 600 12px/1.3 var(--font-sans); color: var(--ink-900)">Nerello Mascalese</span><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$16</span></div>
+            </div>
+            <div style="width: 74px; flex: none; border-left: 1px solid var(--border-default); background: var(--paper-2); padding: 12px 10px; display: flex; flex-direction: column; gap: 9px">
+              <span style="font: 600 10px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: #7d1a49">Orange</span>
+              <span style="font: 600 10px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400)">Red</span>
+              <span style="font: 600 10px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400)">Fizz</span>
+              <span style="font: 600 10px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400)">Snacks</span>
+            </div>
+          </div>
+          <div style="flex: none; padding: 10px 12px 12px; background: var(--paper-0); border-top: 1px solid var(--border-default); display: grid; grid-template-columns: 1fr 1fr; gap: 6px">
+            <div style="height: 40px; border: 1px solid var(--border-default); border-radius: 6px; display: grid; place-items: center; font: 500 12px/1 var(--font-sans); color: var(--ink-700)">Bill</div>
+            <div style="height: 40px; background: #7d1a49; border-radius: 6px; display: grid; place-items: center; font: 500 12px/1 var(--font-sans); color: #fff">Cart · $28</div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Config · noodle bar" style="width: 300px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Fire · big photo cards · no landing</div>
+        <div style="width: 300px; height: 470px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="flex: none; padding: 14px 14px 10px; background: var(--paper-0); border-bottom: 1px solid var(--border-default); display: flex; align-items: center; justify-content: space-between">
+            <span style="font: 600 14px/1 var(--font-sans); color: var(--ink-900)">Tonkotsu 8<span style="color: #e2560f">.</span></span>
+            <span style="font: 500 10px/1 var(--font-mono); color: var(--ink-500)">COUNTER 05</span>
+          </div>
+          <div style="flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; overflow: hidden">
+              <div style="height: 92px; background: var(--paper-3)"></div>
+              <div style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: baseline"><span style="font: 600 13px/1.3 var(--font-sans); color: var(--ink-900)">Tonkotsu, 18h</span><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$17</span></div>
+            </div>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; overflow: hidden">
+              <div style="height: 92px; background: var(--paper-3)"></div>
+              <div style="padding: 10px 12px; display: flex; justify-content: space-between; align-items: baseline"><span style="font: 600 13px/1.3 var(--font-sans); color: var(--ink-900)">Spicy miso</span><span class="aivo-num" style="font: 500 12px/1.3 var(--font-mono)">$16</span></div>
+            </div>
+          </div>
+          <div style="flex: none; padding: 10px 12px 12px; background: var(--paper-0); border-top: 1px solid var(--border-default); display: grid; grid-template-columns: 1fr 1fr; gap: 6px">
+            <div style="height: 40px; border: 1px solid var(--border-default); border-radius: 6px; display: grid; place-items: center; font: 500 12px/1 var(--font-sans); color: var(--ink-700)">Waiter</div>
+            <div style="height: 40px; background: #e2560f; border-radius: 6px; display: grid; place-items: center; font: 500 12px/1 var(--font-sans); color: #fff">Cart · $33</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding: 56px 56px 96px; display: flex; flex-direction: column; gap: 56px; font-family: var(--font-sans)">
+
+  <div id="1a" class="{{ boldClass }}" style="{{ themeVars }}">
+    <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: 8px">
+      <span style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--paper-0); background: var(--ink-900); padding: 5px 9px; border-radius: 999px">1a</span>
+      <h1 style="margin: 0; font: var(--weight-regular) 34px/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">AIVO Menu — diner-facing screens</h1>
+    </div>
+    <p style="margin: 0 0 40px; max-width: 720px; font: var(--type-body); color: var(--ink-600); text-wrap: pretty">One entry point: <span style="font: var(--type-numeric)">{{ slug }}/t/xY82kq</span>. No login, no account, no order tracking. Every screen below is a client-side route inside that link. Photos are placeholders — drop real warm-toned food photography in and nothing else changes.</p>
+
+    <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 16px">Core flow</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 32px">
+
+      <div data-screen-label="Landing" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Landing · scan lands here</div>
+        <div style="width: 390px; height: 780px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:07</span><span>{{ slug }}/t/xY82kq</span></div>
+          <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column">
+            <div style="height: 168px; flex: none; background: var(--paper-3); border-bottom: 1px solid var(--border-default); display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">banner photo</div>
+            <div style="padding: 20px 18px 0">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+                <span style="font: 600 20px/1 var(--font-sans); letter-spacing: -0.01em; color: var(--ink-900)">{{ brandName }}<span style="color: var(--accent-solid)">.</span></span>
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="outline" uppercase="{{ true }}" hint-size="76px,22px">Table 12</x-import>
+              </div>
+              <p style="margin: 12px 0 0; font: var(--weight-regular) 15px/1.6 var(--font-sans); color: var(--ink-700); text-wrap: pretty">Live-fire grill, dry-aged beef, one wood oven. Everything comes out when it's ready — we'll pace it for you.</p>
+            </div>
+            <div style="padding: 20px 18px 0; display: flex; flex-direction: column; gap: 10px">
+              <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 14px 16px">
+                <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin-bottom: 10px">Open today</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border-default); padding-bottom: 8px; margin-bottom: 8px"><span style="font: var(--type-body); color: var(--ink-700)">Kitchen</span><span style="font: var(--type-numeric); color: var(--ink-900)">17:00 – 22:30</span></div>
+                <div style="display: flex; justify-content: space-between; align-items: center"><span style="font: var(--type-body); color: var(--ink-700)">Bar</span><span style="font: var(--type-numeric); color: var(--ink-900)">17:00 – 00:00</span></div>
+              </div>
+              <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; overflow: hidden">
+                <div style="height: 96px; background: var(--paper-2); border-bottom: 1px solid var(--border-subtle); display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">map</div>
+                <div style="padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px">
+                  <span style="font: var(--type-body); color: var(--ink-700)">14 Rue des Bouchers</span>
+                  <span style="font: var(--type-label); color: var(--text-link)">Directions</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px">
+                <div style="flex: 1; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 12px 14px; font: var(--type-label); color: var(--ink-700)">Call · 02 512 33 74</div>
+                <div style="flex: none; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 12px 14px; font: var(--type-label); color: var(--ink-700)">Instagram</div>
+              </div>
+            </div>
+          </div>
+          <div style="flex: none; padding: 12px 16px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" icon-left="utensils" hint-size="100%,48px">See the menu</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Menu" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Menu · categories as tabs</div>
+        <div style="width: 390px; height: 780px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:09</span><span>/menu</span></div>
+          <div style="flex: none; padding: 12px 16px 10px; background: var(--paper-0); display: flex; align-items: center; justify-content: space-between; gap: 12px">
+            <span style="font: 600 15px/1 var(--font-sans); letter-spacing: -0.01em; color: var(--ink-900)">{{ brandName }}<span style="color: var(--accent-solid)">.</span></span>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="outline" uppercase="{{ true }}" hint-size="76px,22px">Table 12</x-import>
+          </div>
+          <div style="flex: none; display: flex; gap: 6px; padding: 0 16px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default); overflow: hidden">
+            <span style="flex: none; padding: 8px 13px; border-radius: 999px; background: var(--ink-900); color: var(--paper-0); font: var(--type-label)">Starters</span>
+            <span style="flex: none; padding: 8px 13px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--border-default); color: var(--ink-700); font: var(--type-label)">From the grill</span>
+            <span style="flex: none; padding: 8px 13px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--border-default); color: var(--ink-700); font: var(--type-label)">Sides</span>
+            <span style="flex: none; padding: 8px 13px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--border-default); color: var(--ink-700); font: var(--type-label)">Wine</span>
+          </div>
+          <div style="flex: 1; overflow: hidden; padding: 16px 16px 0; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; gap: 12px; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 12px">
+              <div style="width: 84px; height: 84px; flex: none; border-radius: 8px; background: var(--paper-3); display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">photo</div>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+                <div style="display: flex; justify-content: space-between; gap: 8px"><span style="font: 600 15px/1.25 var(--font-sans); color: var(--ink-900)">Bone marrow, sourdough</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$14.00</span></div>
+                <span style="font: var(--weight-regular) 13px/1.45 var(--font-sans); color: var(--ink-500); text-wrap: pretty">Roasted, parsley and caper salt, grilled sourdough.</span>
+                <div style="display: flex; gap: 6px; margin-top: 2px">
+                  <x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="neutral" hint-size="56px,20px">gluten</x-import>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 12px">
+              <div style="width: 84px; height: 84px; flex: none; border-radius: 8px; background: var(--paper-3); display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">photo</div>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+                <div style="display: flex; justify-content: space-between; gap: 8px"><span style="font: 600 15px/1.25 var(--font-sans); color: var(--ink-900)">Beef tartare, cured yolk</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$18.00</span></div>
+                <span style="font: var(--weight-regular) 13px/1.45 var(--font-sans); color: var(--ink-500); text-wrap: pretty">Hand-cut sirloin, mustard, shallot, rye crisps.</span>
+                <div style="display: flex; gap: 6px; margin-top: 2px">
+                  <x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="neutral" hint-size="46px,20px">egg</x-import>
+                  <x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="neutral" hint-size="64px,20px">mustard</x-import>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px; background: var(--paper-0); border: 1px dashed var(--border-strong); border-radius: 10px; padding: 12px; cursor: not-allowed">
+              <div style="width: 84px; height: 84px; flex: none; border-radius: 8px; background: var(--paper-3); opacity: 0.42; display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">photo</div>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+                <div style="display: flex; justify-content: space-between; gap: 8px; opacity: 0.42"><span style="font: 600 15px/1.25 var(--font-sans); color: var(--ink-900)">Charred leeks, olive oil</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$12.00</span></div>
+                <span style="font: var(--weight-regular) 13px/1.45 var(--font-sans); color: var(--ink-500); opacity: 0.42">Vadouvan, hazelnut, sheep's curd.</span>
+                <div style="display: flex; gap: 6px; margin-top: 2px">
+                  <x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="warning" hint-size="120px,20px">off the menu tonight</x-import>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 12px">
+              <div style="width: 84px; height: 84px; flex: none; border-radius: 8px; background: var(--paper-3); display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">photo</div>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+                <div style="display: flex; justify-content: space-between; gap: 8px"><span style="font: 600 15px/1.25 var(--font-sans); color: var(--ink-900)">Grilled flatbread, beef fat</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$8.00</span></div>
+                <span style="font: var(--weight-regular) 13px/1.45 var(--font-sans); color: var(--ink-500); text-wrap: pretty">Wood oven, smoked salt, rosemary.</span>
+              </div>
+            </div>
+          </div>
+          <div style="flex: none; display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="bell" hint-size="100%,48px">Waiter</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="receipt" hint-size="100%,48px">Bill</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Cart · $79.00</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Item detail" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Item · customize</div>
+        <div style="width: 390px; height: 780px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:11</span><span>/menu/ribeye</span></div>
+          <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column">
+            <div style="height: 150px; flex: none; background: var(--paper-3); display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">photo</div>
+            <div style="padding: 16px 18px 0">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+                <h2 style="margin: 0; font: var(--weight-regular) 22px/1.2 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Dry-aged ribeye</h2>
+                <span class="aivo-num" style="font: 500 15px/1.3 var(--font-mono); color: var(--ink-900)">from $46.00</span>
+              </div>
+              <p style="margin: 8px 0 0; font: var(--weight-regular) 14px/1.5 var(--font-sans); color: var(--ink-600); text-wrap: pretty">45 days on the bone, over vine wood. Rested 10 minutes, carved to order.</p>
+              <div style="display: flex; gap: 6px; margin-top: 10px">
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="neutral" hint-size="50px,20px">dairy</x-import>
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="neutral" hint-size="64px,20px">mustard</x-import>
+              </div>
+            </div>
+            <div style="padding: 18px 18px 0">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px">
+                <span style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-500)">Size</span>
+                <span style="font: var(--weight-regular) 11px/1.2 var(--font-sans); color: var(--ink-400)">pick one</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border-strong); background: var(--paper-0); border-radius: 6px">
+                  <span style="width: 18px; height: 18px; flex: none; border-radius: 50%; border: 2px solid var(--border-strong)"></span>
+                  <span style="flex: 1; font: var(--type-label); color: var(--ink-800)">300 g</span>
+                  <span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-400)">included</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--accent-solid); background: var(--red-50); border-radius: 6px">
+                  <span style="width: 18px; height: 18px; flex: none; border-radius: 50%; border: 2px solid var(--accent-solid); display: grid; place-items: center"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-solid)"></span></span>
+                  <span style="flex: 1; font: var(--type-label); color: var(--ink-900)">400 g · centre cut</span>
+                  <span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-700)">+$12.00</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border-strong); background: var(--paper-0); border-radius: 6px">
+                  <span style="width: 18px; height: 18px; flex: none; border-radius: 50%; border: 2px solid var(--border-strong)"></span>
+                  <span style="flex: 1; font: var(--type-label); color: var(--ink-800)">600 g · to share</span>
+                  <span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-700)">+$26.00</span>
+                </div>
+              </div>
+            </div>
+            <div style="padding: 18px 18px 0">
+              <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-500); margin-bottom: 10px">Add-ons · any number</div>
+              <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 14px">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px dashed var(--border-default)">
+                  <x-import component-from-global-scope="AIVODesignSystem_3d538f.Checkbox" label="Béarnaise" default-checked="{{ true }}" hint-size="140px,22px"></x-import>
+                  <span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-700)">+$3.00</span>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px dashed var(--border-default)">
+                  <x-import component-from-global-scope="AIVODesignSystem_3d538f.Checkbox" label="Bone marrow butter" hint-size="180px,22px"></x-import>
+                  <span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-700)">+$4.00</span>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0">
+                  <x-import component-from-global-scope="AIVODesignSystem_3d538f.Checkbox" label="Peppercorn sauce" hint-size="170px,22px"></x-import>
+                  <span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-700)">+$3.00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.QuantityStepper" default-value="{{ 1 }}" min="{{ 1 }}" size="lg" hint-size="120px,44px"></x-import>
+            <div style="flex: 1">
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Add · $61.00</x-import>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Cart" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Cart · full-screen route</div>
+        <div style="width: 390px; height: 780px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:14</span><span>/cart</span></div>
+          <div style="flex: none; padding: 14px 18px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default); display: flex; align-items: baseline; justify-content: space-between">
+            <h2 style="margin: 0; font: var(--weight-regular) 22px/1.1 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Your order</h2>
+            <span style="font: var(--type-body); color: var(--ink-500)">Table 12</span>
+          </div>
+          <div style="flex: 1; overflow: hidden; padding: 16px 18px 0; display: flex; flex-direction: column; gap: 12px">
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 14px">
+              <div style="display: flex; justify-content: space-between; gap: 10px"><span style="font: 600 15px/1.25 var(--font-sans); color: var(--ink-900)">Dry-aged ribeye</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$61.00</span></div>
+              <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500); margin-top: 4px">400 g · centre cut · medium rare · béarnaise</div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px">
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.QuantityStepper" default-value="{{ 1 }}" min="{{ 1 }}" size="lg" hint-size="120px,44px"></x-import>
+                <span style="font: var(--type-label); color: var(--text-link)">Remove</span>
+              </div>
+            </div>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 14px">
+              <div style="display: flex; justify-content: space-between; gap: 10px"><span style="font: 600 15px/1.25 var(--font-sans); color: var(--ink-900)">Triple-cooked chips</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$18.00</span></div>
+              <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500); margin-top: 4px">beef fat · rosemary salt</div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px">
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.QuantityStepper" default-value="{{ 2 }}" min="{{ 1 }}" size="lg" hint-size="120px,44px"></x-import>
+                <span style="font: var(--type-label); color: var(--text-link)">Remove</span>
+              </div>
+            </div>
+            <div>
+              <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-500); margin-bottom: 8px">Note for the kitchen · one per order</div>
+              <div style="background: var(--paper-0); border: 1px solid var(--border-strong); border-radius: 6px; padding: 12px 14px; min-height: 64px; font: var(--weight-regular) 14px/1.5 var(--font-sans); color: var(--ink-400)">Anything the kitchen should know — allergies, pacing, one plate to share.</div>
+              <div style="display: flex; justify-content: flex-end; font: var(--type-numeric); font-size: 11px; color: var(--ink-400); margin-top: 6px">0 / 240</div>
+            </div>
+            <div style="background: var(--paper-2); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px">
+              <div style="display: flex; justify-content: space-between; align-items: center"><span style="font: var(--type-label); color: var(--ink-700)">Total</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.MoneyAmount" value="{{ 79 }}" size="lg" strong="{{ true }}" hint-size="90px,24px"></x-import></div>
+              <div style="font: var(--weight-regular) 12px/1.5 var(--font-sans); color: var(--ink-500); margin-top: 6px">You pay at the table, as usual. This screen never takes payment.</div>
+            </div>
+          </div>
+          <div style="flex: none; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Send to the kitchen</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Order sent" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Confirmation · 201, no tracking</div>
+        <div style="width: 390px; height: 780px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:16</span><span>/sent</span></div>
+          <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 22px">
+            <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--green-100); border: 1px solid var(--green-200); display: grid; place-items: center; margin-bottom: 20px">
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="check" size="{{ 24 }}" hint-size="24px,24px"></x-import>
+            </div>
+            <h2 style="margin: 0; font: var(--weight-regular) 27px/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Sent to the kitchen</h2>
+            <p style="margin: 10px 0 20px; font: var(--weight-regular) 15px/1.55 var(--font-sans); color: var(--ink-600); text-wrap: pretty">Table 12 · 3 items · 20:16. It'll come out when it's ready — nothing else to do.</p>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 16px">
+              <div style="display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Ribeye · 400 g</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">×1</span></div>
+              <div style="display: flex; justify-content: space-between; padding: 11px 0"><span style="font: var(--type-body); color: var(--ink-600)">Triple-cooked chips</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">×2</span></div>
+            </div>
+          </div>
+          <div style="flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Order more</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="receipt" hint-size="100%,48px">Ask for the bill</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Service" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Service · two buttons, not a form</div>
+        <div style="width: 390px; height: 780px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:18</span><span>/service</span></div>
+          <div style="flex: 1; display: flex; flex-direction: column; padding: 24px 20px">
+            <h2 style="margin: 0; font: var(--weight-regular) 27px/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Need something?</h2>
+            <p style="margin: 10px 0 24px; font: var(--weight-regular) 15px/1.55 var(--font-sans); color: var(--ink-600); text-wrap: pretty">One request per table. Everyone at table 12 sees the same state, so there's no need for two of you to ask.</p>
+            <div style="display: flex; flex-direction: column; gap: 12px">
+              <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 18px">
+                <div style="font: 600 16px/1.25 var(--font-sans); color: var(--ink-900); margin-bottom: 4px">Call the waiter</div>
+                <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500); margin-bottom: 14px">Someone comes over. No reason needed.</div>
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" icon-left="bell" hint-size="100%,48px">Call the waiter</x-import>
+              </div>
+              <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 18px">
+                <div style="font: 600 16px/1.25 var(--font-sans); color: var(--ink-900); margin-bottom: 4px">Ask for the bill</div>
+                <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500); margin-bottom: 14px">Brought to the table. Pay however you like — cash or card.</div>
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="receipt" hint-size="100%,48px">Ask for the bill</x-import>
+              </div>
+            </div>
+          </div>
+          <div style="flex: none; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="ghost" size="touch" full-width="{{ true }}" hint-size="100%,48px">Back to the menu</x-import>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 48px 0 16px">States that are real, not silent</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 32px">
+
+      <div data-screen-label="86 item detail" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">86'd item · disabled, explained</div>
+        <div style="width: 390px; height: 560px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:10</span><span>/menu/lamb-shoulder</span></div>
+          <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column">
+            <div style="height: 130px; flex: none; background: var(--paper-3); opacity: 0.42; display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">photo</div>
+            <div style="padding: 16px 18px 0">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; opacity: 0.42">
+                <h2 style="margin: 0; font: var(--weight-regular) 22px/1.2 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Lamb shoulder, 6 hours</h2>
+                <span class="aivo-num" style="font: 500 15px/1.3 var(--font-mono); color: var(--ink-900)">$46.00</span>
+              </div>
+              <div style="margin-top: 14px; background: var(--yellow-100); border: 1px solid var(--yellow-200); border-radius: 10px; padding: 14px 16px">
+                <div style="font: 600 14px/1.3 var(--font-sans); color: var(--yellow-800); margin-bottom: 4px">Off the menu tonight</div>
+                <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-700)">The kitchen sold out at 20:04. We're leaving it here so you know it exists — ask the waiter about tomorrow.</div>
+              </div>
+              <p style="margin: 16px 0 0; font: var(--weight-regular) 14px/1.5 var(--font-sans); color: var(--ink-500); opacity: 0.42">Slow-roasted over embers, harissa, yoghurt, flatbread. Enough for two.</p>
+            </div>
+          </div>
+          <div style="flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <div style="flex: 1">
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" disabled="{{ true }}" hint-size="100%,48px">Can't be ordered tonight</x-import>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Waiter already called" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">429 · someone already asked</div>
+        <div style="width: 390px; height: 560px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:19</span><span>/service</span></div>
+          <div style="flex: 1; padding: 22px 20px; display: flex; flex-direction: column; gap: 14px">
+            <div style="background: var(--paper-0); border: 1px solid var(--orange-200); border-radius: 10px; padding: 16px 18px">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px">
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="bell-ring" size="{{ 16 }}" hint-size="16px,16px"></x-import>
+                <span style="font: 600 15px/1.2 var(--font-sans); color: var(--orange-700)">Already asked</span>
+              </div>
+              <div style="font: var(--weight-regular) 14px/1.5 var(--font-sans); color: var(--ink-700)">Someone at table 12 called the waiter at <span style="font: var(--type-numeric)">20:14</span>. One open request per table — we won't send a second.</div>
+            </div>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" disabled="{{ true }}" icon-left="bell" hint-size="100%,48px">Waiter on the way</x-import>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 18px">
+              <div style="font: 600 16px/1.25 var(--font-sans); color: var(--ink-900); margin-bottom: 4px">Ask for the bill</div>
+              <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500); margin-bottom: 14px">Separate request — still available.</div>
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="receipt" hint-size="100%,48px">Ask for the bill</x-import>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Order rate limited" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Order too soon · slow down</div>
+        <div style="width: 390px; height: 560px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:17</span><span>/cart</span></div>
+          <div style="flex: 1; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+            <div style="background: var(--paper-0); border: 1px solid var(--orange-200); border-radius: 10px; padding: 16px 18px">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px">
+                <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="clock" size="{{ 16 }}" hint-size="16px,16px"></x-import>
+                <span style="font: 600 15px/1.2 var(--font-sans); color: var(--orange-700)">One moment</span>
+              </div>
+              <div style="font: var(--weight-regular) 14px/1.5 var(--font-sans); color: var(--ink-700)">Table 12 sent an order at <span style="font: var(--type-numeric)">20:16</span>. To stop double orders reaching the kitchen, the next one can go in <span style="font: var(--type-numeric)">1:14</span>. Nothing was lost.</div>
+            </div>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 16px">
+              <div style="display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-700)">Burnt basque cheesecake</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$11.00</span></div>
+              <div style="display: flex; justify-content: space-between; padding: 11px 0"><span style="font: var(--type-body); color: var(--ink-700)">Malbec, glass</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$14.00</span></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px"><span style="font: var(--type-label); color: var(--ink-600)">Still in your cart</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.MoneyAmount" value="{{ 25 }}" size="md" strong="{{ true }}" hint-size="80px,20px"></x-import></div>
+          </div>
+          <div style="flex: none; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" disabled="{{ true }}" hint-size="100%,48px">Send again in 1:14</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Empty cart" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Empty cart · never persisted</div>
+        <div style="width: 390px; height: 560px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:08</span><span>/cart</span></div>
+          <div style="flex: 1; display: grid; place-items: center; padding: 20px">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.EmptyState" icon="utensils" title="Nothing in the cart yet" message="Pick something from the menu. Your cart lives on this phone only — it clears if you close the tab." hint-size="100%,240px"></x-import>
+          </div>
+          <div style="flex: none; display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="bell" hint-size="100%,48px">Waiter</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="receipt" hint-size="100%,48px">Bill</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Browse menu</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Long note" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Long note · one per order, capped</div>
+        <div style="width: 390px; height: 560px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:15</span><span>/cart</span></div>
+          <div style="flex: 1; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+            <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-500)">Note for the kitchen</div>
+            <div style="background: var(--paper-0); border: 1px solid var(--border-focus); box-shadow: var(--focus-ring); border-radius: 6px; padding: 12px 14px; font: var(--weight-regular) 14px/1.55 var(--font-sans); color: var(--ink-800)">One of us has a severe nut allergy — no hazelnut anywhere on the table, please. Bring the ribeye after the starters, not with them, and can the chips come at the same time as the steak? Also one still water, no ice.</div>
+            <div style="display: flex; justify-content: space-between; align-items: center">
+              <span style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500)">The waiter reads this before firing.</span>
+              <span style="font: var(--type-numeric); font-size: 11px; color: var(--ink-500)">223 / 240</span>
+            </div>
+            <div style="background: var(--paper-2); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; margin-top: 4px"><span style="font: var(--type-label); color: var(--ink-700)">Total</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.MoneyAmount" value="{{ 79 }}" size="lg" strong="{{ true }}" hint-size="90px,24px"></x-import></div>
+          </div>
+          <div style="flex: none; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Send to the kitchen</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Token expired" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Table link expired</div>
+        <div style="width: 390px; height: 560px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>23:41</span><span>/t/xY82kq</span></div>
+          <div style="flex: 1; display: grid; place-items: center; padding: 20px">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.EmptyState" icon="qr-code" title="This table link has expired" message="Table tokens end with the service. Scan the code on your table again, or ask a staff member for a fresh one." hint-size="100%,260px"></x-import>
+          </div>
+          <div style="flex: none; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="refresh-cw" hint-size="100%,48px">Try again</x-import>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="Offline" style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">Offline · menu stays readable</div>
+        <div style="width: 390px; height: 560px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 26px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-md)">
+          <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--paper-0); border-bottom: 1px solid var(--border-subtle); font: 500 11px/1 var(--font-mono); color: var(--ink-500)"><span>20:22</span><span>/menu</span></div>
+          <div style="flex: none; background: var(--ink-900); padding: 11px 16px; display: flex; align-items: center; gap: 8px">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--red-500); flex: none"></span>
+            <span style="font: var(--weight-medium) 13px/1.3 var(--font-sans); color: var(--paper-1)">No connection — showing the menu loaded at 20:09</span>
+          </div>
+          <div style="flex: 1; overflow: hidden; padding: 16px 16px 0; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; gap: 12px; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 12px">
+              <div style="width: 72px; height: 72px; flex: none; border-radius: 8px; background: var(--paper-3); display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">photo</div>
+              <div style="flex: 1; min-width: 0"><div style="display: flex; justify-content: space-between; gap: 8px"><span style="font: 600 15px/1.25 var(--font-sans); color: var(--ink-900)">Dry-aged ribeye</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">$46.00</span></div><div style="font: var(--weight-regular) 13px/1.45 var(--font-sans); color: var(--ink-500); margin-top: 4px">45 days, vine wood, carved to order.</div></div>
+            </div>
+            <div style="background: var(--paper-2); border: 1px dashed var(--border-strong); border-radius: 10px; padding: 14px 16px">
+              <div style="font: 600 14px/1.3 var(--font-sans); color: var(--ink-800); margin-bottom: 4px">Ordering is paused</div>
+              <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">Sending needs a connection. Your cart is safe on this phone — or just wave someone over.</div>
+            </div>
+          </div>
+          <div style="flex: none; display: grid; grid-template-columns: 1fr 1.25fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="refresh-cw" hint-size="100%,48px">Retry</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" disabled="{{ true }}" hint-size="100%,48px">Cart · offline</x-import>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 48px 0 4px">Alternates · pick one per row</div>
+    <p style="margin: 0 0 20px; max-width: 720px; font: var(--type-body); color: var(--ink-600)">Same design language, different structure. The left option is what the core flow above uses.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 32px">
+
+      <div style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">A · Category tabs <span style="color: var(--ink-900)">(in use)</span></div>
+        <div style="width: 390px; height: 300px; background: var(--paper-0); border: 1px solid var(--border-strong); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm)">
+          <div style="display: flex; gap: 6px; padding: 14px 16px; border-bottom: 1px solid var(--border-default); overflow: hidden">
+            <span style="flex: none; padding: 8px 13px; border-radius: 999px; background: var(--ink-900); color: var(--paper-0); font: var(--type-label)">Starters</span>
+            <span style="flex: none; padding: 8px 13px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--border-default); color: var(--ink-700); font: var(--type-label)">From the grill</span>
+            <span style="flex: none; padding: 8px 13px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--border-default); color: var(--ink-700); font: var(--type-label)">Sides</span>
+          </div>
+          <div style="padding: 16px; display: flex; flex-direction: column; gap: 10px">
+            <div style="height: 56px; background: var(--paper-1); border: 1px solid var(--border-subtle); border-radius: 8px"></div>
+            <div style="height: 56px; background: var(--paper-1); border: 1px solid var(--border-subtle); border-radius: 8px"></div>
+            <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500)">One category at a time. Short lists, no scrolling past what you don't want.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">B · Long scroll, sticky index</div>
+        <div style="width: 390px; height: 300px; background: var(--paper-0); border: 1px solid var(--border-strong); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm)">
+          <div style="display: flex; height: 100%">
+            <div style="flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+              <div style="font: var(--weight-regular) 18px/1.2 var(--font-display); color: var(--ink-900)">Starters</div>
+              <div style="height: 46px; background: var(--paper-1); border: 1px solid var(--border-subtle); border-radius: 8px"></div>
+              <div style="height: 46px; background: var(--paper-1); border: 1px solid var(--border-subtle); border-radius: 8px"></div>
+              <div style="font: var(--weight-regular) 18px/1.2 var(--font-display); color: var(--ink-900); border-top: 1px dashed var(--border-default); padding-top: 10px">From the grill</div>
+              <div style="height: 46px; background: var(--paper-1); border: 1px solid var(--border-subtle); border-radius: 8px"></div>
+            </div>
+            <div style="width: 96px; flex: none; border-left: 1px solid var(--border-default); background: var(--paper-1); padding: 16px 12px; display: flex; flex-direction: column; gap: 10px">
+              <span style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--accent-solid)">Starters</span>
+              <span style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400)">Grill</span>
+              <span style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400)">Sides</span>
+              <span style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400)">Wine</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">A · Customize as a page <span style="color: var(--ink-900)">(in use)</span></div>
+        <div style="width: 390px; height: 300px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column">
+          <div style="height: 74px; flex: none; background: var(--paper-3); display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">photo</div>
+          <div style="flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+            <div style="font: var(--weight-regular) 18px/1.2 var(--font-display); color: var(--ink-900)">Dry-aged ribeye</div>
+            <div style="height: 34px; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 6px"></div>
+            <div style="height: 34px; background: var(--paper-0); border: 1px solid var(--accent-solid); border-radius: 6px"></div>
+            <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500)">Full height for long option lists. Back returns to the same scroll spot.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">B · Customize as a sheet</div>
+        <div style="width: 390px; height: 300px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm); position: relative">
+          <div style="position: absolute; inset: 0; background: rgba(18, 16, 15, 0.42)"></div>
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 218px; background: var(--paper-0); border-top-left-radius: 14px; border-top-right-radius: 14px; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px">
+            <div style="width: 40px; height: 4px; border-radius: 999px; background: var(--border-strong); margin: 0 auto 6px"></div>
+            <div style="font: var(--weight-regular) 18px/1.2 var(--font-display); color: var(--ink-900)">Dry-aged ribeye</div>
+            <div style="height: 34px; background: var(--paper-1); border: 1px solid var(--accent-solid); border-radius: 6px"></div>
+            <div style="height: 34px; background: var(--paper-1); border: 1px solid var(--border-default); border-radius: 6px"></div>
+            <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500)">Menu stays visible behind. Tighter for items with one option group; cramped for the grill.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">A · Landing, hero-led <span style="color: var(--ink-900)">(in use)</span></div>
+        <div style="width: 390px; height: 300px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column">
+          <div style="height: 120px; flex: none; background: var(--paper-3); display: grid; place-items: center; font: 500 10px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-300)">banner photo</div>
+          <div style="flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+            <div style="font: 600 16px/1 var(--font-sans); color: var(--ink-900)">{{ brandName }}<span style="color: var(--accent-solid)">.</span></div>
+            <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">Blurb, then hours, map and socials underneath. Sets the room before the menu.</div>
+            <div style="margin-top: auto; height: 40px; background: var(--accent-solid); border-radius: 6px; display: grid; place-items: center; font: var(--type-label); color: var(--accent-on-solid)">See the menu</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width: 390px; flex: none">
+        <div style="font: 600 11px/1.2 var(--font-sans); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 8px 2px">B · Landing, utility-led</div>
+        <div style="width: 390px; height: 300px; background: var(--paper-1); border: 1px solid var(--border-strong); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; padding: 16px; gap: 10px">
+          <div style="display: flex; align-items: center; justify-content: space-between"><span style="font: 600 16px/1 var(--font-sans); color: var(--ink-900)">{{ brandName }}<span style="color: var(--accent-solid)">.</span></span><span style="font: var(--type-numeric); font-size: 11px; color: var(--ink-500)">TABLE 12</span></div>
+          <div style="height: 44px; background: var(--accent-solid); border-radius: 6px; display: grid; place-items: center; font: var(--type-label); color: var(--accent-on-solid)">See the menu</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+            <div style="height: 40px; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 6px; display: grid; place-items: center; font: var(--type-label); color: var(--ink-700)">Waiter</div>
+            <div style="height: 40px; background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 6px; display: grid; place-items: center; font: var(--type-label); color: var(--ink-700)">Bill</div>
+          </div>
+          <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">Actions first, story below the fold. Faster mid-meal, colder on arrival.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;brandName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Ember &amp; Bone&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Restaurant config&quot;},&quot;slug&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;ember-bone&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Restaurant config&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Blood red&quot;,&quot;Olive&quot;,&quot;Wine&quot;,&quot;Fire&quot;],&quot;default&quot;:&quot;Blood red&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Restaurant config&quot;},&quot;boldTheme&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Restaurant config&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const accent = this.props.accent ?? "Blood red";
+    const map = {
+      "Blood red": ["--red-600", "--red-700", "--red-800", "--red-100", "--red-50"],
+      "Olive": ["--olive-600", "--olive-700", "--olive-800", "--olive-100", "--olive-100"],
+      "Wine": ["--wine-600", "--wine-700", "--wine-800", "--wine-100", "--wine-100"],
+      "Fire": ["--orange-600", "--orange-700", "--orange-800", "--orange-100", "--orange-100"]
+    };
+    const [solid, hover, active, soft, wash] = map[accent] || map["Blood red"];
+    return {
+      brandName: this.props.brandName ?? "Ember & Bone",
+      slug: this.props.slug ?? "ember-bone",
+      boldClass: (this.props.boldTheme ?? false) ? "theme-bold" : "",
+      themeVars: {
+        "--accent-solid": "var(" + solid + ")",
+        "--accent-solid-hover": "var(" + hover + ")",
+        "--accent-solid-active": "var(" + active + ")",
+        "--accent-soft": "var(" + soft + ")",
+        "--red-50": "var(" + wash + ")",
+        "--text-link": "var(" + hover + ")",
+        "--text-link-hover": "var(" + active + ")"
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

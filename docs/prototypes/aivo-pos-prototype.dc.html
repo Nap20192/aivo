@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../../web/design-system/support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="../../web/design-system/styles.css">
+<script src="../../web/design-system/_ds_bundle.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: var(--paper-2); }
+  a { color: var(--text-link); text-decoration: none; }
+  a:hover { color: var(--text-link-hover); text-decoration: underline; }
+</style>
+</helmet>
+
+<div style="min-height: 100dvh; background: var(--paper-2); display: flex; justify-content: center; font-family: var(--font-sans)">
+<div style="width: 100%; max-width: 430px; height: 100dvh; display: flex; flex-direction: column; background: var(--paper-1); border-left: 1px solid var(--border-default); border-right: 1px solid var(--border-default); overflow: hidden">
+
+  <div style="height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: var(--ink-900); font: 500 11px/1 var(--font-mono); color: var(--paper-3)"><span>{{ clock }}</span><span>{{ context }}</span></div>
+
+  <sc-if value="{{ isOpen }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="Open shift" style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+      <div style="flex: 1; overflow-y: auto; min-height: 0; padding: 22px 18px">
+        <h2 style="margin: 0; font: var(--weight-regular) 27px/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Open a shift</h2>
+        <p style="margin: 8px 0 20px; font: var(--weight-regular) 14px/1.5 var(--font-sans); color: var(--ink-600)">Nothing can be ordered or tendered until a shift is open on your till.</p>
+        <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 16px; margin-bottom: 12px">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Cashier</span><span style="font: var(--type-label); color: var(--ink-900)">{{ cashierName }}</span></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Till</span><x-import component-from-global-scope="AIVODesignSystem_3d538f.Badge" tone="outline" uppercase="{{ true }}" hint-size="60px,22px">Till 1</x-import></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0"><span style="font: var(--type-body); color: var(--ink-600)">Opening float</span><span class="aivo-num" style="font: 600 15px/1.3 var(--font-mono); color: var(--ink-900)">{{ floatStr }}</span></div>
+        </div>
+        <div style="background: var(--paper-2); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="lock" size="{{ 15 }}" hint-size="15px,15px"></x-import>
+            <span style="font: 600 13px/1.2 var(--font-sans); color: var(--ink-800)">Till 2 already has an open shift</span>
+          </div>
+          <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">shift-117, opened 16:04 by Marek. One open shift per till and per cashier.</div>
+        </div>
+      </div>
+      <div style="flex: none; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" on-click="{{ openShift }}" hint-size="100%,48px">Open shift on till 1</x-import>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isFloor }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Floor" style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+      <div style="flex: none; padding: 14px 18px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default); display: flex; align-items: center; justify-content: space-between">
+        <h2 style="margin: 0; font: var(--weight-regular) 22px/1.1 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Floor</h2>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <x-import component-from-global-scope="AIVODesignSystem_3d538f.StatusPill" status="open" label="shift open" dot="{{ true }}" hint-size="96px,22px"></x-import>
+          <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="ghost" size="sm" on-click="{{ goClose }}" hint-size="60px,32px">Close</x-import>
+        </div>
+      </div>
+      <div style="flex: 1; overflow-y: auto; min-height: 0; padding: 14px 16px 14px; display: flex; flex-direction: column; gap: 10px">
+        <sc-for list="{{ floorTables }}" as="ft" hint-placeholder-count="4">
+          <div style="{{ ft.cardStyle }}" onClick="{{ ft.onOpen }}">
+            <span style="{{ ft.numStyle }}">{{ ft.n }}</span>
+            <div style="flex: 1; min-width: 0">
+              <div style="{{ ft.titleStyle }}">{{ ft.title }}</div>
+              <div style="font: var(--weight-regular) 13px/1.4 var(--font-sans); color: var(--ink-500)">{{ ft.sub }}</div>
+            </div>
+            <sc-if value="{{ ft.hasIcon }}" hint-placeholder-val="{{ false }}">
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="{{ ft.icon }}" size="{{ 18 }}" hint-size="18px,18px"></x-import>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="bell" on-click="{{ goRequests }}" hint-size="100%,48px">{{ requestsLabel }}</x-import>
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" on-click="{{ newOrder }}" hint-size="100%,48px">New order</x-import>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isTicket }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Ticket" style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+      <div style="flex: none; padding: 6px 8px 0; background: var(--paper-0); display: flex">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="ghost" size="sm" icon-left="arrow-left" on-click="{{ goFloor }}" hint-size="90px,36px">Floor</x-import>
+      </div>
+      <div style="flex: none; padding: 8px 18px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default); display: flex; align-items: center; justify-content: space-between">
+        <div>
+          <div style="font: var(--weight-regular) 22px/1.1 var(--font-display); color: var(--ink-900)">Table {{ tkN }}</div>
+          <div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500); margin-top: 2px">{{ tkSource }}</div>
+        </div>
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.StatusPill" status="{{ tkPillStatus }}" label="{{ tkPillLabel }}" hint-size="70px,22px"></x-import>
+      </div>
+      <div style="flex: 1; overflow-y: auto; min-height: 0; padding: 14px 16px 14px; display: flex; flex-direction: column; gap: 10px">
+        <sc-if value="{{ tkEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: 1; display: grid; place-items: center; padding: 20px">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.EmptyState" icon="utensils" title="Nothing ordered yet" message="Take the order here, or wait for the diner order to arrive from their phone." hint-size="100%,220px"></x-import>
+          </div>
+        </sc-if>
+        <sc-if value="{{ tkHasItems }}" hint-placeholder-val="{{ false }}">
+          <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 14px">
+            <sc-for list="{{ tkItems }}" as="ti" hint-placeholder-count="2">
+              <div style="{{ ti.rowStyle }}">
+                <div style="display: flex; justify-content: space-between; gap: 10px"><span style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">{{ ti.name }}</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">{{ ti.priceStr }}</span></div>
+                <sc-if value="{{ ti.hasDetail }}" hint-placeholder-val="{{ false }}">
+                  <div style="font: var(--weight-regular) 13px/1.45 var(--font-sans); color: var(--ink-500); margin-top: 3px">{{ ti.detail }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ tkHasNote }}" hint-placeholder-val="{{ false }}">
+            <div style="background: var(--yellow-100); border: 1px solid var(--yellow-200); border-radius: 10px; padding: 13px 15px">
+              <div style="font: 600 12px/1.2 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--yellow-800); margin-bottom: 5px">Note from the table</div>
+              <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-800)">{{ tkNote }}</div>
+            </div>
+          </sc-if>
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 4px">
+            <span style="font: var(--type-label); color: var(--ink-600)">Open on this table</span>
+            <span class="aivo-num" style="font: 600 18px/1.3 var(--font-mono); color: var(--ink-900)">{{ tkTotalStr }}</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="plus" on-click="{{ startOrderForTicket }}" hint-size="100%,48px">Add item</x-import>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" icon-left="split" hint-size="100%,48px">Split</x-import>
+          </div>
+          <sc-if value="{{ tkFired }}" hint-placeholder-val="{{ false }}">
+            <div style="background: var(--paper-2); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 13px 15px; font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">Fired to the kitchen at <span style="font: var(--type-numeric)">{{ tkFiredAt }}</span>. New items fire separately.</div>
+          </sc-if>
+        </sc-if>
+      </div>
+      <sc-if value="{{ tkEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: none; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+          <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" icon-left="plus" on-click="{{ startOrderForTicket }}" hint-size="100%,48px">Take the order</x-import>
+        </div>
+      </sc-if>
+      <sc-if value="{{ tkHasItems }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: none; display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+          <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" hint-size="100%,48px">Tender</x-import>
+          <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" icon-left="flame" disabled="{{ tkFired }}" on-click="{{ fire }}" hint-size="100%,48px">{{ fireLabel }}</x-import>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isRequests }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Requests" style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+      <div style="flex: none; padding: 6px 8px 0; background: var(--paper-0); display: flex">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="ghost" size="sm" icon-left="arrow-left" on-click="{{ goFloor }}" hint-size="90px,36px">Floor</x-import>
+      </div>
+      <div style="flex: none; padding: 8px 18px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default)">
+        <div style="font: var(--weight-regular) 22px/1.1 var(--font-display); color: var(--ink-900)">Requests</div>
+        <div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500); margin-top: 2px">Also pushed to the Telegram group. Clearing here clears it for everyone.</div>
+      </div>
+      <div style="flex: 1; overflow-y: auto; min-height: 0; padding: 14px 16px 14px; display: flex; flex-direction: column; gap: 10px">
+        <sc-if value="{{ noRequests }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: 1; display: grid; place-items: center; padding: 20px">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.EmptyState" icon="bell" title="No open requests" message="Diner calls and bill requests from table phones land here." hint-size="100%,200px"></x-import>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasWaiterReq }}" hint-placeholder-val="{{ false }}">
+          <div style="background: var(--paper-0); border: 1px solid var(--orange-200); border-radius: 10px; padding: 15px 16px">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px">
+              <span style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">Table 12 · waiter</span>
+              <span style="font: var(--type-numeric); font-size: 12px; color: var(--orange-700)">{{ waiterWait }}</span>
+            </div>
+            <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600); margin-bottom: 12px">Asked at 20:14. No reason given.</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" on-click="{{ dismissWaiter }}" hint-size="100%,48px">Dismiss</x-import>
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" on-click="{{ ackWaiter }}" hint-size="100%,48px">On my way</x-import>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasBillReq }}" hint-placeholder-val="{{ false }}">
+          <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 15px 16px">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px">
+              <span style="font: 600 15px/1.2 var(--font-sans); color: var(--ink-900)">Table 04 · bill</span>
+              <span style="font: var(--type-numeric); font-size: 12px; color: var(--ink-500)">{{ billWait }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px"><span style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">Open total</span><span class="aivo-num" style="font: 600 15px/1.3 var(--font-mono); color: var(--ink-900)">$128.00</span></div>
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" icon-left="receipt" on-click="{{ takeBill }}" hint-size="100%,48px">Print and take over</x-import>
+          </div>
+        </sc-if>
+        <div style="background: var(--paper-1); border: 1px dashed var(--border-strong); border-radius: 10px; padding: 13px 15px; font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-500)">One open request per table. A second tap from the same table does not create a second card.</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isPick }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Pick table" style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+      <div style="flex: none; padding: 6px 8px 0; background: var(--paper-0); display: flex">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="ghost" size="sm" icon-left="arrow-left" on-click="{{ goFloor }}" hint-size="90px,36px">Floor</x-import>
+      </div>
+      <div style="flex: none; padding: 8px 18px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default)">
+        <div style="font: var(--weight-regular) 22px/1.1 var(--font-display); color: var(--ink-900)">New order</div>
+        <div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500); margin-top: 2px">Pick a table. A table with an open ticket gets the new items added to it.</div>
+      </div>
+      <div style="flex: 1; overflow-y: auto; min-height: 0; padding: 14px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start">
+        <sc-for list="{{ pickTables }}" as="pt" hint-placeholder-count="4">
+          <div style="{{ pt.tileStyle }}" onClick="{{ pt.onPick }}">
+            <span class="aivo-num" style="{{ pt.numStyle }}">{{ pt.n }}</span>
+            <div style="font: 600 13px/1.2 var(--font-sans); color: var(--ink-900)">{{ pt.title }}</div>
+            <div style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500)">{{ pt.sub }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isOrder }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Take order" style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+      <div style="flex: none; padding: 6px 8px 0; background: var(--paper-0); display: flex">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="ghost" size="sm" icon-left="arrow-left" on-click="{{ cancelOrder }}" hint-size="90px,36px">Back</x-import>
+      </div>
+      <div style="flex: none; padding: 8px 18px 10px; background: var(--paper-0); display: flex; align-items: baseline; justify-content: space-between">
+        <div style="font: var(--weight-regular) 22px/1.1 var(--font-display); color: var(--ink-900)">Table {{ orderTable }}</div>
+        <span style="font: var(--weight-regular) 12px/1.4 var(--font-sans); color: var(--ink-500)">{{ orderHint }}</span>
+      </div>
+      <div style="flex: none; display: flex; gap: 6px; padding: 0 16px 12px; background: var(--paper-0); border-bottom: 1px solid var(--border-default); overflow-x: auto">
+        <sc-for list="{{ orderCats }}" as="oc" hint-placeholder-count="4">
+          <span style="{{ oc.style }}" onClick="{{ oc.onPick }}">{{ oc.label }}</span>
+        </sc-for>
+      </div>
+      <div style="flex: 1; overflow-y: auto; min-height: 0; padding: 10px 16px 14px; display: flex; flex-direction: column; gap: 8px">
+        <sc-for list="{{ orderRows }}" as="r" hint-placeholder-count="4">
+          <div style="{{ r.rowStyle }}">
+            <div style="display: flex; align-items: center; gap: 10px; min-height: 44px" onClick="{{ r.onAdd }}">
+              <span style="flex: 1; font: 600 15px/1.25 var(--font-sans); color: var(--ink-900)">{{ r.name }}</span>
+              <span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-700)">{{ r.priceStr }}</span>
+              <sc-if value="{{ r.inDraft }}" hint-placeholder-val="{{ false }}">
+                <span class="aivo-num" style="min-width: 28px; height: 28px; padding: 0 6px; border-radius: 999px; background: var(--accent-solid, var(--red-600)); color: #fff; display: grid; place-items: center; font: 600 13px/1 var(--font-mono)">{{ r.qty }}</span>
+              </sc-if>
+            </div>
+            <sc-if value="{{ r.inDraft }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 2px 0 8px">
+                <span style="width: 44px; height: 34px; flex: none; display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: 6px; font: 500 16px/1 var(--font-mono); color: var(--ink-700); cursor: pointer; background: var(--paper-0)" onClick="{{ r.onMinus }}">−</span>
+                <sc-for list="{{ r.modChips }}" as="mc" hint-placeholder-count="0">
+                  <span style="{{ mc.style }}" onClick="{{ mc.onPick }}">{{ mc.label }}</span>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex: none; display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" on-click="{{ cancelOrder }}" hint-size="100%,48px">Cancel</x-import>
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" disabled="{{ draftEmpty }}" on-click="{{ commitOrder }}" hint-size="100%,48px">{{ commitLabel }}</x-import>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isClose }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Close shift" style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+      <div style="flex: none; padding: 6px 8px 0; background: var(--paper-0); display: flex">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="ghost" size="sm" icon-left="arrow-left" on-click="{{ goFloor }}" hint-size="90px,36px">Floor</x-import>
+      </div>
+      <div style="flex: 1; overflow-y: auto; min-height: 0; padding: 14px 18px 14px">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px">
+          <h2 style="margin: 0; font: var(--weight-regular) 24px/1.1 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">Close shift</h2>
+          <x-import component-from-global-scope="AIVODesignSystem_3d538f.StatusPill" status="closed" label="cash frozen" hint-size="100px,22px"></x-import>
+        </div>
+        <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 16px; margin-bottom: 12px">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Expected cash</span><span class="aivo-num" style="font: 500 14px/1.3 var(--font-mono); color: var(--ink-900)">{{ expectedStr }}</span></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--border-default); gap: 12px">
+            <span style="font: var(--type-body); color: var(--ink-600); flex: none">Declared cash</span>
+            <input type="text" inputMode="decimal" placeholder="0.00" value="{{ declared }}" onChange="{{ onDeclared }}" style="width: 120px; text-align: right; background: var(--paper-0); border: 1px solid var(--border-strong); border-radius: 6px; padding: 9px 12px; font: 500 14px/1.3 var(--font-mono); color: var(--ink-900); outline: none" style-focus="border-color: var(--border-focus); box-shadow: var(--focus-ring)">
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 13px 0"><span style="font: var(--type-label); color: var(--ink-800)">Variance</span><span class="aivo-num" style="{{ varianceStyle }}">{{ varianceStr }}</span></div>
+        </div>
+        <sc-if value="{{ needsManager }}" hint-placeholder-val="{{ false }}">
+          <div style="background: var(--paper-0); border: 1px solid var(--orange-200); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--orange-700)">
+              <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="triangle-alert" size="{{ 15 }}" hint-size="15px,15px"></x-import>
+              <span style="font: 600 13px/1.2 var(--font-sans); color: var(--orange-700)">Variance over $10.00</span>
+            </div>
+            <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">A manager accepts this posting. Recount first — most variances are a miscounted float.</div>
+          </div>
+        </sc-if>
+        <div style="background: var(--paper-2); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px 16px">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px">
+            <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="lock" size="{{ 15 }}" hint-size="15px,15px"></x-import>
+            <span style="font: 600 13px/1.2 var(--font-sans); color: var(--ink-800)">Posting is immutable</span>
+          </div>
+          <div style="font: var(--weight-regular) 13px/1.5 var(--font-sans); color: var(--ink-600)">An accepted shift cannot be cancelled or reopened. A manager accepts variances over $10.00.</div>
+        </div>
+      </div>
+      <div style="flex: none; display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; padding: 10px 14px 14px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" on-click="{{ recount }}" hint-size="100%,48px">Recount</x-import>
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="primary" size="touch" full-width="{{ true }}" icon-left="check" disabled="{{ acceptDisabled }}" on-click="{{ accept }}" hint-size="100%,48px">Accept and post</x-import>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isPosted }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Shift posted" style="flex: 1; min-height: 0; display: flex; flex-direction: column">
+      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 22px">
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--green-100); border: 1px solid var(--green-200); display: grid; place-items: center; margin-bottom: 20px; color: var(--green-700)">
+          <x-import component-from-global-scope="AIVODesignSystem_3d538f.Icon" name="check" size="{{ 24 }}" hint-size="24px,24px"></x-import>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px">
+          <h2 style="margin: 0; font: var(--weight-regular) 27px/1.15 var(--font-display); letter-spacing: -0.02em; color: var(--ink-900)">shift-121 accepted</h2>
+          <x-import component-from-global-scope="AIVODesignSystem_3d538f.StatusPill" status="accepted" label="accepted" hint-size="80px,22px"></x-import>
+        </div>
+        <p style="margin: 0 0 20px; font: var(--weight-regular) 15px/1.55 var(--font-sans); color: var(--ink-600)">Posted at {{ postedAt }} · 3 GL lines posted. This shift cannot be cancelled or reopened.</p>
+        <div style="background: var(--paper-0); border: 1px solid var(--border-default); border-radius: 10px; padding: 4px 16px">
+          <div style="display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Expected cash</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">{{ expectedStr }}</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 11px 0; border-bottom: 1px dashed var(--border-default)"><span style="font: var(--type-body); color: var(--ink-600)">Declared cash</span><span class="aivo-num" style="font: var(--type-numeric); color: var(--ink-900)">{{ postedDeclaredStr }}</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 11px 0"><span style="font: var(--type-label); color: var(--ink-800)">Variance</span><span class="aivo-num" style="{{ varianceStyle }}">{{ varianceStr }}</span></div>
+        </div>
+      </div>
+      <div style="flex: none; padding: 12px 14px 16px; background: var(--paper-0); border-top: 1px solid var(--border-default)">
+        <x-import component-from-global-scope="AIVODesignSystem_3d538f.Button" variant="secondary" size="touch" full-width="{{ true }}" on-click="{{ restart }}" hint-size="100%,48px">Open the next shift</x-import>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:430,&quot;height&quot;:860},&quot;cashierName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Yana P.&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Shift config&quot;},&quot;openingFloat&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:150,&quot;min&quot;:0,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Shift config&quot;}}">
+class Component extends DCLogic {
+  state = {
+    route: "open", ticketN: null, now: Date.now(),
+    waiterReq: true, billReq: true,
+    declared: "", posted: null,
+    orderTable: null, orderCat: 0, draft: [],
+    tables: [
+      { n: "12", covers: 4, kind: "called", items: [
+        { name: "1 × Dry-aged ribeye", detail: "400 g · medium rare · béarnaise", price: 61 },
+        { name: "2 × Triple-cooked chips", price: 18 }
+      ], note: "Severe nut allergy — no hazelnut on the table. Ribeye after the starters.", source: "from the diner's phone · 20:16", fired: false },
+      { n: "04", covers: 2, kind: "bill", items: [
+        { name: "2 × Bavette, chimichurri", price: 68 },
+        { name: "1 × Malbec, bottle", price: 60 }
+      ], source: "taken at the table · 19:32", fired: true, firedAt: "19:34" },
+      { n: "07", covers: 3, kind: "ordering", items: [], source: "seated 20:05", fired: false },
+      { n: "09", free: true },
+      { n: "03", free: true },
+      { n: "15", free: true }
+    ]
+  };
+  componentDidMount() { this._t = setInterval(() => this.setState({ now: Date.now() }), 1000); }
+  componentWillUnmount() { clearInterval(this._t); }
+  fmt(n) { return (n < 0 ? "-$" : "$") + Math.abs(n).toFixed(2); }
+  posMenu() {
+    if (this._pm) return this._pm;
+    const D = ["Rare", "Medium rare", "Medium", "Well done"];
+    this._pm = [
+      { cat: "Starters", items: [
+        { name: "Bone marrow, sourdough", price: 14 }, { name: "Beef tartare, cured yolk", price: 18 }, { name: "Grilled flatbread, beef fat", price: 8 }
+      ] },
+      { cat: "Grill", items: [
+        { name: "Ribeye 300 g", price: 46, mods: D }, { name: "Ribeye 400 g", price: 58, mods: D }, { name: "Bavette, chimichurri", price: 34, mods: D }, { name: "Half chicken, brined", price: 28 }
+      ] },
+      { cat: "Sides", items: [
+        { name: "Triple-cooked chips", price: 9 }, { name: "Hispi cabbage", price: 8 }, { name: "Green salad", price: 7 }
+      ] },
+      { cat: "Wine", items: [
+        { name: "Malbec, glass", price: 14 }, { name: "Gamay, Beaujolais", price: 12 }, { name: "Ribolla, 2021", price: 13 }
+      ] }
+    ];
+    return this._pm;
+  }
+  startOrder(n) { this.setState({ route: "order", orderTable: n, orderCat: 0, draft: [] }); }
+  timeStr(t) { const d = new Date(t); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+  total(t) { return t.items.reduce((a, i) => a + i.price, 0); }
+  renderVals() {
+    const s = this.state;
+    const float = this.props.openingFloat ?? 150;
+    const expected = float + 1134.5;
+    const reqCount = (s.waiterReq ? 1 : 0) + (s.billReq ? 1 : 0);
+    const contexts = { open: "aivo · waiter", floor: "shift-121 · till 1", ticket: "table " + (s.ticketN || ""), pick: "new order", order: "table " + (s.orderTable || "") + " · new order", requests: "service requests", close: "shift-121", posted: "shift-121 · accepted" };
+    const floorTables = s.tables.map(t => {
+      const free = !!t.free;
+      const called = t.kind === "called" && s.waiterReq;
+      const bill = t.kind === "bill" && s.billReq;
+      let title = "Ordering", sub = t.covers ? t.covers + " covers" : "", icon = "", numBg = "var(--paper-2)", numColor = "var(--ink-700)";
+      if (free) { title = "Free"; sub = ""; }
+      else if (called) { title = "Waiter called · 20:14"; sub = t.covers + " covers · order sent 20:16 · " + this.fmt(this.total(t)); icon = "bell-ring"; numBg = "var(--orange-100)"; numColor = "var(--orange-700)"; }
+      else if (bill) { title = "Bill requested · 20:11"; sub = t.covers + " covers · " + this.fmt(this.total(t)) + " open"; icon = "receipt"; }
+      else if (t.items && t.items.length) { title = t.fired ? "Fired · eating" : "Order to fire"; sub = t.covers + " covers · " + this.fmt(this.total(t)) + " open"; }
+      else if (!free) { sub = t.covers + " covers · nothing fired yet"; }
+      return {
+        n: t.n, title, sub, icon, hasIcon: !!icon,
+        onOpen: free ? () => this.startOrder(t.n) : () => this.setState({ route: "ticket", ticketN: t.n }),
+        cardStyle: free
+          ? { background: "var(--paper-1)", border: "1px dashed var(--border-strong)", borderRadius: "10px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", opacity: 0.7 }
+          : { background: "var(--paper-0)", border: called ? "1px solid var(--orange-200)" : "1px solid var(--border-default)", borderRadius: "10px", padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer" },
+        numStyle: { width: "44px", height: "44px", flex: "none", borderRadius: "8px", background: numBg, display: "grid", placeItems: "center", font: "600 15px/1 var(--font-mono)", color: free ? "var(--ink-400)" : numColor },
+        titleStyle: { font: free ? "var(--type-body)" : "600 15px/1.2 var(--font-sans)", color: free ? "var(--ink-500)" : "var(--ink-900)" }
+      };
+    });
+    const tk0 = s.ticketN ? s.tables.find(t => t.n === s.ticketN) : null;
+    const tk = tk0 ? (tk0.items ? tk0 : Object.assign({}, tk0, { items: [] })) : null;
+    let tkVals = {};
+    if (tk) {
+      tkVals = {
+        tkN: tk.n, tkSource: tk.source || "",
+        tkEmpty: !tk.items.length, tkHasItems: !!tk.items.length,
+        tkItems: tk.items.map((i, ix) => ({
+          name: i.name, detail: i.detail || "", hasDetail: !!i.detail, priceStr: this.fmt(i.price),
+          rowStyle: { padding: "12px 0", borderBottom: ix === tk.items.length - 1 ? "none" : "1px dashed var(--border-default)" }
+        })),
+        tkHasNote: !!tk.note, tkNote: tk.note || "",
+        tkTotalStr: this.fmt(this.total(tk)),
+        tkFired: !!tk.fired, tkFiredAt: tk.firedAt || "",
+        tkPillStatus: tk.fired ? "open" : "closed",
+        tkPillLabel: tk.fired ? "fired" : "to fire",
+        fireLabel: tk.fired ? "Fired" : "Fire to kitchen",
+        fire: () => {
+          if (tk.fired) return;
+          const tables = s.tables.map(t => t.n === tk.n ? Object.assign({}, t, { fired: true, firedAt: this.timeStr(Date.now()) }) : t);
+          this.setState({ tables });
+        },
+        startOrderForTicket: () => this.startOrder(tk.n)
+      };
+    }
+    let orderVals = {};
+    if (s.route === "order") {
+      const pm = this.posMenu();
+      const draftTotal = s.draft.reduce((a, l) => a + l.price * l.qty, 0);
+      const draftCount = s.draft.reduce((a, l) => a + l.qty, 0);
+      const chipBase = { flex: "none", padding: "8px 13px", borderRadius: "999px", font: "var(--type-label)", cursor: "pointer" };
+      const curT = s.tables.find(x => x.n === s.orderTable);
+      const existing = curT && curT.items ? curT.items.reduce((a, i) => a + i.price, 0) : 0;
+      orderVals = {
+        orderTable: s.orderTable,
+        orderHint: existing ? "on the ticket · " + this.fmt(existing) : "tap to add · tap − to remove",
+        orderCats: pm.map((c, i) => ({
+          label: c.cat,
+          onPick: () => this.setState({ orderCat: i }),
+          style: i === s.orderCat
+            ? Object.assign({}, chipBase, { background: "var(--ink-900)", color: "var(--paper-0)" })
+            : Object.assign({}, chipBase, { background: "var(--paper-2)", border: "1px solid var(--border-default)", color: "var(--ink-700)" })
+        })),
+        orderRows: (pm[s.orderCat] || pm[0]).items.map(it => {
+          const li = s.draft.findIndex(l => l.name === it.name);
+          const line = li >= 0 ? s.draft[li] : null;
+          return {
+            name: it.name, priceStr: this.fmt(it.price),
+            inDraft: !!line, qty: line ? line.qty : 0,
+            onAdd: () => {
+              const draft = line
+                ? s.draft.map((l, x) => x === li ? Object.assign({}, l, { qty: l.qty + 1 }) : l)
+                : [...s.draft, { name: it.name, price: it.price, qty: 1, mod: it.mods ? "Medium rare" : null }];
+              this.setState({ draft });
+            },
+            onMinus: () => {
+              if (!line) return;
+              const draft = line.qty > 1
+                ? s.draft.map((l, x) => x === li ? Object.assign({}, l, { qty: l.qty - 1 }) : l)
+                : s.draft.filter((l, x) => x !== li);
+              this.setState({ draft });
+            },
+            rowStyle: {
+              background: line ? "var(--red-50)" : "var(--paper-0)",
+              border: line ? "1px solid var(--accent-solid, var(--red-600))" : "1px solid var(--border-default)",
+              borderRadius: "10px", padding: "2px 14px", cursor: "pointer"
+            },
+            modChips: (line && it.mods ? it.mods : []).map(m => ({
+              label: m.toLowerCase(),
+              onPick: () => this.setState({ draft: s.draft.map((l, x) => x === li ? Object.assign({}, l, { mod: m }) : l) }),
+              style: line && line.mod === m
+                ? { flex: "none", padding: "8px 11px", borderRadius: "999px", font: "500 12px/1.2 var(--font-sans)", whiteSpace: "nowrap", cursor: "pointer", background: "var(--ink-900)", color: "var(--paper-0)" }
+                : { flex: "none", padding: "8px 11px", borderRadius: "999px", font: "500 12px/1.2 var(--font-sans)", whiteSpace: "nowrap", cursor: "pointer", background: "var(--paper-0)", border: "1px solid var(--border-default)", color: "var(--ink-700)" }
+            }))
+          };
+        }),
+        draftEmpty: draftCount === 0,
+        commitLabel: draftCount ? "Add to ticket · " + this.fmt(draftTotal) : "Add to ticket",
+        commitOrder: () => {
+          if (!draftCount) return;
+          const newLines = s.draft.map(l => ({ name: l.qty + " × " + l.name, detail: l.mod ? l.mod.toLowerCase() : "", price: l.price * l.qty }));
+          const tables = s.tables.map(t => t.n === s.orderTable
+            ? Object.assign({}, t, { free: false, covers: t.covers || 2, items: [...(t.items || []), ...newLines], fired: false, source: "taken at the table · " + this.timeStr(Date.now()) })
+            : t);
+          this.setState({ tables, draft: [], route: "ticket", ticketN: s.orderTable });
+        },
+        cancelOrder: () => {
+          const t = s.tables.find(x => x.n === s.orderTable);
+          if (t && t.items && t.items.length) this.setState({ route: "ticket", ticketN: s.orderTable, draft: [] });
+          else this.setState({ route: "floor", draft: [] });
+        }
+      };
+    }
+    const declaredNum = parseFloat(s.declared);
+    const declaredValid = !isNaN(declaredNum);
+    const shown = s.posted ? s.posted.declared : (declaredValid ? declaredNum : null);
+    const variance = shown === null ? null : shown - expected;
+    return Object.assign({
+      cashierName: this.props.cashierName ?? "Yana P.",
+      floatStr: this.fmt(float), expectedStr: this.fmt(expected),
+      clock: this.timeStr(s.now), context: contexts[s.route] || "aivo · waiter",
+      isOpen: s.route === "open", isFloor: s.route === "floor", isTicket: s.route === "ticket",
+      isOrder: s.route === "order",
+      isRequests: s.route === "requests", isClose: s.route === "close", isPosted: s.route === "posted",
+      openShift: () => this.setState({ route: "floor" }),
+      goFloor: () => this.setState({ route: "floor" }),
+      goRequests: () => this.setState({ route: "requests" }),
+      goClose: () => this.setState({ route: "close" }),
+      newOrder: () => this.setState({ route: "pick" }),
+      isPick: s.route === "pick",
+      pickTables: s.tables.map(t => {
+        const free = !!t.free;
+        const open = t.items ? t.items.reduce((a, i) => a + i.price, 0) : 0;
+        return {
+          n: t.n,
+          title: free ? "Free" : (open ? "Open ticket" : "Seated"),
+          sub: free ? "start a new ticket" : (open ? this.fmt(open) + " · adds to it" : t.covers + " covers · nothing yet"),
+          onPick: () => this.startOrder(t.n),
+          tileStyle: {
+            background: free ? "var(--paper-1)" : "var(--paper-0)",
+            border: free ? "1px dashed var(--border-strong)" : "1px solid var(--border-default)",
+            borderRadius: "10px", padding: "14px 16px", cursor: "pointer",
+            display: "flex", flexDirection: "column", gap: "3px", minHeight: "84px"
+          },
+          numStyle: { font: "600 18px/1 var(--font-mono)", color: free ? "var(--ink-400)" : "var(--ink-900)", marginBottom: "6px" }
+        };
+      }),
+      floorTables,
+      requestsLabel: reqCount ? "Requests · " + reqCount : "Requests",
+      noRequests: reqCount === 0,
+      hasWaiterReq: s.waiterReq, hasBillReq: s.billReq,
+      waiterWait: "waiting 1 min", billWait: "waiting 4 min",
+      dismissWaiter: () => this.setState({ waiterReq: false }),
+      ackWaiter: () => this.setState({ waiterReq: false, route: "floor" }),
+      takeBill: () => this.setState({ billReq: false, route: "ticket", ticketN: "04" }),
+      declared: s.declared,
+      onDeclared: e => this.setState({ declared: e.target.value.replace(/[^0-9.]/g, "").slice(0, 9) }),
+      varianceStr: variance === null ? "—" : this.fmt(variance),
+      varianceStyle: { font: "600 14px/1.3 var(--font-mono)", color: variance === null ? "var(--ink-400)" : (Math.abs(variance) < 0.005 ? "var(--green-700)" : "var(--red-700)") },
+      needsManager: s.route === "close" && variance !== null && Math.abs(variance) > 10,
+      acceptDisabled: !declaredValid,
+      recount: () => this.setState({ declared: "" }),
+      accept: () => {
+        if (!declaredValid) return;
+        this.setState({ posted: { declared: declaredNum, at: this.timeStr(Date.now()) }, route: "posted" });
+      },
+      postedAt: s.posted ? s.posted.at : "",
+      postedDeclaredStr: s.posted ? this.fmt(s.posted.declared) : "",
+      restart: () => this.setState({ route: "open", declared: "", posted: null })
+    }, tkVals, orderVals);
+  }
+}
+</script>
+</body>
+</html>

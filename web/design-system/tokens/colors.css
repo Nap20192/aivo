@@ -1,0 +1,48 @@
+:root{
+/* ── Paper (warm neutral surfaces) ───────────────────────────── */
+--paper-0:#ffffff;--paper-1:#faf8f5;--paper-2:#f4f1ec;--paper-3:#ece7df;--paper-4:#ded8ce;
+/* ── Ink (near-black, warm-shifted) ─────────────────────────── */
+--ink-900:#12100f;--ink-800:#211e1b;--ink-700:#3a3531;--ink-600:#55504a;--ink-500:#6f6962;--ink-400:#928b82;--ink-300:#b3aca3;--ink-200:#d3ccc3;
+/* ── Red — blood (brand primary) ────────────────────────────── */
+--red-900:#4d0a10;--red-800:#750f18;--red-700:#99101a;--red-600:#bd1220;--red-500:#d92433;--red-400:#e65a5c;--red-300:#f09b98;--red-200:#f8cec9;--red-100:#fce8e4;--red-50:#fdf5f2;
+/* ── Orange — fire ──────────────────────────────────────────── */
+--orange-800:#8a3208;--orange-700:#b3420b;--orange-600:#e2560f;--orange-500:#f06a1c;--orange-400:#f68a44;--orange-200:#fbd0ab;--orange-100:#fdeadb;
+/* ── Yellow — butter ────────────────────────────────────────── */
+--yellow-800:#7d5a04;--yellow-700:#a8790a;--yellow-600:#d1a01f;--yellow-500:#f2c14e;--yellow-400:#f7d478;--yellow-200:#fbe9b8;--yellow-100:#fdf5de;
+/* ── Green — greens ─────────────────────────────────────────── */
+--green-800:#164a25;--green-700:#1f5c2e;--green-600:#2c7a3d;--green-500:#3f9950;--green-400:#71b878;--green-200:#c4e2c2;--green-100:#e7f2e3;
+/* ── Olive — herbs & oil ────────────────────────────────────── */
+--olive-800:#3f4a15;--olive-700:#55631d;--olive-600:#6b7a2f;--olive-500:#879647;--olive-200:#dbe2bf;--olive-100:#eef1de;
+/* ── Wine — drinks & vintage ────────────────────────────────── */
+--wine-800:#3f0a26;--wine-700:#5c1036;--wine-600:#7d1a49;--wine-500:#a02a60;--wine-200:#e8c6d7;--wine-100:#f6e7ee;
+/* ── Blue (posted / immutable only) ─────────────────────────── */
+--blue-700:#1c4d8c;--blue-500:#2f6bb3;--blue-100:#e5edf7;
+/* Legacy amber aliases → butter/fire */
+--amber-700:var(--yellow-700);--amber-500:var(--yellow-600);--amber-100:var(--yellow-100);
+
+/* ── Semantic aliases ───────────────────────────────────────── */
+--bg-app:var(--paper-1);--bg-canvas:var(--paper-2);--surface-card:var(--paper-0);--surface-sunken:var(--paper-2);--surface-raised:var(--paper-0);--surface-inverse:var(--ink-900);--surface-hover:var(--paper-2);--surface-active:var(--paper-3);
+
+--text-strong:var(--ink-900);--text-body:var(--ink-800);--text-muted:var(--ink-500);--text-subtle:var(--ink-400);--text-inverse:var(--paper-1);--text-accent:var(--red-700);--text-link:var(--red-700);--text-link-hover:var(--red-900);
+
+--border-subtle:#eae4db;--border-default:#ded8ce;--border-strong:#c3bbb0;--border-accent:var(--red-500);--border-focus:var(--red-600);
+
+--accent-solid:var(--red-600);--accent-solid-hover:var(--red-700);--accent-solid-active:var(--red-800);--accent-soft:var(--red-100);--accent-soft-hover:var(--red-200);--accent-on-solid:#fff;
+/* Secondary accents: fire for kitchen/service urgency, butter for highlights, greens for fresh/ok */
+--accent-fire:var(--orange-600);--accent-butter:var(--yellow-500);--accent-greens:var(--green-600);--accent-olive:var(--olive-600);--accent-wine:var(--wine-600);
+--chart-1:var(--red-600);--chart-2:var(--orange-500);--chart-3:var(--yellow-500);--chart-4:var(--green-600);--chart-5:var(--olive-600);--chart-6:var(--wine-600);
+
+--status-open-fg:var(--green-700);--status-open-bg:var(--green-100);
+--status-closed-fg:var(--yellow-800);--status-closed-bg:var(--yellow-100);
+--status-accepted-fg:var(--blue-700);--status-accepted-bg:var(--blue-100);
+--status-cancelled-fg:var(--ink-500);--status-cancelled-bg:var(--paper-3);
+--status-danger-fg:var(--red-700);--status-danger-bg:var(--red-100);
+--status-firing-fg:var(--orange-700);--status-firing-bg:var(--orange-100);
+
+--money-positive:var(--green-700);--money-negative:var(--red-700);--money-neutral:var(--ink-800);
+
+/* AI surfaces: ink-tinted, never purple/blue gradients */
+--ai-surface:#f6f3ee;--ai-border:#ddd5c8;--ai-accent:var(--ink-900);--ai-marker:var(--red-600);
+
+--focus-ring:0 0 0 3px var(--red-200);
+}
