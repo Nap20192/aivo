@@ -133,7 +133,49 @@ const state: PosState = {
   menu,
 };
 
-const notFound = () => Object.assign(new Error("not found"), { code: "not_found" });
+const notFound = () => Object.assign(new Error("not found"), { code: "not_found", status: 404 });
+
+// Cart handoff codes (single-use, 15 min TTL, A-Z2-9). K7M2PX is the live demo code.
+interface MockHandoff {
+  code: string;
+  table_id: string;
+  customer_name: string | null;
+  note: string | null;
+  lines: { menu_item_id: string | null; name: string; qty: number; options: string[]; unit_price_cents: number }[];
+  expires_at_ms: number;
+  used: boolean;
+}
+
+const handoffs: MockHandoff[] = [
+  {
+    code: "K7M2PX",
+    table_id: "t-07",
+    customer_name: "Mila K.",
+    note: "Glasses chilled, please.",
+    lines: [
+      { menu_item_id: "m-tartare", name: "Beef tartare, cured yolk", qty: 1, options: [], unit_price_cents: 1800 },
+      { menu_item_id: "m-malbec", name: "Malbec, glass", qty: 2, options: [], unit_price_cents: 1400 },
+    ],
+    expires_at_ms: Date.now() + 15 * 60_000,
+    used: false,
+  },
+  {
+    // expired fixture for the honest-404 path
+    code: "XPRD99",
+    table_id: "t-07",
+    customer_name: null,
+    note: null,
+    lines: [{ menu_item_id: "m-salad", name: "Green salad", qty: 1, options: [], unit_price_cents: 700 }],
+    expires_at_ms: Date.now() - 60_000,
+    used: false,
+  },
+];
+
+function activeHandoff(code: string): MockHandoff {
+  const h = handoffs.find((x) => x.code === code.toUpperCase());
+  if (!h || h.used || Date.now() > h.expires_at_ms) throw notFound();
+  return h;
+}
 
 export const mockApi: PosApi = {
   async login() {
@@ -189,6 +231,35 @@ export const mockApi: PosApi = {
     const table = state.tables.find((t) => t.ticket?.id === ticketId);
     if (!table || !table.ticket) throw notFound();
     table.ticket.fired_at = timeHM();
+  },
+  async handoff(code: string) {
+    const h = activeHandoff(code);
+    const table = state.tables.find((t) => t.id === h.table_id);
+    return {
+      code: h.code,
+      table_id: h.table_id,
+      table_number: table?.number ?? "",
+      customer_name: h.customer_name,
+      note: h.note,
+      lines: h.lines.map((l, i) => ({ id: "hl-" + i, ...l })),
+      expires_at: new Date(h.expires_at_ms).toISOString(),
+    };
+  },
+  async acceptHandoff(code: string, tableId: string) {
+    const h = activeHandoff(code);
+    const table = state.tables.find((t) => t.id === tableId);
+    if (!table) throw notFound();
+    const now = timeHM();
+    if (!table.ticket) {
+      table.covers = table.covers ?? 2;
+      table.ticket = { id: uid("tk"), lines: [], note: null, source: "", placed_at: null, fired_at: null };
+    }
+    table.ticket.lines.push(...h.lines.map((l) => ({ id: uid("l"), ...l })));
+    if (h.note) table.ticket.note = table.ticket.note ? table.ticket.note + " " + h.note : h.note;
+    table.ticket.source = "from the diner's phone · " + now;
+    table.ticket.placed_at = now;
+    table.ticket.fired_at = null; // new items fire separately
+    h.used = true;
   },
   async ack(requestId: string) {
     state.requests = state.requests.filter((r) => r.id !== requestId);

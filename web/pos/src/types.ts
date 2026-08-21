@@ -80,6 +80,16 @@ export interface PosState {
   menu: MenuCategory[];
 }
 
+export interface HandoffPreview {
+  code: string;
+  table_id: string;
+  table_number: string;
+  customer_name: string | null;
+  note: string | null;
+  lines: Line[];
+  expires_at: string; // ISO
+}
+
 export interface NewLine {
   menu_item_id: string;
   qty: number;
@@ -93,6 +103,8 @@ export interface PosApi {
   openShift(openingFloatCents: number): Promise<void>;
   addLines(tableId: string, lines: NewLine[]): Promise<void>;
   fire(ticketId: string): Promise<void>;
+  handoff(code: string): Promise<HandoffPreview>;
+  acceptHandoff(code: string, tableId: string): Promise<void>;
   ack(requestId: string): Promise<void>;
   dismiss(requestId: string): Promise<void>;
   closeShift(shiftId: string, declaredCents: number): Promise<PostedShift>;

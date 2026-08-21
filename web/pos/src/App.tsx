@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api.ts";
-import type { Me, NewLine, PosRequest, PosState, PostedShift, Table } from "./types.ts";
+import type { HandoffPreview, Me, NewLine, PosRequest, PosState, PostedShift, Table } from "./types.ts";
 import { fmt, parseDollars, timeHM, waiting } from "./format.ts";
 import { Badge, Button, EmptyState, Icon, StatusPill } from "./ui.tsx";
 
@@ -10,6 +10,7 @@ type Route =
   | { name: "requests" }
   | { name: "pick" }
   | { name: "order"; tableId: string }
+  | { name: "handoff" }
   | { name: "close" };
 
 const ticketTotal = (t: Table) => (t.ticket ? t.ticket.lines.reduce((a, l) => a + l.unit_price_cents * l.qty, 0) : 0);
@@ -156,6 +157,7 @@ export default function App() {
     pick: "new order",
     order: route.name === "order" ? `table ${pos.tables.find((t) => t.id === route.tableId)?.number ?? ""} · new order` : "",
     requests: "service requests",
+    handoff: "add from code",
     close: shift.number,
   };
 
@@ -178,6 +180,7 @@ export default function App() {
         pos={pos}
         onTable={(t) => (t.ticket ? setRoute({ name: "ticket", tableId: t.id }) : startOrder(t.id))}
         onRequests={() => setRoute({ name: "requests" })}
+        onAddFromCode={() => setRoute({ name: "handoff" })}
         onNewOrder={() => setRoute({ name: "pick" })}
         onClose={() => setRoute({ name: "close" })}
       />
@@ -270,6 +273,33 @@ export default function App() {
         }}
       />
     ) : null;
+  } else if (route.name === "handoff") {
+    screen = (
+      <Handoff
+        pos={pos}
+        onBack={goFloor}
+        onAccept={(preview, tableId) => {
+          mutate(
+            (p) => {
+              const tb = p.tables.find((x) => x.id === tableId);
+              if (!tb) return;
+              const t = timeHM();
+              if (!tb.ticket) {
+                tb.covers = tb.covers ?? 2;
+                tb.ticket = { id: "optimistic", lines: [], note: null, source: "", placed_at: null, fired_at: null };
+              }
+              tb.ticket.lines.push(...preview.lines.map((l, i) => ({ ...l, id: "optimistic-h" + i })));
+              if (preview.note) tb.ticket.note = tb.ticket.note ? tb.ticket.note + " " + preview.note : preview.note;
+              tb.ticket.source = "from the diner's phone · " + t;
+              tb.ticket.placed_at = t;
+              tb.ticket.fired_at = null;
+            },
+            () => api.acceptHandoff(preview.code, tableId)
+          );
+          setRoute({ name: "ticket", tableId });
+        }}
+      />
+    );
   } else if (route.name === "close") {
     screen = (
       <CloseShift
@@ -434,12 +464,14 @@ function Floor({
   pos,
   onTable,
   onRequests,
+  onAddFromCode,
   onNewOrder,
   onClose,
 }: {
   pos: PosState;
   onTable: (t: Table) => void;
   onRequests: () => void;
+  onAddFromCode: () => void;
   onNewOrder: () => void;
   onClose: () => void;
 }) {
@@ -500,10 +532,15 @@ function Floor({
           );
         })}
       </div>
-      <div className="screen-footer footer-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <Button fullWidth iconLeft="bell" onClick={onRequests}>
-          {reqCount ? `Requests · ${reqCount}` : "Requests"}
-        </Button>
+      <div className="screen-footer footer-grid">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <Button fullWidth iconLeft="bell" onClick={onRequests}>
+            {reqCount ? `Requests · ${reqCount}` : "Requests"}
+          </Button>
+          <Button fullWidth iconLeft="qr-code" onClick={onAddFromCode}>
+            Add from code
+          </Button>
+        </div>
         <Button variant="primary" fullWidth onClick={onNewOrder}>
           New order
         </Button>
@@ -862,6 +899,196 @@ function TakeOrder({
           {draftCount ? `Add to ticket · ${fmt(draftTotal)}` : "Add to ticket"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function Handoff({
+  pos,
+  onBack,
+  onAccept,
+}: {
+  pos: PosState;
+  onBack: () => void;
+  onAccept: (preview: HandoffPreview, tableId: string) => void;
+}) {
+  const [code, setCode] = useState("");
+  const [preview, setPreview] = useState<HandoffPreview | null>(null);
+  const [targetId, setTargetId] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const lookup = () => {
+    if (code.length !== 6 || busy) return;
+    setBusy(true);
+    setErr("");
+    api
+      .handoff(code)
+      .then((h) => {
+        setPreview(h);
+        setTargetId(h.table_id);
+        setBusy(false);
+      })
+      .catch((e: { status?: number; message?: string }) => {
+        setErr(e.status === 404 ? "Code not found. Codes expire after 15 minutes and work once." : (e.message ?? "Could not look up the code."));
+        setBusy(false);
+      });
+  };
+
+  const target = pos.tables.find((t) => t.id === targetId);
+  const total = preview ? preview.lines.reduce((a, l) => a + l.unit_price_cents * l.qty, 0) : 0;
+
+  if (preview && picking) {
+    return (
+      <div className="screen">
+        <div className="back-row">
+          <Button variant="ghost" size="sm" iconLeft="arrow-left" onClick={() => setPicking(false)}>
+            Back
+          </Button>
+        </div>
+        <div className="screen-header">
+          <div className="screen-title">Add to which table?</div>
+          <div className="screen-sub">The diner sat at table {preview.table_number}. Pick another only if they moved.</div>
+        </div>
+        <div
+          className="screen-body"
+          style={{ padding: "14px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, alignContent: "start" }}
+        >
+          {pos.tables.map((t) => {
+            const free = !t.ticket;
+            const open = ticketTotal(t);
+            return (
+              <div
+                key={t.id}
+                className={`pick-tile${free ? " free" : ""}`}
+                style={t.id === targetId ? { borderColor: "var(--accent-solid)", borderStyle: "solid" } : undefined}
+                onClick={() => {
+                  setTargetId(t.id);
+                  setPicking(false);
+                }}
+              >
+                <span className="aivo-num pick-num">{t.number}</span>
+                <div style={{ font: "600 13px/1.2 var(--font-sans)", color: "var(--ink-900)" }}>
+                  {free ? "Free" : open ? "Open ticket" : "Seated"}
+                </div>
+                <div style={{ font: "var(--weight-regular) 12px/1.4 var(--font-sans)", color: "var(--ink-500)" }}>
+                  {free ? "start a new ticket" : open ? `${fmt(open)} · adds to it` : `${t.covers} covers · nothing yet`}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="screen">
+      <div className="back-row">
+        <Button variant="ghost" size="sm" iconLeft="arrow-left" onClick={onBack}>
+          Floor
+        </Button>
+      </div>
+      <div className="screen-header">
+        <div className="screen-title">Add from code</div>
+        <div className="screen-sub">Type the code from the diner's phone. Their cart lands on a table ticket.</div>
+      </div>
+      <div className="screen-body" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            lookup();
+          }}
+        >
+          <input
+            className="code-input"
+            type="text"
+            placeholder="CODE"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={6}
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, "").slice(0, 6));
+              setPreview(null);
+              setErr("");
+            }}
+          />
+        </form>
+        {err ? (
+          <div className="hint-card" style={{ padding: "13px 15px" }}>
+            <span className="hint-card-body">{err}</span>
+          </div>
+        ) : null}
+        {preview ? (
+          <>
+            <div className="card" style={{ padding: "4px 14px" }}>
+              <div style={{ padding: "12px 0", borderBottom: "1px dashed var(--border-default)" }}>
+                <div style={{ font: "600 15px/1.2 var(--font-sans)", color: "var(--ink-900)" }}>Table {preview.table_number}</div>
+                <div style={{ font: "var(--weight-regular) 12px/1.4 var(--font-sans)", color: "var(--ink-500)", marginTop: 2 }}>
+                  {preview.customer_name ? `${preview.customer_name} · from the diner's phone` : "from the diner's phone"}
+                </div>
+              </div>
+              {preview.lines.map((l, ix) => (
+                <div
+                  key={l.id}
+                  style={{ padding: "12px 0", borderBottom: ix === preview.lines.length - 1 ? "none" : "1px dashed var(--border-default)" }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <span style={{ font: "600 15px/1.2 var(--font-sans)", color: "var(--ink-900)" }}>
+                      {l.qty} × {l.name}
+                    </span>
+                    <span className="aivo-num" style={{ color: "var(--ink-900)" }}>{fmt(l.unit_price_cents * l.qty)}</span>
+                  </div>
+                  {l.options.length ? (
+                    <div style={{ font: "var(--weight-regular) 13px/1.45 var(--font-sans)", color: "var(--ink-500)", marginTop: 3 }}>
+                      {l.options.join(" · ")}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            {preview.note ? (
+              <div style={{ background: "var(--yellow-100)", border: "1px solid var(--yellow-200)", borderRadius: 10, padding: "13px 15px" }}>
+                <div
+                  style={{
+                    font: "600 12px/1.2 var(--font-sans)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--yellow-800)",
+                    marginBottom: 5,
+                  }}
+                >
+                  Note from the table
+                </div>
+                <div style={{ font: "var(--weight-regular) 13px/1.5 var(--font-sans)", color: "var(--ink-800)" }}>{preview.note}</div>
+              </div>
+            ) : null}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 4px" }}>
+              <span style={{ font: "var(--type-label)", color: "var(--ink-600)" }}>On the code</span>
+              <span className="aivo-num" style={{ font: "600 18px/1.3 var(--font-mono)", color: "var(--ink-900)" }}>{fmt(total)}</span>
+            </div>
+          </>
+        ) : null}
+      </div>
+      {preview && target ? (
+        <div className="screen-footer footer-grid" style={{ gridTemplateColumns: "1fr 1.3fr" }}>
+          <Button fullWidth onClick={() => setPicking(true)}>
+            Change table
+          </Button>
+          <Button variant="primary" fullWidth iconLeft="plus" onClick={() => onAccept(preview, target.id)}>
+            Add to table {target.number}
+          </Button>
+        </div>
+      ) : (
+        <div className="screen-footer">
+          <Button variant="primary" fullWidth disabled={code.length !== 6 || busy} onClick={lookup}>
+            Look up code
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
