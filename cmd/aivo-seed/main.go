@@ -112,6 +112,9 @@ func run() error {
 	if err := seedMenu(ctx, menuStore, rest.ID); err != nil {
 		return err
 	}
+	if err := seedCustomer(ctx, db, menuStore, platform, rest.ID); err != nil {
+		return err
+	}
 
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
@@ -241,6 +244,72 @@ func seedMenu(ctx context.Context, store *menupg.PostgresStore, restaurantID uui
 			return fmt.Errorf("seed: table %s: %w", label, err)
 		}
 	}
+	return nil
+}
+
+// seedCustomer creates the demo diner account (guest@ember.test /
+// embertest1) with two historical linked orders at Ember & Bone, so the
+// admin Guests screen and customer/me history have data.
+func seedCustomer(ctx context.Context, db *sql.DB, store *menupg.PostgresStore, platform *platformapp.App, restaurantID uuid.UUID) error {
+	customer, _, err := platform.RegisterCustomer(ctx, "guest@ember.test", "embertest1", "Nora Guest")
+	if err != nil {
+		return fmt.Errorf("seed: customer: %w", err)
+	}
+
+	_, items, err := store.Menu(ctx, restaurantID)
+	if err != nil {
+		return fmt.Errorf("seed: customer orders: menu: %w", err)
+	}
+	byName := map[string]menudomain.MenuItem{}
+	for _, it := range items {
+		byName[it.Name] = it
+	}
+	tables, err := store.Tables(ctx, restaurantID)
+	if err != nil || len(tables) == 0 {
+		return fmt.Errorf("seed: customer orders: tables: %v", err)
+	}
+
+	orderFixtures := []struct {
+		daysAgo int
+		names   []string
+	}{
+		{21, []string{"Bavette, chimichurri", "Triple-cooked chips", "Malbec, glass"}},
+		{6, []string{"Beef tartare, cured yolk", "Half chicken, brined", "Gamay, Beaujolais"}},
+	}
+	for _, of := range orderFixtures {
+		lines := []menudomain.OrderLine{}
+		for _, name := range of.names {
+			it, ok := byName[name]
+			if !ok {
+				return fmt.Errorf("seed: customer orders: item %q missing", name)
+			}
+			line, err := menudomain.NewOrderLine(it, nil, 1)
+			if err != nil {
+				return fmt.Errorf("seed: customer orders: %w", err)
+			}
+			lines = append(lines, line)
+		}
+		order, err := store.CreateOrder(ctx, menudomain.Order{
+			RestaurantID: restaurantID,
+			TableID:      tables[0].ID,
+			CustomerID:   &customer.ID,
+			Lines:        lines,
+		})
+		if err != nil {
+			return fmt.Errorf("seed: customer orders: create: %w", err)
+		}
+		// Backdate for a believable history.
+		if _, err := db.ExecContext(ctx,
+			`UPDATE orders SET created_at = now() - $1::int * interval '1 day' WHERE id = $2`,
+			of.daysAgo, order.ID); err != nil {
+			return fmt.Errorf("seed: customer orders: backdate: %w", err)
+		}
+	}
+
+	if err := platform.TouchGuest(ctx, restaurantID, customer.ID); err != nil {
+		return fmt.Errorf("seed: guest profile: %w", err)
+	}
+	fmt.Println("Demo customer: guest@ember.test / embertest1 (2 historical orders)")
 	return nil
 }
 

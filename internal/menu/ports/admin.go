@@ -71,6 +71,20 @@ type AdminStore interface {
 	MenuItemByID(ctx context.Context, restaurantID, id uuid.UUID) (domain.MenuItem, error)
 	CountMenuItems(ctx context.Context, restaurantID uuid.UUID) (int, error)
 
+	// CreateHandoff stores a pickup code, deleting any previous active
+	// handoff for the same table (no stacking). Returns ErrConflict on a
+	// code collision — the caller regenerates and retries.
+	CreateHandoff(ctx context.Context, h domain.Handoff) error
+	// HandoffByCode returns the restaurant's ACTIVE (unused, unexpired)
+	// handoff for code; ErrNotFound otherwise (unknown, expired, used, or
+	// another restaurant's — all look identical).
+	HandoffByCode(ctx context.Context, restaurantID uuid.UUID, code string) (domain.Handoff, error)
+	// MarkHandoffUsed consumes the code (single-use); ErrNotFound if it
+	// is no longer active. UnmarkHandoffUsed compensates when the accept
+	// that consumed it fails afterwards.
+	MarkHandoffUsed(ctx context.Context, restaurantID, id uuid.UUID) error
+	UnmarkHandoffUsed(ctx context.Context, id uuid.UUID) error
+
 	PendingServiceRequests(ctx context.Context, restaurantID uuid.UUID) ([]domain.ServiceRequest, error)
 	// PendingServiceRequestsForTable narrows to one table (the diner
 	// "one open request per table" state).

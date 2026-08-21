@@ -128,6 +128,49 @@ Platform (session cookie):
 - `POST /api/v1/restaurants/{id}/images` — multipart upload → S3, returns URL
 - Staff: `GET/POST /api/v1/restaurants/{id}/staff` {email, role}
 
+Customer accounts (diner logins — optional, anonymous flow stays; cookie
+`aivo_customer`, HttpOnly, sessions fully separate from staff: neither
+cookie ever resolves in the other's session store):
+- `POST /api/v1/customer/register` `{email, password, name}` → 201
+  `{customer: {id, email, name, phone}}` + session cookie
+- `POST /api/v1/customer/login` / `POST /api/v1/customer/logout`
+- `GET  /api/v1/customer/me` → `{customer, orders: [{restaurant_name,
+  created_at, total_cents, lines: [{name, qty, unit_price_cents,
+  total_cents, options: [label]}]}]}` (own history, newest first)
+- Diner order submit and cart handoff attach `customer_id` automatically
+  when the cookie is present.
+
+Cart handoff (diner stores the cart under a short pickup code and shows
+it to the waiter; coexists with direct kitchen send):
+- `POST /api/v1/t/{table_token}/handoff` `{lines: same shape as order
+  submit, note}` → 201 `{code, qr_url, expires_at}`. Code: 6 chars from
+  A-Z2-9 minus 0/O/1/I, unique among active, TTL 15 min, single-use,
+  restaurant-scoped; a new handoff replaces the table's previous active
+  one (no stacking); same per-session cooldown as order submit (429 +
+  retry_after_seconds).
+- `GET /api/v1/t/{table_token}/handoff/qr?code=X` → PNG QR of the code.
+- POS (waiter+): `GET /api/v1/pos/handoff/{code}` (case-insensitive) →
+  `{code, table_id, table_number, customer_name|null, note|null, lines:
+  [ticket-line shape], total_cents, expires_at}` — 404 for unknown/
+  expired/used/foreign, all identical. `POST
+  /api/v1/pos/handoff/{code}/accept` `{table_id?}` (defaults to the
+  diner's table) → appends snapshot lines to that table's ticket via the
+  normal add-lines path, consumes the code (single-use; double accept
+  404), returns the updated ticket.
+
+CRM (manager+, restaurant-scoped; a restaurant sees ONLY customers with
+a guest_profile row — created lazily on first linked order/handoff — and
+only its own orders; waiters see the name only via the handoff preview):
+- `GET /api/v1/restaurants/{id}/guests?query=&limit=` → sorted by
+  last_seen desc: `[{customer: {id, name, email, phone}, visits,
+  total_spent_cents, last_seen, tags}]`
+- `GET /api/v1/restaurants/{id}/guests/{customer_id}` → `{customer,
+  visits, total_spent_cents, first_seen, last_seen, notes, tags, orders:
+  [{id, created_at, table_label, total_cents, lines: [{name, qty,
+  total_cents}]}]}`
+- `PATCH /api/v1/restaurants/{id}/guests/{customer_id}` `{notes?, tags?}`
+  → same shape as GET.
+
 Admin AI assistant (manager+, restaurant-scoped chat; nothing applies
 without explicit confirm — proposals and applied sets are slog-logged):
 - `GET  /api/v1/restaurants/{id}/assistant/messages?limit=50` — history

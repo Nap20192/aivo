@@ -18,16 +18,73 @@ type fakeStore struct {
 	sessions    map[string]uuid.UUID   // token hash -> user id
 	subs        map[uuid.UUID]domain.Subscription
 	restaurants map[uuid.UUID]domain.Restaurant
+
+	customers        map[string]domain.Customer // by email
+	customerSessions map[string]uuid.UUID       // token hash -> customer id
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
-		users:       map[string]domain.User{},
-		sessions:    map[string]uuid.UUID{},
-		subs:        map[uuid.UUID]domain.Subscription{},
-		restaurants: map[uuid.UUID]domain.Restaurant{},
+		users:            map[string]domain.User{},
+		sessions:         map[string]uuid.UUID{},
+		subs:             map[uuid.UUID]domain.Subscription{},
+		restaurants:      map[uuid.UUID]domain.Restaurant{},
+		customers:        map[string]domain.Customer{},
+		customerSessions: map[string]uuid.UUID{},
 	}
 }
+
+func (f *fakeStore) CreateCustomer(_ context.Context, c domain.Customer) error {
+	if _, ok := f.customers[c.Email]; ok {
+		return ports.ErrConflict
+	}
+	f.customers[c.Email] = c
+	return nil
+}
+func (f *fakeStore) CustomerByEmail(_ context.Context, email string) (domain.Customer, error) {
+	c, ok := f.customers[email]
+	if !ok {
+		return domain.Customer{}, ports.ErrNotFound
+	}
+	return c, nil
+}
+func (f *fakeStore) CustomerByID(_ context.Context, id uuid.UUID) (domain.Customer, error) {
+	for _, c := range f.customers {
+		if c.ID == id {
+			return c, nil
+		}
+	}
+	return domain.Customer{}, ports.ErrNotFound
+}
+func (f *fakeStore) CreateCustomerSession(_ context.Context, s domain.Session) error {
+	f.customerSessions[string(s.TokenHash)] = s.UserID
+	return nil
+}
+func (f *fakeStore) CustomerSession(_ context.Context, tokenHash []byte) (domain.Customer, error) {
+	id, ok := f.customerSessions[string(tokenHash)]
+	if !ok {
+		return domain.Customer{}, ports.ErrNotFound
+	}
+	return f.CustomerByID(context.Background(), id)
+}
+func (f *fakeStore) DeleteCustomerSession(_ context.Context, tokenHash []byte) error {
+	delete(f.customerSessions, string(tokenHash))
+	return nil
+}
+func (f *fakeStore) CustomerOrders(context.Context, uuid.UUID, int) ([]domain.CustomerOrder, error) {
+	return nil, nil
+}
+func (f *fakeStore) TouchGuestProfile(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+func (f *fakeStore) Guests(context.Context, uuid.UUID, string, int) ([]domain.GuestSummary, error) {
+	return nil, nil
+}
+func (f *fakeStore) GuestProfile(context.Context, uuid.UUID, uuid.UUID) (domain.GuestProfile, domain.GuestSummary, error) {
+	return domain.GuestProfile{}, domain.GuestSummary{}, ports.ErrNotFound
+}
+func (f *fakeStore) GuestOrders(context.Context, uuid.UUID, uuid.UUID) ([]domain.GuestOrder, error) {
+	return nil, nil
+}
+func (f *fakeStore) UpdateGuestProfile(context.Context, domain.GuestProfile) error { return nil }
 
 func (f *fakeStore) CreateOrgWithOwner(_ context.Context, org domain.Organization, owner domain.User, sub domain.Subscription, rest domain.Restaurant) error {
 	if _, ok := f.users[owner.Email]; ok {
@@ -310,6 +367,50 @@ func TestTenantScopingOnRestaurantLookup(t *testing.T) {
 	// error — same as a nonexistent ID.
 	if _, err := a.Restaurant(ctx, ownerA.OrgID, restsB[0].ID); !errors.Is(err, ports.ErrNotFound) {
 		t.Errorf("cross-tenant lookup: got %v, want ErrNotFound", err)
+	}
+}
+
+func TestCustomerAuthSeparateFromStaff(t *testing.T) {
+	ctx := context.Background()
+	a, _ := newTestApp()
+
+	// Staff owner and customer with the same email/password coexist.
+	_, staffToken, err := a.Register(ctx, "Org", "Rest", "same@x.test", "embertest1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	customer, custToken, err := a.RegisterCustomer(ctx, "same@x.test", "embertest1", "Guest")
+	if err != nil {
+		t.Fatalf("register customer: %v", err)
+	}
+
+	// A staff token never resolves as a customer session and vice versa.
+	if _, err := a.CustomerByToken(ctx, staffToken); !errors.Is(err, ErrUnauthorized) {
+		t.Errorf("staff token resolved as customer: %v", err)
+	}
+	if _, err := a.UserByToken(ctx, custToken); !errors.Is(err, ErrUnauthorized) {
+		t.Errorf("customer token resolved as staff: %v", err)
+	}
+
+	// Customer login + logout round trip.
+	_, token2, err := a.LoginCustomer(ctx, "same@x.test", "embertest1")
+	if err != nil {
+		t.Fatalf("customer login: %v", err)
+	}
+	got, err := a.CustomerByToken(ctx, token2)
+	if err != nil || got.ID != customer.ID {
+		t.Fatalf("customer by token: %v", err)
+	}
+	if err := a.LogoutCustomer(ctx, token2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.CustomerByToken(ctx, token2); !errors.Is(err, ErrUnauthorized) {
+		t.Errorf("after logout: %v", err)
+	}
+
+	// Wrong password fails closed.
+	if _, _, err := a.LoginCustomer(ctx, "same@x.test", "wrong-password"); !errors.Is(err, ErrUnauthorized) {
+		t.Errorf("wrong password: %v", err)
 	}
 }
 

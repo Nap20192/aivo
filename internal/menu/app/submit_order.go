@@ -37,6 +37,7 @@ type SubmitOrder struct {
 	RestaurantSlug string
 	TableToken     string
 	SessionID      string
+	CustomerID     *uuid.UUID // logged-in customer, nil for anonymous diners
 	Lines          []OrderLineInput
 	Comment        string
 }
@@ -93,6 +94,7 @@ func (h SubmitOrderHandler) Handle(ctx context.Context, cmd SubmitOrder) (domain
 	order, err := h.store.CreateOrder(ctx, domain.Order{
 		RestaurantID: restaurant.ID,
 		TableID:      table.ID,
+		CustomerID:   cmd.CustomerID,
 		Lines:        lines,
 		Comment:      cmd.Comment,
 	})
