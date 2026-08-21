@@ -3,8 +3,11 @@
 import { ApiError } from "./error";
 import { mockApi } from "./mock";
 import type {
+  AssistantApplyResult,
+  AssistantMessage,
   Category,
   Me,
+  Menu,
   MenuItem,
   Plan,
   Restaurant,
@@ -145,14 +148,60 @@ export const api = {
     );
   },
 
-  listCategories(id: string): Promise<Category[]> {
+  generateTheme(id: string): Promise<{ proposal: Theme; based_on: string }> {
     return withFallback(
-      () => request("GET", `/restaurants/${id}/categories`),
-      () => mockApi.listCategories(id),
+      () => request("POST", `/restaurants/${id}/theme/generate`),
+      () => mockApi.generateTheme(id),
     );
   },
 
-  createCategory(id: string, input: { name: string }): Promise<Category> {
+  listMenus(id: string): Promise<Menu[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/menus`),
+      () => mockApi.listMenus(id),
+    );
+  },
+
+  createMenu(id: string, input: { name: string; slug: string }): Promise<Menu> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/menus`, input),
+      () => mockApi.createMenu(id, input),
+    );
+  },
+
+  updateMenu(id: string, menuId: string, patch: Partial<Menu>): Promise<Menu> {
+    return withFallback(
+      () => request("PATCH", `/restaurants/${id}/menus/${menuId}`, patch),
+      () => mockApi.updateMenu(id, menuId, patch),
+    );
+  },
+
+  deleteMenu(id: string, menuId: string, force = false): Promise<void> {
+    return withFallback(
+      () =>
+        request(
+          "DELETE",
+          `/restaurants/${id}/menus/${menuId}${force ? "?force=1" : ""}`,
+        ),
+      () => mockApi.deleteMenu(id, menuId, force),
+    );
+  },
+
+  listCategories(id: string, menuId?: string): Promise<Category[]> {
+    return withFallback(
+      () =>
+        request(
+          "GET",
+          `/restaurants/${id}/categories${menuId ? `?menu_id=${menuId}` : ""}`,
+        ),
+      () => mockApi.listCategories(id, menuId),
+    );
+  },
+
+  createCategory(
+    id: string,
+    input: { name: string; menu_id: string },
+  ): Promise<Category> {
     return withFallback(
       () => request("POST", `/restaurants/${id}/categories`, input),
       () => mockApi.createCategory(id, input),
@@ -257,6 +306,54 @@ export const api = {
     return withFallback(
       () => request("POST", `/restaurants/${id}/staff`, input),
       () => mockApi.inviteStaff(id, input),
+    );
+  },
+
+  listAssistantMessages(id: string): Promise<AssistantMessage[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/assistant/messages?limit=50`),
+      () => mockApi.listAssistantMessages(id),
+    );
+  },
+
+  sendAssistantMessage(
+    id: string,
+    text: string,
+    files: File[],
+  ): Promise<AssistantMessage> {
+    const form = new FormData();
+    form.append("text", text);
+    for (const f of files) form.append("files", f);
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/assistant/messages`, form),
+      () => mockApi.sendAssistantMessage(id, text, files),
+    );
+  },
+
+  applyAssistantActions(
+    id: string,
+    msgId: string,
+    indexes?: number[],
+  ): Promise<{ results: AssistantApplyResult[] }> {
+    return withFallback(
+      () =>
+        request(
+          "POST",
+          `/restaurants/${id}/assistant/messages/${msgId}/apply`,
+          indexes ? { action_indexes: indexes } : {},
+        ),
+      () => mockApi.applyAssistantActions(id, msgId, indexes),
+    );
+  },
+
+  discardAssistantActions(id: string, msgId: string): Promise<void> {
+    return withFallback(
+      () =>
+        request(
+          "POST",
+          `/restaurants/${id}/assistant/messages/${msgId}/discard`,
+        ),
+      () => mockApi.discardAssistantActions(id, msgId),
     );
   },
 

@@ -373,6 +373,28 @@
 .tab:hover { color: var(--text-strong); }
 .tab.on { color: var(--text-accent); border-bottom-color: var(--accent-solid); }
 
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 13px;
+  border-radius: var(--radius-pill);
+  background: var(--paper-2);
+  border: 1px solid var(--border-default);
+  color: var(--ink-700);
+  font: var(--type-label);
+  cursor: pointer;
+}
+.chip:hover { background: var(--surface-active); }
+.chip.on { background: var(--ink-900); border-color: var(--ink-900); color: var(--paper-0); }
+.chip-note {
+  margin-left: 6px;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
 .swatch-row { display: flex; gap: 8px; }
 .swatch {
   width: 40px;
@@ -384,6 +406,106 @@
   position: relative;
 }
 .swatch.on { border-color: var(--ink-900); box-shadow: 0 0 0 2px var(--paper-0) inset; }
+
+/* ── AI proposal (ink-tinted per tokens, never purple) ─────── */
+.ai-panel {
+  background: var(--ai-surface);
+  border: 1px solid var(--ai-border);
+  border-radius: var(--radius-md);
+  padding: var(--pad-card);
+}
+.ai-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ai-source::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ai-marker);
+  flex: none;
+}
+.ai-clock { font: 500 13px/1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ai-accent); }
+.compare-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr 1fr;
+  gap: 6px 16px;
+  align-items: center;
+  font: var(--type-body);
+}
+.compare-grid .hd { font: var(--type-eyebrow); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--text-muted); }
+.compare-grid .rowlabel { font: var(--type-label); color: var(--ink-700); }
+.swatch-mini {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  vertical-align: -2px;
+  margin-right: 6px;
+  border: 1px solid var(--border-default);
+}
+.diff-list { display: flex; flex-direction: column; gap: 4px; }
+.diff-row { display: flex; gap: 8px; align-items: baseline; font: var(--type-numeric); font-size: var(--text-body-sm); }
+.diff-add { color: var(--green-700); }
+.diff-del { color: var(--red-700); text-decoration: line-through; }
+.diff-chg { color: var(--ink-800); }
+
+/* ── Assistant chat ────────────────────────────────────────── */
+.chat-wrap { max-width: 760px; display: flex; flex-direction: column; gap: var(--gap-stack); }
+.msg-user {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--paper-0);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font: var(--type-body);
+  white-space: pre-wrap;
+}
+.msg-assistant { align-self: stretch; }
+.attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--paper-2);
+  border: 1px solid var(--border-default);
+  font: var(--weight-medium) var(--text-caption)/1.2 var(--font-sans);
+  color: var(--ink-600);
+  max-width: 220px;
+}
+.attach-chip .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.action-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--paper-0);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font: var(--type-body);
+}
+.action-card input { accent-color: var(--accent-solid); width: 15px; height: 15px; margin: 2px 0 0; flex: none; }
+.action-kind {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.composer {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-app);
+  padding: var(--space-5) 0 var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+}
 
 /* ── QR ────────────────────────────────────────────────────── */
 .qr-box {

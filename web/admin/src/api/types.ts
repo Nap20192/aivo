@@ -48,8 +48,17 @@ export interface Theme {
   design_md: string;
 }
 
+export interface Menu {
+  id: string;
+  slug: string;
+  name: string;
+  position: number;
+  is_default: boolean;
+}
+
 export interface Category {
   id: string;
+  menu_id: string;
   name: string;
   position: number;
 }
@@ -100,4 +109,55 @@ export interface Subscription {
 
 export interface ApiErrorBody {
   error: { code: string; message: string };
+}
+
+// Assistant actions — allowlist per the assistant contract. Anything else
+// is rejected server-side; the client only renders and forwards them.
+export type AssistantAction =
+  | { type: "create_category"; menu_id: string; name: string }
+  | { type: "rename_category"; id: string; name: string }
+  | { type: "delete_category"; id: string }
+  | {
+      type: "create_item";
+      category_id: string;
+      name: string;
+      description?: string;
+      price_cents: number;
+      allergens?: string[];
+      image_url?: string;
+    }
+  | {
+      type: "update_item";
+      id: string;
+      name?: string;
+      description?: string;
+      price_cents?: number;
+      allergens?: string[];
+      image_url?: string;
+    }
+  | { type: "delete_item"; id: string }
+  | { type: "set_item_available"; id: string; available: boolean }
+  | ({ type: "update_theme" } & Partial<Omit<Theme, "design_md">>)
+  | { type: "create_menu"; name: string; slug: string };
+
+export interface AssistantAttachment {
+  name: string;
+  url: string;
+  mime: string;
+}
+
+export interface AssistantMessage {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  attachments: AssistantAttachment[];
+  actions: AssistantAction[];
+  action_status: null | "applied" | "discarded";
+  created_at: string;
+}
+
+export interface AssistantApplyResult {
+  index: number;
+  ok: boolean;
+  detail: string;
 }

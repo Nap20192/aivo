@@ -7,10 +7,10 @@ import {
 import { AuthProvider, useAuth } from "./auth";
 import { Shell } from "./layout";
 import { LoadingPage } from "./ui";
+import Assistant from "./pages/Assistant";
 import Dashboard from "./pages/Dashboard";
-import Design from "./pages/Design";
 import Login from "./pages/Login";
-import Menu from "./pages/Menu";
+import MenuScreen from "./pages/MenuScreen";
 import Register from "./pages/Register";
 import Settings from "./pages/Settings";
 import Staff from "./pages/Staff";
@@ -58,8 +58,11 @@ const router = createBrowserRouter(
       ),
       children: [
         { index: true, element: <Dashboard /> },
-        { path: "menu", element: <Menu /> },
-        { path: "design", element: <Design /> },
+        { path: "menu", element: <MenuScreen tab="items" /> },
+        { path: "menu/design", element: <MenuScreen tab="design" /> },
+        { path: "menu/brief", element: <MenuScreen tab="brief" /> },
+        { path: "design", element: <Navigate to="/menu/design" replace /> },
+        { path: "assistant", element: <Assistant /> },
         { path: "tables", element: <Tables /> },
         { path: "staff", element: <Staff /> },
         { path: "settings", element: <Settings /> },

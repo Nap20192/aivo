@@ -1,6 +1,7 @@
-import { ImagePlus, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { ImagePlus, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
+import { ApiError } from "../api/error";
 import type { Accent, Theme } from "../api/types";
 import { useRestaurant } from "../auth";
 import { useLoad } from "../lib/useLoad";
@@ -32,31 +33,35 @@ function textToVars(text: string): Record<string, string> | null {
   return vars;
 }
 
-export default function Design() {
+export default function Design(props: { tab: "theme" | "design_md" }) {
   const restaurant = useRestaurant();
   const { data, error, loading, reload } = useLoad(
     async () => {
-      const [theme, categories, items] = await Promise.all([
+      const [theme, menus, categories, items] = await Promise.all([
         api.getTheme(restaurant.id),
+        api.listMenus(restaurant.id),
         api.listCategories(restaurant.id),
         api.listItems(restaurant.id),
       ]);
-      return { theme, categories, items };
+      // Preview shows what diners land on: the default menu.
+      const defaultMenu = menus.find((m) => m.is_default) ?? menus[0];
+      return {
+        theme,
+        categories: categories.filter((c) => c.menu_id === defaultMenu?.id),
+        items,
+      };
     },
     [restaurant.id],
   );
 
   if (loading) return <LoadingPage />;
   if (error || !data)
-    return (
-      <div className="content">
-        <ErrorBanner message={error ?? "Failed to load."} onRetry={reload} />
-      </div>
-    );
+    return <ErrorBanner message={error ?? "Failed to load."} onRetry={reload} />;
 
   return (
     <Editor
       key={restaurant.id}
+      tab={props.tab}
       initial={data.theme}
       categories={data.categories}
       items={data.items}
@@ -66,12 +71,13 @@ export default function Design() {
 }
 
 function Editor(props: {
+  tab: "theme" | "design_md";
   initial: Theme;
   categories: import("../api/types").Category[];
   items: import("../api/types").MenuItem[];
   restaurantId: string;
 }) {
-  const [tab, setTab] = useState<"theme" | "design_md">("theme");
+  const { tab } = props;
   const [theme, setTheme] = useState<Theme>(props.initial);
   const [saved, setSaved] = useState<Theme>(props.initial);
   const [varsText, setVarsText] = useState(varsToText(props.initial.css_vars));
@@ -80,6 +86,17 @@ function Editor(props: {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [proposal, setProposal] = useState<Theme | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [genSeconds, setGenSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!generating) return;
+    setGenSeconds(0);
+    const t = setInterval(() => setGenSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [generating]);
 
   const dirty = useMemo(
     () => JSON.stringify(theme) !== JSON.stringify(saved),
@@ -114,6 +131,47 @@ function Editor(props: {
     }
   }
 
+  const briefEmpty = !theme.design_md.trim();
+  const briefUnsaved = theme.design_md !== saved.design_md;
+
+  async function generate() {
+    setGenerating(true);
+    setGenError(null);
+    setProposal(null);
+    try {
+      const res = await api.generateTheme(props.restaurantId);
+      setProposal(res.proposal);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 503) {
+        setGenError(
+          "The theme generator isn't configured on this server. Your brief is saved — try again once it's enabled.",
+        );
+      } else {
+        setGenError(e instanceof Error ? e.message : "Generation failed.");
+      }
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function applyProposal() {
+    if (!proposal) return;
+    setBusy(true);
+    setSaveError(null);
+    try {
+      const result = await api.putTheme(props.restaurantId, proposal);
+      setSaved(result);
+      setTheme(result);
+      setVarsText(varsToText(result.css_vars));
+      setVarsError(null);
+      setProposal(null);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Apply failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function save() {
     if (varsError) return;
     setBusy(true);
@@ -130,15 +188,11 @@ function Editor(props: {
   }
 
   return (
-    <div className="content">
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Menu design</h1>
-          <p className="page-sub">
-            What diners see when they scan the QR. The preview updates as you
-            edit — nothing goes live until you save.
-          </p>
-        </div>
+    <>
+      <div className="row-between" style={{ marginBottom: "var(--gap-stack)" }}>
+        <span style={{ font: "var(--type-body)", color: "var(--text-muted)" }}>
+          {dirty ? "Unsaved changes." : "Everything here is published."}
+        </span>
         <button
           className="btn btn-primary"
           disabled={!dirty || busy || !!varsError}
@@ -156,21 +210,6 @@ function Editor(props: {
 
       <div className="theme-layout">
         <div>
-          <div className="tabs">
-            <button
-              className={"tab" + (tab === "theme" ? " on" : "")}
-              onClick={() => setTab("theme")}
-            >
-              Theme
-            </button>
-            <button
-              className={"tab" + (tab === "design_md" ? " on" : "")}
-              onClick={() => setTab("design_md")}
-            >
-              design.md
-            </button>
-          </div>
-
           {tab === "theme" ? (
             <div className="stack">
               <div className="card stack">
@@ -306,29 +345,169 @@ function Editor(props: {
               </div>
             </div>
           ) : (
-            <div className="card stack">
-              <Field
-                label="Design brief"
-                hint="Paste or write the restaurant's design.md. Stored with the theme; a later AI feature will translate it into theme settings."
-              >
-                <textarea
-                  className="textarea input-mono"
-                  rows={22}
-                  spellCheck={false}
-                  placeholder={"# Design brief\n\nVoice, palette, type…"}
-                  value={theme.design_md}
-                  onChange={(e) => patch({ design_md: e.target.value })}
+            <div className="stack">
+              <div className="card stack" style={{ gap: 8 }}>
+                <div className="row-between">
+                  <div>
+                    <div className="field-label">Generate theme from brief</div>
+                    <div className="field-hint">
+                      {briefEmpty
+                        ? "Write a brief first — generation reads the saved design.md."
+                        : briefUnsaved
+                          ? "Save the brief first — generation reads the saved version."
+                          : "AIVO proposes theme settings from the saved brief. Nothing applies until you say so."}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-secondary"
+                    disabled={briefEmpty || briefUnsaved || generating}
+                    onClick={generate}
+                  >
+                    <Sparkles size={15} />
+                    Generate theme from brief
+                  </button>
+                </div>
+              </div>
+
+              {generating && (
+                <div className="ai-panel row-between">
+                  <span style={{ font: "var(--type-body)", color: "var(--ai-accent)" }}>
+                    AIVO is reading the brief
+                  </span>
+                  <span className="ai-clock">
+                    0:{String(genSeconds % 60).padStart(2, "0")}
+                  </span>
+                </div>
+              )}
+
+              {genError && <ErrorBanner message={genError} onRetry={generate} />}
+
+              {proposal && (
+                <ProposalPanel
+                  current={theme}
+                  proposal={proposal}
+                  busy={busy}
+                  onApply={applyProposal}
+                  onDiscard={() => setProposal(null)}
                 />
-              </Field>
+              )}
+
+              <div className="card stack">
+                <Field
+                  label="Design brief"
+                  hint="Paste or write the restaurant's design.md. Stored with the theme via PUT."
+                >
+                  <textarea
+                    className="textarea input-mono"
+                    rows={18}
+                    spellCheck={false}
+                    placeholder={"# Design brief\n\nVoice, palette, type…"}
+                    value={theme.design_md}
+                    onChange={(e) => patch({ design_md: e.target.value })}
+                  />
+                </Field>
+              </div>
             </div>
           )}
         </div>
 
         <MenuPreview
-          theme={theme}
+          theme={proposal ?? theme}
           categories={props.categories}
           items={props.items}
         />
+      </div>
+    </>
+  );
+}
+
+function AccentCell(props: { accent: Accent }) {
+  const color =
+    ACCENTS.find((a) => a.name === props.accent)?.color ?? "var(--red-600)";
+  return (
+    <span>
+      <span className="swatch-mini" style={{ background: color }} />
+      {props.accent}
+    </span>
+  );
+}
+
+function ProposalPanel(props: {
+  current: Theme;
+  proposal: Theme;
+  busy: boolean;
+  onApply: () => void;
+  onDiscard: () => void;
+}) {
+  const { current, proposal } = props;
+  const keys = [
+    ...new Set([
+      ...Object.keys(current.css_vars),
+      ...Object.keys(proposal.css_vars),
+    ]),
+  ].sort();
+  const varDiff = keys
+    .map((k) => {
+      const a = current.css_vars[k];
+      const b = proposal.css_vars[k];
+      if (a === b) return null;
+      if (a === undefined)
+        return { k, cls: "diff-add", text: `${k}: ${b}` };
+      if (b === undefined)
+        return { k, cls: "diff-del", text: `${k}: ${a}` };
+      return { k, cls: "diff-chg", text: `${k}: ${a} → ${b}` };
+    })
+    .filter((d): d is NonNullable<typeof d> => d !== null);
+
+  return (
+    <div className="ai-panel stack">
+      <div className="row-between">
+        <span className="ai-source">Based on your design brief</span>
+        <span className="field-hint">
+          The phone preview is showing this proposal.
+        </span>
+      </div>
+      <div className="compare-grid">
+        <span />
+        <span className="hd">Current</span>
+        <span className="hd">Proposed</span>
+        <span className="rowlabel">Accent</span>
+        <AccentCell accent={current.accent} />
+        <AccentCell accent={proposal.accent} />
+        <span className="rowlabel">Bold theme</span>
+        <span>{current.bold ? "On" : "Off"}</span>
+        <span>{proposal.bold ? "On" : "Off"}</span>
+        <span className="rowlabel">Brand name</span>
+        <span>{current.brand_name}</span>
+        <span>{proposal.brand_name}</span>
+      </div>
+      {varDiff.length > 0 && (
+        <div className="field">
+          <span className="field-label">CSS variable changes</span>
+          <div className="diff-list">
+            {varDiff.map((d) => (
+              <span key={d.k} className={`diff-row ${d.cls}`}>
+                {d.text}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="row">
+        <button
+          className="btn btn-primary"
+          disabled={props.busy}
+          onClick={props.onApply}
+        >
+          {props.busy ? "Applying…" : "Apply proposal"}
+        </button>
+        <button
+          className="btn btn-secondary"
+          disabled={props.busy}
+          onClick={props.onDiscard}
+        >
+          Discard
+        </button>
       </div>
     </div>
   );
