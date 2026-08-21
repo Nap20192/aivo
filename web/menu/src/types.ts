@@ -90,6 +90,33 @@ export interface BrowseSession {
   menu: Menu;
 }
 
+export interface Customer {
+  id: string;
+  email: string;
+  name: string;
+  phone?: string | null;
+}
+
+/** One past order in GET /api/v1/customer/me history. */
+export interface HistoricalOrder {
+  restaurant_name: string;
+  created_at: string;
+  total_cents: number;
+  lines: { name: string; qty: number }[];
+}
+
+export interface CustomerMe {
+  customer: Customer;
+  orders: HistoricalOrder[];
+}
+
+/** POST /api/v1/t/{token}/handoff result — cart parked behind a pickup code. */
+export interface Handoff {
+  code: string;
+  qr_url: string;
+  expires_at: string;
+}
+
 export interface OrderLineInput {
   menu_item_id: string;
   qty: number;

@@ -1,4 +1,4 @@
-import type { MenuItem, OrderLineInput } from "./types";
+import type { Handoff, MenuItem, OrderLineInput } from "./types";
 
 export interface CartLine {
   menuItemId: string;
@@ -95,6 +95,44 @@ export function saveCart(token: string, lines: CartLine[]): void {
   } catch {
     // storage full/blocked — cart just won't survive refresh
   }
+}
+
+// Active handoff + the cart lines it holds, so an expired-unused code can
+// put the cart back (and a refresh returns to the code screen).
+export interface StoredHandoff {
+  handoff: Handoff;
+  backup: CartLine[];
+}
+
+const handoffKey = (token: string) => `aivo:handoff:${token}`;
+
+export function loadHandoff(token: string): StoredHandoff | null {
+  try {
+    const raw = sessionStorage.getItem(handoffKey(token));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveHandoff(token: string, stored: StoredHandoff): void {
+  try {
+    sessionStorage.setItem(handoffKey(token), JSON.stringify(stored));
+  } catch {
+    // ignore
+  }
+}
+
+export function clearHandoff(token: string): void {
+  try {
+    sessionStorage.removeItem(handoffKey(token));
+  } catch {
+    // ignore
+  }
+}
+
+export function handoffExpired(stored: StoredHandoff, now: number): boolean {
+  return now >= new Date(stored.handoff.expires_at).getTime();
 }
 
 export function loadSentAt(token: string): number | null {

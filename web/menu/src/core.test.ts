@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { mockClient, normalizeSession } from "./api";
-import { hasFromPrice, lineDetail, lineOptions, unitPriceCents } from "./cart";
+
+// Node test env has no sessionStorage; the mock client needs one.
+if (typeof sessionStorage === "undefined") {
+  const store = new Map<string, string>();
+  (globalThis as { sessionStorage?: unknown }).sessionStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, String(v)),
+    removeItem: (k: string) => void store.delete(k),
+  };
+}
+import { genHandoffCode, HANDOFF_CHARSET, mockClient, normalizeSession, pseudoQrDataUri } from "./api";
+import { handoffExpired, hasFromPrice, lineDetail, lineOptions, unitPriceCents } from "./cart";
 import { demoSession } from "./fixtures";
 import { countdownStr, fmtCents } from "./format";
 import { themeVars } from "./theme";
@@ -72,6 +82,56 @@ describe("multi-menu contract", () => {
     expect(b.restaurant.slug).toBe("ember-and-bone");
     await expect(mockClient.getBrowse("ember-and-bone", "brunch")).rejects.toMatchObject({ status: 404 });
     await expect(mockClient.getBrowse("nope", "dinner")).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("handoff", () => {
+  it("codes are 6 chars from the lookalike-free alphabet", () => {
+    expect(HANDOFF_CHARSET).not.toMatch(/[0O1I]/);
+    for (let i = 0; i < 50; i++) {
+      expect(genHandoffCode()).toMatch(/^[A-HJ-NP-Z2-9]{6}$/);
+    }
+  });
+  it("pseudo QR is a deterministic svg data uri", () => {
+    expect(pseudoQrDataUri("K7M2PX")).toBe(pseudoQrDataUri("K7M2PX"));
+    expect(pseudoQrDataUri("K7M2PX")).not.toBe(pseudoQrDataUri("AAAAAA"));
+    expect(pseudoQrDataUri("K7M2PX").startsWith("data:image/svg+xml,")).toBe(true);
+  });
+  it("expiry check", () => {
+    const stored = {
+      handoff: { code: "K7M2PX", qr_url: "", expires_at: "2026-08-22T12:15:00Z" },
+      backup: [],
+    };
+    const t = new Date("2026-08-22T12:15:00Z").getTime();
+    expect(handoffExpired(stored, t - 1)).toBe(false);
+    expect(handoffExpired(stored, t)).toBe(true);
+  });
+  it("mock handoff replaces the previous active code", async () => {
+    const order = { lines: [] };
+    const a = await mockClient.submitHandoff("tt", order);
+    const b = await mockClient.submitHandoff("tt", order);
+    expect(sessionStorage.getItem("aivo:mock:tt:handoff")).toContain(b.code);
+    expect(a.code).not.toBe(b.code);
+  });
+});
+
+describe("customer auth (mock)", () => {
+  it("login validates the seeded credentials, me reflects session, logout clears", async () => {
+    await expect(mockClient.login("guest@ember.test", "wrong")).rejects.toMatchObject({ status: 401 });
+    expect(await mockClient.me()).toBeNull();
+    const c = await mockClient.login("guest@ember.test", "embertest1");
+    expect(c.name).toBe("Alex Guest");
+    const m = await mockClient.me();
+    expect(m?.orders).toHaveLength(2);
+    expect(m?.orders[0].total_cents).toBe(8700);
+    await mockClient.logout();
+    expect(await mockClient.me()).toBeNull();
+  });
+  it("register validates at the boundary", async () => {
+    await expect(mockClient.register("bad", "short", "")).rejects.toMatchObject({ status: 422 });
+    const c = await mockClient.register("new@example.com", "longenough", "Nia");
+    expect(c.email).toBe("new@example.com");
+    await mockClient.logout();
   });
 });
 

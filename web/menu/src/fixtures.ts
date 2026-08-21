@@ -1,7 +1,36 @@
 // Ember & Bone demo tenant — mirrors docs/prototypes/aivo-menu-prototype.dc.html
 // and the backend seed (cmd/aivo-seed).
 
-import type { OptionGroup, TableSession } from "./types";
+import type { Customer, HistoricalOrder, OptionGroup, TableSession } from "./types";
+
+// Demo customer (backend seed: guest@ember.test / embertest1).
+export const demoCustomer: Customer = {
+  id: "cust-demo",
+  email: "guest@ember.test",
+  name: "Alex Guest",
+};
+
+export const demoOrderHistory: HistoricalOrder[] = [
+  {
+    restaurant_name: "Ember & Bone",
+    created_at: "2026-08-14T20:12:00Z",
+    total_cents: 8700,
+    lines: [
+      { name: "Dry-aged ribeye", qty: 1 },
+      { name: "Triple-cooked chips", qty: 1 },
+      { name: "Malbec, glass", qty: 2 },
+    ],
+  },
+  {
+    restaurant_name: "Ember & Bone",
+    created_at: "2026-07-30T19:41:00Z",
+    total_cents: 5200,
+    lines: [
+      { name: "Bavette, chimichurri", qty: 1 },
+      { name: "Beef tartare, cured yolk", qty: 1 },
+    ],
+  },
+];
 
 const doneness: OptionGroup = {
   id: "doneness",
