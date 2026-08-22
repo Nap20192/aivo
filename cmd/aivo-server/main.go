@@ -17,11 +17,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
-	menuhttp "aivo/internal/menu/adapters/http"
 	menupg "aivo/internal/menu/adapters/postgres"
 	"aivo/internal/menu/adapters/telegram"
 	menuapp "aivo/internal/menu/app"
@@ -129,6 +131,16 @@ func run() error {
 		return fmt.Errorf("server: unknown ASSISTANT %q (want claudecli)", os.Getenv("ASSISTANT"))
 	}
 
+	// POS display timezone (RESTAURANT_TZ, e.g. "Europe/Brussels");
+	// unset = server-local.
+	var posLocation *time.Location
+	if tz := os.Getenv("RESTAURANT_TZ"); tz != "" {
+		posLocation, err = time.LoadLocation(tz)
+		if err != nil {
+			return fmt.Errorf("server: RESTAURANT_TZ: %w", err)
+		}
+	}
+
 	apiV1 := platformhttp.NewMux(platformhttp.Deps{
 		Platform:    platformApplication,
 		Pos:         posApplication,
@@ -139,64 +151,89 @@ func run() error {
 		Assistant:   assistant,
 		ImagePrefix: imagePrefix,
 		BaseURL:     baseURL,
+		POSLocation: posLocation,
 	})
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/v1/", apiV1)
-	// Legacy menu API paths (existing diner SPA still calls these).
-	mux.Handle("/api/", menuhttp.NewMux(menuApplication))
 	mux.Handle("/admin/", http.StripPrefix("/admin", spaFileServer("web/admin/dist")))
 	mux.Handle("/admin", http.RedirectHandler("/admin/", http.StatusMovedPermanently))
 	mux.Handle("/pos/", http.StripPrefix("/pos", spaFileServer("web/pos/dist")))
 	mux.Handle("/pos", http.RedirectHandler("/pos/", http.StatusMovedPermanently))
-	// Tenant routes (/{slug}, /{slug}/menu, /{slug}/t/{token}) are
-	// client-side routes of the menu SPA.
-	mux.Handle("/", spaFileServer(menuSPADir()))
+	// Tenant routes (/{slug}, /{slug}/menu, /{slug}/t/{token},
+	// /{slug}/m/{menu}) are client-side routes of the menu SPA — served
+	// from its Vite build only (the Dockerfile builds it; 503 until then).
+	mux.Handle("/", spaFileServer("web/menu/dist"))
 
-	root := customDomainMiddleware(platformStore, menuStore, mux)
+	root := customDomainMiddleware(platformStore, baseURL, mux)
 
 	addr := ":" + port
 	log.Printf("server: listening on %s", addr)
 	return http.ListenAndServe(addr, root)
 }
 
-// customDomainMiddleware resolves a verified custom domain from the Host
-// header to its restaurant and rewrites the path onto the slug route, so
-// menu.example.com/ serves what aivo.example/{slug} serves. Falls through
-// to slug routing for unknown hosts. Certificate automation is out of
-// scope for v1 — this only handles routing.
-func customDomainMiddleware(platformStore *platformpg.Store, menuStore *menupg.PostgresStore, next http.Handler) http.Handler {
+// customDomainMiddleware maps a verified custom domain to a 302 redirect
+// onto the canonical BASE_URL/{slug}{path} — a server-side path rewrite
+// is invisible to the SPA's location.pathname parsing (and mangled Vite
+// /assets/* paths); one canonical URL space avoids all of that.
+// Lookups are cached in-memory for a minute so assets don't hammer the
+// DB. Certificate automation stays out of scope for v1.
+func customDomainMiddleware(platformStore *platformpg.Store, baseURL string, next http.Handler) http.Handler {
+	baseHost := baseURL
+	if u, err := url.Parse(baseURL); err == nil && u.Host != "" {
+		baseHost = u.Hostname()
+	}
+
+	type cacheEntry struct {
+		slug  string // "" = no verified domain
+		until time.Time
+	}
+	var mu sync.Mutex
+	cache := map[string]cacheEntry{}
+	const cacheTTL = time.Minute
+
+	slugFor := func(r *http.Request, host string) string {
+		mu.Lock()
+		if e, ok := cache[host]; ok && time.Now().Before(e.until) {
+			mu.Unlock()
+			return e.slug
+		}
+		mu.Unlock()
+
+		slug := ""
+		if restaurantID, err := platformStore.RestaurantIDByDomain(r.Context(), host); err == nil {
+			if rest, err := platformStore.RestaurantByID(r.Context(), restaurantID); err == nil {
+				slug = rest.Slug
+			}
+		} else if !errors.Is(err, platformports.ErrNotFound) {
+			log.Printf("server: custom domain lookup: %v", err)
+			return "" // don't cache transient DB errors
+		}
+		mu.Lock()
+		cache[host] = cacheEntry{slug: slug, until: time.Now().Add(cacheTTL)}
+		mu.Unlock()
+		return slug
+	}
+
+	reserved := func(path string) bool {
+		return strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/admin") ||
+			strings.HasPrefix(path, "/pos") || strings.HasPrefix(path, "/assets/")
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
 		if i := strings.LastIndex(host, ":"); i >= 0 {
 			host = host[:i]
 		}
-		if host != "" && !strings.HasPrefix(r.URL.Path, "/api/") &&
-			!strings.HasPrefix(r.URL.Path, "/admin") && !strings.HasPrefix(r.URL.Path, "/pos") {
-			if restaurantID, err := platformStore.RestaurantIDByDomain(r.Context(), host); err == nil {
-				if rest, err := menuStore.RestaurantByID(r.Context(), restaurantID); err == nil {
-					r2 := r.Clone(r.Context())
-					r2.URL.Path = "/" + rest.Slug + r.URL.Path
-					next.ServeHTTP(w, r2)
-					return
-				}
-			} else if !errors.Is(err, platformports.ErrNotFound) {
-				log.Printf("server: custom domain lookup: %v", err)
+		if host != "" && host != baseHost &&
+			(r.Method == http.MethodGet || r.Method == http.MethodHead) && !reserved(r.URL.Path) {
+			if slug := slugFor(r, host); slug != "" {
+				http.Redirect(w, r, strings.TrimRight(baseURL, "/")+"/"+slug+r.URL.Path, http.StatusFound)
+				return
 			}
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-// menuSPADir picks the diner menu SPA directory: the menu teammate's
-// Vite build if present, else the legacy static site.
-func menuSPADir() string {
-	for _, dir := range []string{"web/menu-app/dist", "web/menu/dist", "web/menu"} {
-		if st, err := os.Stat(filepath.Join(dir, "index.html")); err == nil && !st.IsDir() {
-			return dir
-		}
-	}
-	return "web/menu"
 }
 
 // spaFileServer serves static files under dir, falling back to
