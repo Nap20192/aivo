@@ -47,6 +47,8 @@ type Store interface {
 	CreateTicket(ctx context.Context, t domain.Ticket) error
 	// AddLines appends lines to an open ticket.
 	AddLines(ctx context.Context, ticketID uuid.UUID, lines []domain.TicketLine) error
+	// AppendTicketNote adds a diner note to the ticket (newline-joined).
+	AppendTicketNote(ctx context.Context, restaurantID, id uuid.UUID, note string) error
 	// TicketByID returns the ticket with lines, scoped to restaurantID.
 	TicketByID(ctx context.Context, restaurantID, id uuid.UUID) (domain.Ticket, error)
 	// FireTicket stamps fired_at=now on every unfired line of the ticket.

@@ -59,7 +59,13 @@ func (h *handler) pos(next posFunc) http.HandlerFunc {
 
 // --- Views -------------------------------------------------------------
 
-func hhmm(t time.Time) string { return t.Local().Format("15:04") }
+// posLocation is the timezone POS display times ("HH:MM") render in,
+// set from RESTAURANT_TZ via Deps.POSLocation (default: server-local).
+// ponytail: single global TZ; move to a per-restaurant column when
+// multi-region tenants need it.
+var posLocation = time.Local
+
+func hhmm(t time.Time) string { return t.In(posLocation).Format("15:04") }
 
 type posShiftView struct {
 	ID                uuid.UUID `json:"id"`
@@ -126,8 +132,12 @@ func toPosTicketView(t posdomain.Ticket) posTicketView {
 		f := hhmm(*lastFired)
 		fired = &f
 	}
+	var note *string
+	if t.Note != "" {
+		note = &t.Note
+	}
 	return posTicketView{
-		ID: t.ID, Lines: lines, Note: nil,
+		ID: t.ID, Lines: lines, Note: note,
 		Source: "at the till · " + placed, PlacedAt: &placed, FiredAt: fired,
 		TableID: t.TableID, ShiftID: t.ShiftID, Status: t.Status, TotalCents: t.TotalCents(),
 	}
@@ -353,7 +363,7 @@ func (h *handler) posAddLines(w http.ResponseWriter, r *http.Request, _ domain.U
 	for i, l := range req.Lines {
 		inputs[i] = posapp.LineInput{MenuItemID: l.MenuItemID, OptionIDs: l.OptionIDs, OptionLabels: l.Options, Qty: l.Qty}
 	}
-	ticket, err := h.Pos.AddLines(r.Context(), restaurantID, tableID, inputs)
+	ticket, err := h.Pos.AddLines(r.Context(), restaurantID, tableID, inputs, "")
 	if writeAppErr(w, err) {
 		return
 	}

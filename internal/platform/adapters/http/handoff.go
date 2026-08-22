@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -54,19 +55,12 @@ func (h *handler) dinerHandoff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Same cooldown mechanics as order submit (shared per-session
-	// debounce; a new handoff also replaces the previous active one).
-	sessionID := session.IssueOrRefresh(w, r)
-	if !session.AllowOrder(sessionID) {
-		w.Header().Set("Retry-After", "30")
-		writeJSON(w, http.StatusTooManyRequests, map[string]apiError{"error": {
-			Code: "rate_limited", Message: "a cart just went in from this device", RetryAfterSeconds: session.OrderDebounceSeconds,
-		}})
-		return
-	}
+	session.IssueOrRefresh(w, r)
 
 	// Snapshot-validate every line against the live menu (same rules as
-	// order submit: qty, availability, option ownership).
+	// order submit: qty, availability, option ownership). Validation
+	// runs BEFORE the cooldown slot is consumed — a 422 (item just
+	// 86'd) must not burn the diner's 30s window.
 	_, items, err := h.Menu.Menu(r.Context(), table.RestaurantID)
 	if writeAppErr(w, err) {
 		return
@@ -94,6 +88,17 @@ func (h *handler) dinerHandoff(w http.ResponseWriter, r *http.Request) {
 			MenuItemID: snap.MenuItemID, OptionIDs: optionIDs, Qty: snap.Qty,
 			Name: snap.Name, UnitPriceCents: snap.UnitPriceCents, Options: snap.ChosenOptions,
 		})
+	}
+
+	// Cooldown keys on the table token (shared with order submit — a
+	// handoff and an order trade off the same 30s slot; unforgeable
+	// unlike the session cookie). Consumed only after validation passed.
+	if !session.AllowOrder(table.Token) {
+		w.Header().Set("Retry-After", "30")
+		writeJSON(w, http.StatusTooManyRequests, map[string]apiError{"error": {
+			Code: "rate_limited", Message: "a cart just went in from this table", RetryAfterSeconds: session.OrderDebounceSeconds,
+		}})
+		return
 	}
 
 	var customerID *uuid.UUID
@@ -228,7 +233,11 @@ func (h *handler) posHandoffAccept(w http.ResponseWriter, r *http.Request, u dom
 	}
 
 	// Consume first (single-use, blocks a concurrent double accept),
-	// compensate if appending fails.
+	// compensate if appending fails. Compensation runs on a
+	// non-cancelable context: the accept context being canceled is
+	// exactly the situation where the unmark must still go through.
+	// ponytail: one cross-store DB transaction would remove the
+	// compensation entirely; do that if this two-step ever bites.
 	if writeAppErr(w, h.MenuAdmin.MarkHandoffUsed(r.Context(), restaurantID, handoff.ID)) {
 		return
 	}
@@ -236,9 +245,9 @@ func (h *handler) posHandoffAccept(w http.ResponseWriter, r *http.Request, u dom
 	for i, l := range handoff.Lines {
 		inputs[i] = posapp.LineInput{MenuItemID: l.MenuItemID, OptionIDs: l.OptionIDs, Qty: l.Qty}
 	}
-	ticket, err := h.Pos.AddLines(r.Context(), restaurantID, tableID, inputs)
+	ticket, err := h.Pos.AddLines(r.Context(), restaurantID, tableID, inputs, handoff.Note)
 	if err != nil {
-		if unmarkErr := h.MenuAdmin.UnmarkHandoffUsed(r.Context(), handoff.ID); unmarkErr != nil {
+		if unmarkErr := h.MenuAdmin.UnmarkHandoffUsed(context.WithoutCancel(r.Context()), handoff.ID); unmarkErr != nil {
 			slog.Error("handoff accept: unmark after failure", "error", unmarkErr)
 		}
 		writeAppErr(w, err)

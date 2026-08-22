@@ -67,6 +67,7 @@ type Ticket struct {
 	ShiftID      uuid.UUID
 	TableID      uuid.UUID
 	Status       string
+	Note         string // diner note from a cart handoff, "" otherwise
 	Lines        []TicketLine
 	CreatedAt    time.Time
 }

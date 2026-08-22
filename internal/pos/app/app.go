@@ -165,8 +165,9 @@ type LineInput struct {
 // AddLines appends snapshot lines to the table's open ticket, creating
 // the ticket under the open shift if the table has none. Snapshots reuse
 // the menu context's NewOrderLine validation (qty, availability, option
-// ownership).
-func (a *App) AddLines(ctx context.Context, restaurantID, tableID uuid.UUID, inputs []LineInput) (domain.Ticket, error) {
+// ownership). A non-empty note (cart handoff) is appended to the
+// ticket's note.
+func (a *App) AddLines(ctx context.Context, restaurantID, tableID uuid.UUID, inputs []LineInput, note string) (domain.Ticket, error) {
 	if len(inputs) == 0 {
 		return domain.Ticket{}, fmt.Errorf("%w: at least one line is required", ErrInvalid)
 	}
@@ -228,6 +229,11 @@ func (a *App) AddLines(ctx context.Context, restaurantID, tableID uuid.UUID, inp
 
 	if err := a.store.AddLines(ctx, ticket.ID, lines); err != nil {
 		return domain.Ticket{}, err
+	}
+	if note != "" {
+		if err := a.store.AppendTicketNote(ctx, restaurantID, ticket.ID, note); err != nil {
+			return domain.Ticket{}, err
+		}
 	}
 	return a.store.TicketByID(ctx, restaurantID, ticket.ID)
 }
