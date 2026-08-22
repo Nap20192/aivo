@@ -164,7 +164,7 @@ export const api = {
     );
   },
 
-  createMenu(id: string, input: { name: string; slug: string }): Promise<Menu> {
+  createMenu(id: string, input: { name: string; slug?: string }): Promise<Menu> {
     return withFallback(
       () => request("POST", `/restaurants/${id}/menus`, input),
       () => mockApi.createMenu(id, input),
