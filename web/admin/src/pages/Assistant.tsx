@@ -59,12 +59,13 @@ function describeAction(a: AssistantAction, ctx: Ctx): { kind: string; text: str
         text: item(a.id),
       };
     case "update_theme": {
+      const t = a.theme;
       const parts: string[] = [];
-      if (a.accent) parts.push(`accent → ${a.accent}`);
-      if (a.bold !== undefined) parts.push(`bold ${a.bold ? "on" : "off"}`);
-      if (a.brand_name) parts.push(`brand name → "${a.brand_name}"`);
-      if (a.banner_url !== undefined) parts.push("banner");
-      if (a.css_vars) parts.push(`${Object.keys(a.css_vars).length} css vars`);
+      if (t.accent) parts.push(`accent → ${t.accent}`);
+      if (t.bold !== undefined) parts.push(`bold ${t.bold ? "on" : "off"}`);
+      if (t.brand_name) parts.push(`brand name → "${t.brand_name}"`);
+      if (t.banner_url !== undefined) parts.push("banner");
+      if (t.css_vars) parts.push(`${Object.keys(t.css_vars).length} css vars`);
       return { kind: "Update theme", text: parts.join(" · ") || "no changes" };
     }
     case "create_menu":
@@ -386,7 +387,9 @@ function AssistantBubble(props: {
                         color: result.ok ? "var(--green-700)" : "var(--red-700)",
                       }}
                     >
-                      {result.detail}
+                      {result.ok
+                        ? "Applied"
+                        : result.error || "Failed — no reason given."}
                     </span>
                   )}
                 </span>

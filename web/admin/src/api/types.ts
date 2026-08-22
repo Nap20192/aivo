@@ -137,7 +137,7 @@ export type AssistantAction =
     }
   | { type: "delete_item"; id: string }
   | { type: "set_item_available"; id: string; available: boolean }
-  | ({ type: "update_theme" } & Partial<Omit<Theme, "design_md">>)
+  | { type: "update_theme"; theme: Partial<Omit<Theme, "design_md">> }
   | { type: "create_menu"; name: string; slug: string };
 
 export interface AssistantAttachment {
@@ -156,10 +156,12 @@ export interface AssistantMessage {
   created_at: string;
 }
 
+// Backend shape: error omitted on success.
 export interface AssistantApplyResult {
   index: number;
+  type: string;
   ok: boolean;
-  detail: string;
+  error?: string;
 }
 
 // Light CRM (manager+). Email/phone are manager-only server-side.

@@ -537,7 +537,7 @@ export const mockApi = {
         price_cents: 1200,
         allergens: ["fish", "milk", "gluten", "eggs"],
       });
-    actions.push({ type: "update_theme", accent: "Wine", bold: db.theme.bold });
+    actions.push({ type: "update_theme", theme: { accent: "Wine" } });
     const reply: AssistantMessage = {
       id: uid("amsg"),
       role: "assistant",
@@ -567,14 +567,17 @@ export const mockApi = {
       indexes ?? msg.actions.map((_, i) => i);
     const results: AssistantApplyResult[] = picked.map((i) => {
       const a = msg.actions[i];
-      if (!a) return { index: i, ok: false, detail: "No such action." };
+      if (!a)
+        return { index: i, type: "unknown", ok: false, error: "No such action." };
       try {
-        return { index: i, ok: true, detail: execAction(a) };
+        execAction(a);
+        return { index: i, type: a.type, ok: true };
       } catch (e) {
         return {
           index: i,
+          type: a.type,
           ok: false,
-          detail: e instanceof Error ? e.message : "Failed.",
+          error: e instanceof Error ? e.message : "Failed.",
         };
       }
     });
@@ -724,8 +727,7 @@ function execAction(a: AssistantAction): string {
       return `${item.name}: ${a.available ? "back on the menu" : "86'd"}.`;
     }
     case "update_theme": {
-      const { type: _, ...patch } = a;
-      db.theme = { ...db.theme, ...patch };
+      db.theme = { ...db.theme, ...a.theme };
       return "Theme updated.";
     }
     case "create_menu": {
