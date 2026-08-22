@@ -52,6 +52,17 @@ type TableState struct {
 func (a *App) State(ctx context.Context, restaurantID uuid.UUID) (State, error) {
 	st := State{}
 
+	// Open tickets load once (two queries total) and serve both the
+	// per-table map and the running expected total.
+	openTickets, err := a.store.OpenTickets(ctx, restaurantID)
+	if err != nil {
+		return State{}, err
+	}
+	openByTable := map[uuid.UUID]*domain.Ticket{}
+	for i := range openTickets {
+		openByTable[openTickets[i].TableID] = &openTickets[i]
+	}
+
 	shift, err := a.store.OpenShiftFor(ctx, restaurantID)
 	switch {
 	case err == nil:
@@ -59,13 +70,15 @@ func (a *App) State(ctx context.Context, restaurantID uuid.UUID) (State, error) 
 		if st.ShiftNumber, err = a.store.ShiftSequence(ctx, restaurantID, shift.ID); err != nil {
 			return State{}, err
 		}
-		tickets, err := a.store.TicketsForShift(ctx, restaurantID, shift.ID)
+		closedSales, err := a.store.ShiftClosedSalesCents(ctx, restaurantID, shift.ID)
 		if err != nil {
 			return State{}, err
 		}
-		st.ShiftExpectedCents = shift.OpeningFloatCents
-		for _, t := range tickets {
-			st.ShiftExpectedCents += t.TotalCents()
+		st.ShiftExpectedCents = shift.OpeningFloatCents + closedSales
+		for _, t := range openTickets {
+			if t.ShiftID == shift.ID {
+				st.ShiftExpectedCents += t.TotalCents()
+			}
 		}
 	case errors.Is(err, ports.ErrNotFound):
 		// no open shift — still show tables/requests
@@ -78,16 +91,7 @@ func (a *App) State(ctx context.Context, restaurantID uuid.UUID) (State, error) 
 		return State{}, err
 	}
 	for _, t := range tables {
-		ts := TableState{Table: t}
-		ticket, err := a.store.OpenTicketForTable(ctx, restaurantID, t.ID)
-		switch {
-		case err == nil:
-			ts.Ticket = &ticket
-		case errors.Is(err, ports.ErrNotFound):
-		default:
-			return State{}, err
-		}
-		st.Tables = append(st.Tables, ts)
+		st.Tables = append(st.Tables, TableState{Table: t, Ticket: openByTable[t.ID]})
 	}
 
 	st.Requests, err = a.menu.PendingServiceRequests(ctx, restaurantID)
@@ -97,7 +101,9 @@ func (a *App) State(ctx context.Context, restaurantID uuid.UUID) (State, error) 
 	return st, nil
 }
 
-func (a *App) OpenShift(ctx context.Context, restaurantID, userID uuid.UUID, openingFloatCents int) (domain.Shift, error) {
+// OpenShift opens a shift; cashier is the display name denormalized
+// onto the row so pos state never needs a per-poll user lookup.
+func (a *App) OpenShift(ctx context.Context, restaurantID, userID uuid.UUID, cashier string, openingFloatCents int) (domain.Shift, error) {
 	if openingFloatCents < 0 {
 		return domain.Shift{}, fmt.Errorf("%w: opening_float_cents must be >= 0", ErrInvalid)
 	}
@@ -105,6 +111,7 @@ func (a *App) OpenShift(ctx context.Context, restaurantID, userID uuid.UUID, ope
 		ID:                uuid.New(),
 		RestaurantID:      restaurantID,
 		OpenedBy:          userID,
+		Cashier:           cashier,
 		OpeningFloatCents: openingFloatCents,
 	}
 	if err := a.store.OpenShift(ctx, sh); err != nil {
@@ -258,6 +265,12 @@ func (a *App) Fire(ctx context.Context, restaurantID, ticketID uuid.UUID) (domai
 		return domain.Ticket{}, err
 	}
 	return a.store.TicketByID(ctx, restaurantID, ticketID)
+}
+
+// LinkTicketCustomer records the handoff customer on the ticket (first
+// link wins) so CRM spend can include handoff sales.
+func (a *App) LinkTicketCustomer(ctx context.Context, restaurantID, ticketID, customerID uuid.UUID) error {
+	return a.store.LinkTicketCustomer(ctx, restaurantID, ticketID, customerID)
 }
 
 func (a *App) AckRequest(ctx context.Context, restaurantID, id uuid.UUID) error {

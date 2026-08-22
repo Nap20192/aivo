@@ -42,6 +42,13 @@ type Store interface {
 	// OpenTicketForTable returns the table's open ticket with lines,
 	// ErrNotFound if none.
 	OpenTicketForTable(ctx context.Context, restaurantID, tableID uuid.UUID) (domain.Ticket, error)
+	// OpenTickets returns every open ticket (with lines) of the
+	// restaurant in two queries — the pos state hot path.
+	OpenTickets(ctx context.Context, restaurantID uuid.UUID) ([]domain.Ticket, error)
+	// ShiftClosedSalesCents aggregates the shift's closed-ticket sales.
+	ShiftClosedSalesCents(ctx context.Context, restaurantID, shiftID uuid.UUID) (int, error)
+	// LinkTicketCustomer sets the ticket's customer when none is linked.
+	LinkTicketCustomer(ctx context.Context, restaurantID, id, customerID uuid.UUID) error
 	// CreateTicket creates an open ticket. Returns ErrConflict if the
 	// table already has one open.
 	CreateTicket(ctx context.Context, t domain.Ticket) error

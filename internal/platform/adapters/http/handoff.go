@@ -254,6 +254,11 @@ func (h *handler) posHandoffAccept(w http.ResponseWriter, r *http.Request, u dom
 		return
 	}
 	if handoff.CustomerID != nil {
+		// Link the customer on the ticket so CRM spend counts handoff
+		// sales, and bump the guest profile.
+		if err := h.Pos.LinkTicketCustomer(r.Context(), restaurantID, ticket.ID, *handoff.CustomerID); err != nil {
+			slog.Warn("handoff accept: link ticket customer", "error", err)
+		}
 		if err := h.Platform.TouchGuest(r.Context(), restaurantID, *handoff.CustomerID); err != nil {
 			slog.Warn("handoff accept: touch guest", "error", err)
 		}

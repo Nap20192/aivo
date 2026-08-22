@@ -17,6 +17,7 @@ type Shift struct {
 	ID                uuid.UUID
 	RestaurantID      uuid.UUID
 	OpenedBy          uuid.UUID
+	Cashier           string // display name, denormalized at open time
 	OpenedAt          time.Time
 	OpeningFloatCents int
 	ClosedAt          *time.Time
@@ -66,6 +67,7 @@ type Ticket struct {
 	RestaurantID uuid.UUID
 	ShiftID      uuid.UUID
 	TableID      uuid.UUID
+	CustomerID   *uuid.UUID // linked when a customer's handoff was accepted
 	Status       string
 	Note         string // diner note from a cart handoff, "" otherwise
 	Lines        []TicketLine

@@ -29,19 +29,19 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
-const shiftCols = `id, restaurant_id, opened_by, opened_at, opening_float_cents, closed_at, declared_cents, expected_cents, variance_cents`
+const shiftCols = `id, restaurant_id, opened_by, cashier, opened_at, opening_float_cents, closed_at, declared_cents, expected_cents, variance_cents`
 
 func scanShift(row interface{ Scan(...any) error }) (domain.Shift, error) {
 	var s domain.Shift
-	err := row.Scan(&s.ID, &s.RestaurantID, &s.OpenedBy, &s.OpenedAt, &s.OpeningFloatCents,
+	err := row.Scan(&s.ID, &s.RestaurantID, &s.OpenedBy, &s.Cashier, &s.OpenedAt, &s.OpeningFloatCents,
 		&s.ClosedAt, &s.DeclaredCents, &s.ExpectedCents, &s.VarianceCents)
 	return s, err
 }
 
 func (s *Store) OpenShift(ctx context.Context, sh domain.Shift) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO shifts (id, restaurant_id, opened_by, opening_float_cents) VALUES ($1, $2, $3, $4)`,
-		sh.ID, sh.RestaurantID, sh.OpenedBy, sh.OpeningFloatCents)
+		`INSERT INTO shifts (id, restaurant_id, opened_by, cashier, opening_float_cents) VALUES ($1, $2, $3, $4, $5)`,
+		sh.ID, sh.RestaurantID, sh.OpenedBy, sh.Cashier, sh.OpeningFloatCents)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return fmt.Errorf("shift already open: %w", ports.ErrConflict)
@@ -111,10 +111,10 @@ func (s *Store) ShiftSequence(ctx context.Context, restaurantID, shiftID uuid.UU
 func (s *Store) OpenTicketForTable(ctx context.Context, restaurantID, tableID uuid.UUID) (domain.Ticket, error) {
 	var t domain.Ticket
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, restaurant_id, shift_id, table_id, status, note, created_at
+		`SELECT id, restaurant_id, shift_id, table_id, customer_id, status, note, created_at
 		 FROM tickets WHERE restaurant_id = $1 AND table_id = $2 AND status = $3`,
 		restaurantID, tableID, domain.TicketOpen,
-	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.Note, &t.CreatedAt)
+	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.CustomerID, &t.Status, &t.Note, &t.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, ports.ErrNotFound
 	}
@@ -180,9 +180,9 @@ func (s *Store) AppendTicketNote(ctx context.Context, restaurantID, id uuid.UUID
 func (s *Store) TicketByID(ctx context.Context, restaurantID, id uuid.UUID) (domain.Ticket, error) {
 	var t domain.Ticket
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, restaurant_id, shift_id, table_id, status, note, created_at
+		`SELECT id, restaurant_id, shift_id, table_id, customer_id, status, note, created_at
 		 FROM tickets WHERE restaurant_id = $1 AND id = $2`, restaurantID, id,
-	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.Note, &t.CreatedAt)
+	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.CustomerID, &t.Status, &t.Note, &t.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, ports.ErrNotFound
 	}
@@ -193,6 +193,108 @@ func (s *Store) TicketByID(ctx context.Context, restaurantID, id uuid.UUID) (dom
 		return domain.Ticket{}, err
 	}
 	return t, nil
+}
+
+// OpenTickets returns every open ticket of the restaurant with lines,
+// in TWO queries total (the 5s POS poll's hot path): tickets, then
+// ticket_lines WHERE ticket_id = ANY(...).
+func (s *Store) OpenTickets(ctx context.Context, restaurantID uuid.UUID) ([]domain.Ticket, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, restaurant_id, shift_id, table_id, customer_id, status, note, created_at
+		 FROM tickets WHERE restaurant_id = $1 AND status = $2 ORDER BY created_at ASC`,
+		restaurantID, domain.TicketOpen)
+	if err != nil {
+		return nil, fmt.Errorf("pos store: open tickets: %w", err)
+	}
+	defer rows.Close()
+
+	tickets := []*domain.Ticket{}
+	for rows.Next() {
+		var t domain.Ticket
+		if err := rows.Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.CustomerID, &t.Status, &t.Note, &t.CreatedAt); err != nil {
+			return nil, fmt.Errorf("pos store: open tickets: scan: %w", err)
+		}
+		tickets = append(tickets, &t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := s.attachLinesBatch(ctx, tickets); err != nil {
+		return nil, err
+	}
+	out := make([]domain.Ticket, len(tickets))
+	for i, t := range tickets {
+		out[i] = *t
+	}
+	return out, nil
+}
+
+// attachLinesBatch fills Lines for all tickets in one query.
+func (s *Store) attachLinesBatch(ctx context.Context, tickets []*domain.Ticket) error {
+	if len(tickets) == 0 {
+		return nil
+	}
+	index := map[uuid.UUID]*domain.Ticket{}
+	ids := make([]uuid.UUID, len(tickets))
+	for i, t := range tickets {
+		t.Lines = []domain.TicketLine{}
+		index[t.ID] = t
+		ids[i] = t.ID
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, ticket_id, menu_item_id, name, unit_price_cents, qty, options, fired_at, created_at
+		 FROM ticket_lines WHERE ticket_id = ANY($1) ORDER BY created_at ASC`, ids)
+	if err != nil {
+		return fmt.Errorf("pos store: lines batch: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var l domain.TicketLine
+		var opts []byte
+		if err := rows.Scan(&l.ID, &l.TicketID, &l.MenuItemID, &l.Name, &l.UnitPriceCents, &l.Qty, &opts, &l.FiredAt, &l.CreatedAt); err != nil {
+			return fmt.Errorf("pos store: lines batch: scan: %w", err)
+		}
+		if err := json.Unmarshal(opts, &l.Options); err != nil {
+			return fmt.Errorf("pos store: lines batch: decode options: %w", err)
+		}
+		if t, ok := index[l.TicketID]; ok {
+			t.Lines = append(t.Lines, l)
+		}
+	}
+	return rows.Err()
+}
+
+// ShiftClosedSalesCents sums the shift's CLOSED tickets (option deltas
+// included) in one aggregate — the open ones come from OpenTickets.
+func (s *Store) ShiftClosedSalesCents(ctx context.Context, restaurantID, shiftID uuid.UUID) (int, error) {
+	var total int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(sum((tl.unit_price_cents + COALESCE(d.delta, 0)) * tl.qty), 0)
+		 FROM tickets t
+		 JOIN ticket_lines tl ON tl.ticket_id = t.id
+		 LEFT JOIN LATERAL (
+		     SELECT sum((o->>'price_delta_cents')::int) AS delta
+		     FROM jsonb_array_elements(tl.options) o
+		 ) d ON true
+		 WHERE t.restaurant_id = $1 AND t.shift_id = $2 AND t.status = $3`,
+		restaurantID, shiftID, domain.TicketClosed).Scan(&total)
+	if err != nil {
+		return 0, fmt.Errorf("pos store: closed sales: %w", err)
+	}
+	return total, nil
+}
+
+// LinkTicketCustomer sets the ticket's customer if none is linked yet
+// (first accepted handoff wins).
+func (s *Store) LinkTicketCustomer(ctx context.Context, restaurantID, id, customerID uuid.UUID) error {
+	if _, err := s.db.ExecContext(ctx,
+		`UPDATE tickets SET customer_id = $1
+		 WHERE restaurant_id = $2 AND id = $3 AND customer_id IS NULL`,
+		customerID, restaurantID, id); err != nil {
+		return fmt.Errorf("pos store: link customer: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) FireTicket(ctx context.Context, restaurantID, id uuid.UUID) error {
@@ -210,7 +312,7 @@ func (s *Store) FireTicket(ctx context.Context, restaurantID, id uuid.UUID) erro
 
 func (s *Store) TicketsForShift(ctx context.Context, restaurantID, shiftID uuid.UUID) ([]domain.Ticket, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, restaurant_id, shift_id, table_id, status, note, created_at
+		`SELECT id, restaurant_id, shift_id, table_id, customer_id, status, note, created_at
 		 FROM tickets WHERE restaurant_id = $1 AND shift_id = $2 ORDER BY created_at ASC`,
 		restaurantID, shiftID)
 	if err != nil {
@@ -221,7 +323,7 @@ func (s *Store) TicketsForShift(ctx context.Context, restaurantID, shiftID uuid.
 	tickets := []*domain.Ticket{}
 	for rows.Next() {
 		var t domain.Ticket
-		if err := rows.Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.Note, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.CustomerID, &t.Status, &t.Note, &t.CreatedAt); err != nil {
 			return nil, fmt.Errorf("pos store: tickets for shift: scan: %w", err)
 		}
 		tickets = append(tickets, &t)
