@@ -1,6 +1,9 @@
 // Typed client for the /api/v1 contract (docs/PLATFORM.md).
 // Mock mode: VITE_MOCK=1, or automatic fallback when the API is unreachable.
-import { ApiError } from "./error";
+import {
+  ApiError,
+  request as sharedRequest,
+} from "../../../design-system/shared/api";
 import { mockApi } from "./mock";
 import type {
   AssistantApplyResult,
@@ -41,40 +44,33 @@ function enableMock() {
   }
 }
 
+// Shared fetch wrapper + the admin's mock-fallback trigger on network failure.
 async function request<T>(
   method: string,
   path: string,
   body?: unknown,
 ): Promise<T> {
-  let res: Response;
   try {
-    res = await fetch(BASE + path, {
+    return await sharedRequest<T>(BASE + path, {
       method,
       credentials: "same-origin",
-      headers: body instanceof FormData ? undefined : body !== undefined ? { "Content-Type": "application/json" } : undefined,
-      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
+      body:
+        body instanceof FormData
+          ? body
+          : body !== undefined
+            ? JSON.stringify(body)
+            : undefined,
+      // FormData must set its own multipart boundary.
+      ...(body instanceof FormData ? { headers: undefined } : {}),
     });
-  } catch {
-    // API unreachable: switch this session to mock mode.
-    enableMock();
-    throw new ApiError("network", "API unreachable — switched to demo mode.", 0);
-  }
-  if (!res.ok) {
-    let code = "error";
-    let message = res.statusText || "Request failed.";
-    try {
-      const data = await res.json();
-      if (data?.error) {
-        code = data.error.code ?? code;
-        message = data.error.message ?? message;
-      }
-    } catch {
-      // non-JSON error body
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 0) {
+      // API unreachable: switch this session to mock mode.
+      enableMock();
+      throw new ApiError(0, "network", "API unreachable — switched to demo mode.");
     }
-    throw new ApiError(code, message, res.status);
+    throw e;
   }
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
 }
 
 // Wrap a real call so that a network failure retries once against the mock.

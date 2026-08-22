@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { GuestDetail as Detail } from "../api/types";
 import { useRestaurant } from "../auth";
-import { formatCents } from "../lib/money";
+import { formatCents } from "../../../design-system/shared/money";
 import { useLoad } from "../lib/useLoad";
 import { ErrorBanner, Field, LoadingPage } from "../ui";
 import { fmtDate } from "./Guests";

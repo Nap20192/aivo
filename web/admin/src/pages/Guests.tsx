@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useRestaurant } from "../auth";
-import { formatCents } from "../lib/money";
+import { formatCents } from "../../../design-system/shared/money";
 import { useLoad } from "../lib/useLoad";
 import { Badge, EmptyState, ErrorBanner, LoadingPage } from "../ui";
 

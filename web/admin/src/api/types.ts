@@ -1,8 +1,10 @@
 // Shapes per docs/PLATFORM.md "API surface (JSON, /api/v1)".
 
+import type { AccentName } from "../../../design-system/shared/theme";
+
 export type Role = "owner" | "manager" | "waiter";
 export type Plan = "free" | "pro" | "business";
-export type Accent = "Blood red" | "Olive" | "Wine" | "Fire";
+export type Accent = AccentName;
 
 export interface User {
   id: string;

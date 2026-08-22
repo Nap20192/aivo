@@ -1,7 +1,7 @@
 import { ImagePlus, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
-import { ApiError } from "../api/error";
+import { ApiError } from "../../../design-system/shared/api";
 import type { Accent, Theme } from "../api/types";
 import { useRestaurant } from "../auth";
 import { useLoad } from "../lib/useLoad";
