@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api.ts";
 import type { HandoffPreview, Me, NewLine, PosRequest, PosState, PostedShift, Table } from "./types.ts";
-import { fmt, parseDollars, timeHM, waiting } from "./format.ts";
+import { defaultMod, fmt, parseDollars, timeHM, waiting } from "./format.ts";
 import { Badge, Button, EmptyState, Icon, StatusPill } from "./ui.tsx";
 
 type Route =
@@ -845,7 +845,7 @@ function TakeOrder({
                   setDraft(
                     line
                       ? draft.map((l, x) => (x === li ? { ...l, qty: l.qty + 1 } : l))
-                      : [...draft, { itemId: it.id, qty: 1, mod: it.mods ? "Medium rare" : null }]
+                      : [...draft, { itemId: it.id, qty: 1, mod: defaultMod(it) }]
                   )
                 }
               >
@@ -891,7 +891,8 @@ function TakeOrder({
               draft.map((l) => ({
                 menu_item_id: l.itemId,
                 qty: l.qty,
-                options: l.mod ? [l.mod.toLowerCase()] : [],
+                // labels go to the server verbatim — matching is case-sensitive; lowercase is display-only
+                options: l.mod ? [l.mod] : [],
               }))
             )
           }

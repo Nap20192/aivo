@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fmt, parseDollars, waiting } from "../src/format.ts";
+import { defaultMod, fmt, parseDollars, waiting } from "../src/format.ts";
 import { mockApi } from "../src/mock.ts";
 
 test("money formatting", () => {
@@ -12,6 +12,13 @@ test("money formatting", () => {
   assert.equal(parseDollars(""), null);
   assert.equal(parseDollars("1.2.3"), null);
   assert.equal(waiting(Date.now() - 4 * 60_000), "waiting 4 min");
+});
+
+test("default mod is the item's own first label, never hardcoded", () => {
+  assert.equal(defaultMod({ mods: ["Rare", "Medium rare", "Medium", "Well done"] }), "Rare");
+  assert.equal(defaultMod({ mods: ["Small", "Large"] }), "Small"); // non-doneness group
+  assert.equal(defaultMod({}), null);
+  assert.equal(defaultMod({ mods: [] }), null);
 });
 
 test("full shift lifecycle in mock mode", async () => {
@@ -33,13 +40,14 @@ test("full shift lifecycle in mock mode", async () => {
   const free = s.tables.find((t) => t.number === "09")!;
   assert.equal(free.ticket, null);
   await mockApi.addLines(free.id, [
-    { menu_item_id: "m-ribeye300", qty: 1, options: ["medium rare"] },
+    { menu_item_id: "m-ribeye300", qty: 1, options: ["Medium rare"] },
     { menu_item_id: "m-chips", qty: 2, options: [] },
   ]);
   s = await mockApi.state();
   const t09 = s.tables.find((t) => t.number === "09")!;
   assert.ok(t09.ticket);
   assert.equal(t09.ticket.lines.length, 2);
+  assert.deepEqual(t09.ticket.lines[0].options, ["Medium rare"]); // labels verbatim, case preserved
   assert.equal(t09.ticket.fired_at, null);
   const total = t09.ticket.lines.reduce((a, l) => a + l.unit_price_cents * l.qty, 0);
   assert.equal(total, 4600 + 2 * 900);
