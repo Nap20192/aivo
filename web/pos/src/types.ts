@@ -99,7 +99,8 @@ export interface NewLine {
 export interface PosApi {
   login(email: string, password: string): Promise<Me>;
   me(): Promise<Me>;
-  state(): Promise<PosState>;
+  /** null = unchanged since the last poll (304 or identical body) — skip the update */
+  state(): Promise<PosState | null>;
   openShift(openingFloatCents: number): Promise<void>;
   addLines(tableId: string, lines: NewLine[]): Promise<void>;
   fire(ticketId: string): Promise<void>;
