@@ -308,6 +308,12 @@ func (h *handler) assistantApply(w http.ResponseWriter, r *http.Request, u domai
 			selected = append(selected, i)
 		}
 	}
+	// Validate every index BEFORE executing anything — a bad index means
+	// nothing runs.
+	if err := validateActionIndexes(selected, len(msg.Actions)); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
+		return
+	}
 
 	type result struct {
 		Index int    `json:"index"`
@@ -316,15 +322,11 @@ func (h *handler) assistantApply(w http.ResponseWriter, r *http.Request, u domai
 		Error string `json:"error,omitempty"`
 	}
 	results := []result{}
-	// ponytail: sequential best-effort, not one transaction — each apply
-	// goes through the existing store commands; a failure stops the rest
-	// and is reported per action. Batch tx if this ever bites.
-	failed := false
+	// ponytail: sequential stop-on-first-failure, not one transaction —
+	// each apply goes through the existing store commands. Batch tx if
+	// this ever bites.
+	failed, succeeded := false, 0
 	for _, i := range selected {
-		if i < 0 || i >= len(msg.Actions) {
-			writeErr(w, http.StatusUnprocessableEntity, "invalid", "action index out of range")
-			return
-		}
 		a := msg.Actions[i]
 		res := result{Index: i, Type: a.Type, OK: true}
 		if failed {
@@ -332,17 +334,41 @@ func (h *handler) assistantApply(w http.ResponseWriter, r *http.Request, u domai
 		} else if err := h.applyAction(r, rest, a); err != nil {
 			res.OK, res.Error = false, err.Error()
 			failed = true
+		} else {
+			succeeded++
 		}
 		results = append(results, res)
 	}
 
-	if writeAppErr(w, h.Platform.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, domain.ActionStatusApplied)) {
-		return
+	// If nothing succeeded, leave the message pending so the admin can
+	// retry after fixing the cause; mark applied only on real effect.
+	status := domain.ActionStatusApplied
+	if succeeded > 0 {
+		if writeAppErr(w, h.Platform.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, domain.ActionStatusApplied)) {
+			return
+		}
+	} else {
+		status = "pending"
 	}
 	actionsJSON, _ := domain.EncodeActions(msg.Actions)
 	slog.Info("assistant actions applied", "restaurant_id", rest.ID, "message_id", msg.ID,
-		"by_user", u.ID, "selected", fmt.Sprint(selected), "all_ok", !failed, "actions", string(actionsJSON))
-	writeJSON(w, http.StatusOK, map[string]any{"status": domain.ActionStatusApplied, "results": results})
+		"by_user", u.ID, "selected", fmt.Sprint(selected), "succeeded", succeeded, "actions", string(actionsJSON))
+	writeJSON(w, http.StatusOK, map[string]any{"status": status, "results": results})
+}
+
+// validateActionIndexes rejects any out-of-range or duplicate index.
+func validateActionIndexes(selected []int, n int) error {
+	seen := map[int]bool{}
+	for _, i := range selected {
+		if i < 0 || i >= n {
+			return fmt.Errorf("action index %d out of range (0..%d)", i, n-1)
+		}
+		if seen[i] {
+			return fmt.Errorf("action index %d selected twice", i)
+		}
+		seen[i] = true
+	}
+	return nil
 }
 
 // POST .../assistant/messages/{msgID}/discard

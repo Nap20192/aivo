@@ -58,6 +58,7 @@ Env vars (native `go run ./cmd/aivo-server` instead of docker-compose):
 | `THEME_GENERATOR` | no | `claudecli` enables AI theme proposals via the `claude` CLI; unset = endpoint 503s |
 | `ASSISTANT` | no | `claudecli` enables the admin AI assistant chat; unset = endpoints 503 |
 | `CLAUDE_BIN` | no | path to the `claude` binary (default `claude`), shared by both AI features |
+| `RESTAURANT_TZ` | no | IANA timezone for POS display times (e.g. `Europe/Brussels`); default server-local |
 
 ## Commands
 

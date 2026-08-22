@@ -48,6 +48,19 @@ func TestValidateActionAllowlist(t *testing.T) {
 	}
 }
 
+func TestValidCSSVarRejectsBackslashEscapes(t *testing.T) {
+	// "\75rl(" spells url( via CSS character escapes — any backslash is
+	// rejected outright.
+	for _, v := range []string{`\75rl(http://evil)`, `red\`, `a\9`} {
+		if err := ValidCSSVar("--x", v); err == nil {
+			t.Errorf("value %q accepted, want reject", v)
+		}
+	}
+	if err := ValidCSSVar("--x", "#556b2f"); err != nil {
+		t.Errorf("plain value rejected: %v", err)
+	}
+}
+
 func TestValidateActionRefsTenantScoping(t *testing.T) {
 	ours, foreign := uuid.New(), uuid.New()
 	refs := ActionRefs{
