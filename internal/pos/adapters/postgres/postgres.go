@@ -111,10 +111,10 @@ func (s *Store) ShiftSequence(ctx context.Context, restaurantID, shiftID uuid.UU
 func (s *Store) OpenTicketForTable(ctx context.Context, restaurantID, tableID uuid.UUID) (domain.Ticket, error) {
 	var t domain.Ticket
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, restaurant_id, shift_id, table_id, status, created_at
+		`SELECT id, restaurant_id, shift_id, table_id, status, note, created_at
 		 FROM tickets WHERE restaurant_id = $1 AND table_id = $2 AND status = $3`,
 		restaurantID, tableID, domain.TicketOpen,
-	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.CreatedAt)
+	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.Note, &t.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, ports.ErrNotFound
 	}
@@ -162,12 +162,27 @@ func (s *Store) AddLines(ctx context.Context, ticketID uuid.UUID, lines []domain
 	return tx.Commit()
 }
 
+// AppendTicketNote adds note to the ticket's note field (newline-joined
+// when one already exists).
+func (s *Store) AppendTicketNote(ctx context.Context, restaurantID, id uuid.UUID, note string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE tickets SET note = CASE WHEN note = '' THEN $1 ELSE note || E'\n' || $1 END
+		 WHERE restaurant_id = $2 AND id = $3`, note, restaurantID, id)
+	if err != nil {
+		return fmt.Errorf("pos store: append note: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ports.ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) TicketByID(ctx context.Context, restaurantID, id uuid.UUID) (domain.Ticket, error) {
 	var t domain.Ticket
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, restaurant_id, shift_id, table_id, status, created_at
+		`SELECT id, restaurant_id, shift_id, table_id, status, note, created_at
 		 FROM tickets WHERE restaurant_id = $1 AND id = $2`, restaurantID, id,
-	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.CreatedAt)
+	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.Note, &t.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, ports.ErrNotFound
 	}
@@ -195,7 +210,7 @@ func (s *Store) FireTicket(ctx context.Context, restaurantID, id uuid.UUID) erro
 
 func (s *Store) TicketsForShift(ctx context.Context, restaurantID, shiftID uuid.UUID) ([]domain.Ticket, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, restaurant_id, shift_id, table_id, status, created_at
+		`SELECT id, restaurant_id, shift_id, table_id, status, note, created_at
 		 FROM tickets WHERE restaurant_id = $1 AND shift_id = $2 ORDER BY created_at ASC`,
 		restaurantID, shiftID)
 	if err != nil {
@@ -206,7 +221,7 @@ func (s *Store) TicketsForShift(ctx context.Context, restaurantID, shiftID uuid.
 	tickets := []*domain.Ticket{}
 	for rows.Next() {
 		var t domain.Ticket
-		if err := rows.Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.Status, &t.Note, &t.CreatedAt); err != nil {
 			return nil, fmt.Errorf("pos store: tickets for shift: scan: %w", err)
 		}
 		tickets = append(tickets, &t)

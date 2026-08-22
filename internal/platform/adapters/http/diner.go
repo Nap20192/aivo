@@ -305,7 +305,10 @@ func (h *handler) dinerOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionID := session.IssueOrRefresh(w, r)
+	// The order cooldown keys on the table token, not the diner session
+	// cookie — a client can discard its cookie, but it cannot mint a
+	// table token. (The cookie is still issued for menu-context dedupe.)
+	session.IssueOrRefresh(w, r)
 	lines := make([]menuapp.OrderLineInput, len(req.Lines))
 	for i, l := range req.Lines {
 		var optionIDs []uuid.UUID
@@ -324,7 +327,7 @@ func (h *handler) dinerOrder(w http.ResponseWriter, r *http.Request) {
 	_, err = h.MenuApp.Commands.SubmitOrder.Handle(r.Context(), menuapp.SubmitOrder{
 		RestaurantSlug: rest.Slug,
 		TableToken:     table.Token,
-		SessionID:      sessionID,
+		SessionID:      table.Token, // cooldown key: unforgeable, unlike the cookie
 		CustomerID:     customerID,
 		Lines:          lines,
 		Comment:        req.Note,

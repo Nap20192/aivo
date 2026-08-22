@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	menuapp "aivo/internal/menu/app"
 	menudomain "aivo/internal/menu/domain"
@@ -42,6 +44,9 @@ type Deps struct {
 	// assistant-proposed image_url values may point at.
 	ImagePrefix string
 	BaseURL     string // origin table links are built under
+	// POSLocation renders POS "HH:MM" display times (RESTAURANT_TZ);
+	// nil = server-local.
+	POSLocation *time.Location
 }
 
 type handler struct {
@@ -52,6 +57,9 @@ type handler struct {
 // mounts this on the root mux).
 func NewMux(d Deps) http.Handler {
 	h := &handler{Deps: d}
+	if d.POSLocation != nil {
+		posLocation = d.POSLocation
+	}
 	mux := http.NewServeMux()
 
 	// Auth (no session required except logout/me).
@@ -118,10 +126,11 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("POST /api/v1/pos/requests/{id}/dismiss", h.pos(h.posDismissRequest))
 
 	// Customer accounts (diner logins, separate cookie/session store).
-	mux.HandleFunc("POST /api/v1/customer/register", h.customerRegister)
-	mux.HandleFunc("POST /api/v1/customer/login", h.customerLogin)
-	mux.HandleFunc("POST /api/v1/customer/logout", h.customerLogout)
-	mux.HandleFunc("GET /api/v1/customer/me", h.customerMe)
+	// Register/login run bcrypt — the per-IP limit matters most here.
+	mux.HandleFunc("POST /api/v1/customer/register", public(h.customerRegister))
+	mux.HandleFunc("POST /api/v1/customer/login", public(h.customerLogin))
+	mux.HandleFunc("POST /api/v1/customer/logout", public(h.customerLogout))
+	mux.HandleFunc("GET /api/v1/customer/me", public(h.customerMe))
 
 	// CRM (manager+).
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/guests", h.restaurant(true, h.listGuests))
@@ -132,15 +141,40 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/v1/pos/handoff/{code}", h.pos(h.posHandoffPreview))
 	mux.HandleFunc("POST /api/v1/pos/handoff/{code}/accept", h.pos(h.posHandoffAccept))
 
-	// Diner (table-token scoped, anonymous).
-	mux.HandleFunc("GET /api/v1/m/{restaurantSlug}/{menuSlug}", h.dinerBrowseMenu)
-	mux.HandleFunc("GET /api/v1/t/{token}", h.dinerEntry)
-	mux.HandleFunc("POST /api/v1/t/{token}/handoff", h.dinerHandoff)
-	mux.HandleFunc("GET /api/v1/t/{token}/handoff/qr", h.dinerHandoffQR)
-	mux.HandleFunc("POST /api/v1/t/{token}/orders", h.dinerOrder)
-	mux.HandleFunc("POST /api/v1/t/{token}/requests", h.dinerRequest)
+	// Diner (table-token scoped, anonymous; per-IP limited).
+	mux.HandleFunc("GET /api/v1/m/{restaurantSlug}/{menuSlug}", public(h.dinerBrowseMenu))
+	mux.HandleFunc("GET /api/v1/t/{token}", public(h.dinerEntry))
+	mux.HandleFunc("POST /api/v1/t/{token}/handoff", public(h.dinerHandoff))
+	mux.HandleFunc("GET /api/v1/t/{token}/handoff/qr", public(h.dinerHandoffQR))
+	mux.HandleFunc("POST /api/v1/t/{token}/orders", public(h.dinerOrder))
+	mux.HandleFunc("POST /api/v1/t/{token}/requests", public(h.dinerRequest))
 
 	return mux
+}
+
+// public wraps unauthenticated endpoints with the per-IP fixed-window
+// rate limit (pkg/session.AllowIP, same mechanism the legacy diner API
+// used) — the bcrypt auth endpoints and anonymous diner surface are the
+// abuse targets.
+func public(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !session.AllowIP(clientIP(r)) {
+			writeErr(w, http.StatusTooManyRequests, "rate_limited", "rate limited")
+			return
+		}
+		next(w, r)
+	}
+}
+
+// clientIP is the direct socket peer, not X-Forwarded-For — spoofable
+// without a trusted, configured proxy in front (same note as the legacy
+// menu adapter).
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // --- JSON + error helpers ----------------------------------------------

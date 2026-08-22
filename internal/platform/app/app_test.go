@@ -370,6 +370,32 @@ func TestTenantScopingOnRestaurantLookup(t *testing.T) {
 	}
 }
 
+func TestSaveThemeValidatesAtChokePoint(t *testing.T) {
+	ctx := context.Background()
+	a, _ := newTestApp()
+	rid := uuid.New()
+
+	bad := map[string]string{
+		"url() css var":     `{"accent":"Wine","css_vars":{"--x":"url(http://evil)"}}`,
+		"backslash escape":  `{"accent":"Wine","css_vars":{"--x":"\\75rl(http://evil)"}}`,
+		"semicolon css var": `{"accent":"Wine","css_vars":{"--x":"red; position:fixed"}}`,
+		"bad accent":        `{"accent":"Hot pink"}`,
+		"bad var name":      `{"css_vars":{"background":"red"}}`,
+		"javascript banner": `{"banner_url":"javascript:alert(1)"}`,
+	}
+	for name, themeJSON := range bad {
+		if _, err := a.SaveTheme(ctx, domain.Theme{RestaurantID: rid, ThemeJSON: []byte(themeJSON)}); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%s: got %v, want ErrInvalid", name, err)
+		}
+	}
+
+	// Sane theme passes.
+	ok := `{"brand_name":"E","accent":"Olive","bold":true,"banner_url":"https://x/img.jpg","css_vars":{"--accent":"#556b2f"}}`
+	if _, err := a.SaveTheme(ctx, domain.Theme{RestaurantID: rid, ThemeJSON: []byte(ok)}); err != nil {
+		t.Errorf("valid theme rejected: %v", err)
+	}
+}
+
 func TestCustomerAuthSeparateFromStaff(t *testing.T) {
 	ctx := context.Background()
 	a, _ := newTestApp()

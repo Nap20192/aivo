@@ -159,12 +159,19 @@ func (s *PostgresStore) CreateMenuItem(ctx context.Context, it domain.MenuItem) 
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(ctx,
+	// category_id is written via a scoped subquery so an item can never
+	// land under another restaurant's category (tenant isolation — same
+	// pattern as CreateCategory's menu check).
+	res, err := tx.ExecContext(ctx,
 		`INSERT INTO menu_items (id, restaurant_id, category_id, name, description, price_cents, image_url, available)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		 SELECT $1, $2, c.id, $4, $5, $6, $7, $8
+		 FROM categories c WHERE c.id = $3 AND c.restaurant_id = $2`,
 		it.ID, it.RestaurantID, it.CategoryID, it.Name, it.Description, it.PriceCents, it.ImageURL, it.Available)
 	if err != nil {
 		return fmt.Errorf("store: create item: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ports.ErrNotFound // category not under this restaurant
 	}
 	if err := insertItemCollections(ctx, tx, it); err != nil {
 		return err
@@ -179,10 +186,13 @@ func (s *PostgresStore) UpdateMenuItem(ctx context.Context, it domain.MenuItem) 
 	}
 	defer tx.Rollback()
 
+	// Same tenant scoping as CreateMenuItem: the target category must
+	// belong to this restaurant or the update matches zero rows.
 	res, err := tx.ExecContext(ctx,
 		`UPDATE menu_items SET category_id = $1, name = $2, description = $3,
 		        price_cents = $4, image_url = $5, available = $6
-		 WHERE restaurant_id = $7 AND id = $8`,
+		 WHERE restaurant_id = $7 AND id = $8
+		   AND EXISTS (SELECT 1 FROM categories c WHERE c.id = $1 AND c.restaurant_id = $7)`,
 		it.CategoryID, it.Name, it.Description, it.PriceCents, it.ImageURL, it.Available,
 		it.RestaurantID, it.ID)
 	if err != nil {

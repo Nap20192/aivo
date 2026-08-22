@@ -107,7 +107,9 @@ func ValidCSSVar(name, value string) error {
 		return errors.New("value empty or too long")
 	}
 	lower := strings.ToLower(value)
-	for _, bad := range []string{"url(", "expression(", ";", "{", "}"} {
+	// Backslash rejected outright: CSS escapes ("\75rl(" spells url()
+	// character-by-character) have no legitimate use in theme values.
+	for _, bad := range []string{"url(", "expression(", ";", "{", "}", `\`} {
 		if strings.Contains(lower, bad) {
 			return fmt.Errorf("value contains %q", bad)
 		}

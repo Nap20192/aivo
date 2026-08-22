@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -445,12 +446,40 @@ func (a *App) Theme(ctx context.Context, restaurantID uuid.UUID) (domain.Theme, 
 	return a.store.Theme(ctx, restaurantID)
 }
 
+// SaveTheme validates the theme JSON here — the one choke point every
+// writer (admin PUT, AI generator apply, assistant update_theme) goes
+// through: accent enum, css_vars injection guard, banner_url policy.
 func (a *App) SaveTheme(ctx context.Context, t domain.Theme) (domain.Theme, error) {
 	if len(t.ThemeJSON) == 0 {
 		t.ThemeJSON = []byte(`{}`)
 	}
 	if len(t.ThemeJSON) > 64<<10 || len(t.DesignMD) > 256<<10 {
 		return domain.Theme{}, fmt.Errorf("%w: theme or design_md too large", ErrInvalid)
+	}
+	var stored struct {
+		Accent    *string           `json:"accent"`
+		BannerURL *string           `json:"banner_url"`
+		CSSVars   map[string]string `json:"css_vars"`
+	}
+	if err := json.Unmarshal(t.ThemeJSON, &stored); err != nil {
+		return domain.Theme{}, fmt.Errorf("%w: theme must be a JSON object", ErrInvalid)
+	}
+	if stored.Accent != nil && !domain.ValidAccent(*stored.Accent) {
+		return domain.Theme{}, fmt.Errorf("%w: accent must be one of: Blood red, Olive, Wine, Fire", ErrInvalid)
+	}
+	if stored.BannerURL != nil && *stored.BannerURL != "" {
+		u := *stored.BannerURL
+		if len(u) > 2048 || !(strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://")) {
+			return domain.Theme{}, fmt.Errorf("%w: banner_url must be an http(s) URL", ErrInvalid)
+		}
+	}
+	if len(stored.CSSVars) > 40 {
+		return domain.Theme{}, fmt.Errorf("%w: too many css_vars", ErrInvalid)
+	}
+	for name, value := range stored.CSSVars {
+		if err := domain.ValidCSSVar(name, value); err != nil {
+			return domain.Theme{}, fmt.Errorf("%w: css var %s: %v", ErrInvalid, name, err)
+		}
 	}
 	if err := a.store.SaveTheme(ctx, t); err != nil {
 		return domain.Theme{}, err
