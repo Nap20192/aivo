@@ -34,7 +34,7 @@ import type {
   Theme,
   User,
 } from "./types";
-import { ApiError } from "./error";
+import { ApiError } from "../../../design-system/shared/api";
 
 interface Db {
   org: Org;
@@ -128,13 +128,13 @@ async function delay<T>(v: T): Promise<T> {
 }
 
 function requireAuth() {
-  if (!db.loggedIn) throw new ApiError("unauthorized", "Not signed in.", 401);
+  if (!db.loggedIn) throw new ApiError(401, "unauthorized", "Not signed in.");
 }
 
 function requireRestaurant(id: string): Restaurant {
   requireAuth();
   if (db.restaurant.id !== id)
-    throw new ApiError("not_found", "Restaurant not found.", 404);
+    throw new ApiError(404, "not_found", "Restaurant not found.");
   return db.restaurant;
 }
 
@@ -186,7 +186,7 @@ export const mockApi = {
 
   async login(input: { email: string; password: string }): Promise<Me> {
     if (input.email !== db.user.email || input.password !== db.password)
-      throw new ApiError("invalid_credentials", "Wrong email or password.", 401);
+      throw new ApiError(401, "invalid_credentials", "Wrong email or password.");
     db.loggedIn = true;
     save();
     return delay(me());
@@ -235,11 +235,7 @@ export const mockApi = {
   ): Promise<{ proposal: Theme; based_on: string }> {
     requireRestaurant(id);
     if (!db.theme.design_md.trim())
-      throw new ApiError(
-        "empty_brief",
-        "The design brief is empty — write or paste one first.",
-        409,
-      );
+      throw new ApiError(409, "empty_brief", "The design brief is empty — write or paste one first.");
     await new Promise((r) => setTimeout(r, 1400));
     return {
       proposal: {
@@ -278,7 +274,7 @@ export const mockApi = {
       const base = slug;
       while (db.menus.some((m) => m.slug === slug)) slug = `${base}-${n++}`;
     } else if (db.menus.some((m) => m.slug === slug)) {
-      throw new ApiError("conflict", "A menu with that slug already exists.", 422);
+      throw new ApiError(422, "conflict", "A menu with that slug already exists.");
     }
     const menu: Menu = {
       id: uid("menu"),
@@ -299,18 +295,14 @@ export const mockApi = {
   ): Promise<Menu> {
     requireRestaurant(id);
     const menu = db.menus.find((m) => m.id === menuId);
-    if (!menu) throw new ApiError("not_found", "Menu not found.", 404);
+    if (!menu) throw new ApiError(404, "not_found", "Menu not found.");
     if (
       patch.slug !== undefined &&
       db.menus.some((m) => m.id !== menuId && m.slug === patch.slug)
     )
-      throw new ApiError("conflict", "A menu with that slug already exists.", 422);
+      throw new ApiError(422, "conflict", "A menu with that slug already exists.");
     if (patch.is_default === false && menu.is_default)
-      throw new ApiError(
-        "invalid",
-        "One menu must be the default — set another menu as default instead.",
-        422,
-      );
+      throw new ApiError(422, "invalid", "One menu must be the default — set another menu as default instead.");
     if (patch.is_default === true)
       db.menus.forEach((m) => (m.is_default = m.id === menuId));
     Object.assign(menu, patch, { id: menuId });
@@ -321,18 +313,14 @@ export const mockApi = {
   async deleteMenu(id: string, menuId: string, force = false): Promise<void> {
     requireRestaurant(id);
     const menu = db.menus.find((m) => m.id === menuId);
-    if (!menu) throw new ApiError("not_found", "Menu not found.", 404);
+    if (!menu) throw new ApiError(404, "not_found", "Menu not found.");
     if (menu.is_default)
-      throw new ApiError("invalid", "The default menu can't be deleted.", 422);
+      throw new ApiError(422, "invalid", "The default menu can't be deleted.");
     if (db.menus.length === 1)
-      throw new ApiError("invalid", "The last menu can't be deleted.", 422);
+      throw new ApiError(422, "invalid", "The last menu can't be deleted.");
     const cats = db.categories.filter((c) => c.menu_id === menuId);
     if (cats.length > 0 && !force)
-      throw new ApiError(
-        "menu_not_empty",
-        "The menu still has categories — delete with its contents to proceed.",
-        422,
-      );
+      throw new ApiError(422, "menu_not_empty", "The menu still has categories — delete with its contents to proceed.");
     const catIds = new Set(cats.map((c) => c.id));
     db.items = db.items.filter((i) => !catIds.has(i.category_id));
     db.categories = db.categories.filter((c) => c.menu_id !== menuId);
@@ -360,7 +348,7 @@ export const mockApi = {
   ): Promise<Category> {
     requireRestaurant(id);
     if (!db.menus.some((m) => m.id === input.menu_id))
-      throw new ApiError("not_found", "Menu not found.", 404);
+      throw new ApiError(404, "not_found", "Menu not found.");
     const cat: Category = {
       id: uid("cat"),
       menu_id: input.menu_id,
@@ -379,7 +367,7 @@ export const mockApi = {
   ): Promise<Category> {
     requireRestaurant(id);
     const cat = db.categories.find((c) => c.id === catId);
-    if (!cat) throw new ApiError("not_found", "Category not found.", 404);
+    if (!cat) throw new ApiError(404, "not_found", "Category not found.");
     Object.assign(cat, patch, { id: catId });
     save();
     return delay({ ...cat });
@@ -421,7 +409,7 @@ export const mockApi = {
   ): Promise<MenuItem> {
     requireRestaurant(id);
     const item = db.items.find((i) => i.id === itemId);
-    if (!item) throw new ApiError("not_found", "Item not found.", 404);
+    if (!item) throw new ApiError(404, "not_found", "Item not found.");
     Object.assign(item, patch, { id: itemId });
     save();
     return delay({ ...item });
@@ -439,7 +427,7 @@ export const mockApi = {
     const url = await new Promise<string>((resolve, reject) => {
       const r = new FileReader();
       r.onload = () => resolve(r.result as string);
-      r.onerror = () => reject(new ApiError("upload_failed", "Could not read file.", 422));
+      r.onerror = () => reject(new ApiError(422, "upload_failed", "Could not read file."));
       r.readAsDataURL(file);
     });
     return delay({ url });
@@ -461,7 +449,7 @@ export const mockApi = {
   async regenerateTableToken(id: string, tableId: string): Promise<Table> {
     requireRestaurant(id);
     const t = db.tables.find((x) => x.id === tableId);
-    if (!t) throw new ApiError("not_found", "Table not found.", 404);
+    if (!t) throw new ApiError(404, "not_found", "Table not found.");
     t.token = token();
     save();
     return delay({ ...t });
@@ -484,7 +472,7 @@ export const mockApi = {
   ): Promise<StaffMember> {
     requireRestaurant(id);
     if (db.staff.some((s) => s.email === input.email))
-      throw new ApiError("conflict", "That email is already on the team.", 422);
+      throw new ApiError(422, "conflict", "That email is already on the team.");
     const s: StaffMember = {
       id: uid("staff"),
       email: input.email,
@@ -516,7 +504,7 @@ export const mockApi = {
               r.onload = () =>
                 resolve({ name: f.name, url: r.result as string, mime: f.type });
               r.onerror = () =>
-                reject(new ApiError("upload_failed", "Could not read file.", 422));
+                reject(new ApiError(422, "upload_failed", "Could not read file."));
               r.readAsDataURL(f);
             },
           ),
@@ -572,9 +560,9 @@ export const mockApi = {
   ): Promise<{ results: AssistantApplyResult[] }> {
     requireRestaurant(id);
     const msg = db.assistant.find((m) => m.id === msgId);
-    if (!msg) throw new ApiError("not_found", "Message not found.", 404);
+    if (!msg) throw new ApiError(404, "not_found", "Message not found.");
     if (msg.action_status)
-      throw new ApiError("conflict", "This proposal was already resolved.", 409);
+      throw new ApiError(409, "conflict", "This proposal was already resolved.");
     const picked =
       indexes ?? msg.actions.map((_, i) => i);
     const results: AssistantApplyResult[] = picked.map((i) => {
@@ -601,7 +589,7 @@ export const mockApi = {
   async discardAssistantActions(id: string, msgId: string): Promise<void> {
     requireRestaurant(id);
     const msg = db.assistant.find((m) => m.id === msgId);
-    if (!msg) throw new ApiError("not_found", "Message not found.", 404);
+    if (!msg) throw new ApiError(404, "not_found", "Message not found.");
     msg.action_status = "discarded";
     save();
     return delay(undefined);
@@ -633,7 +621,7 @@ export const mockApi = {
   async getGuest(id: string, customerId: string): Promise<GuestDetail> {
     requireRestaurant(id);
     const g = db.guests.find((x) => x.customer.id === customerId);
-    if (!g) throw new ApiError("not_found", "Guest not found.", 404);
+    if (!g) throw new ApiError(404, "not_found", "Guest not found.");
     return delay(JSON.parse(JSON.stringify(g)) as GuestDetail);
   },
 
@@ -644,7 +632,7 @@ export const mockApi = {
   ): Promise<GuestDetail> {
     requireRestaurant(id);
     const g = db.guests.find((x) => x.customer.id === customerId);
-    if (!g) throw new ApiError("not_found", "Guest not found.", 404);
+    if (!g) throw new ApiError(404, "not_found", "Guest not found.");
     if (patch.notes !== undefined) g.notes = patch.notes;
     if (patch.tags !== undefined) g.tags = [...patch.tags];
     save();

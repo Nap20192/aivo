@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { api } from "../api/client";
 import type { MenuItem, OptionGroup } from "../api/types";
 import { EU_ALLERGENS } from "../lib/allergens";
-import { formatCents, parseMoney } from "../lib/money";
+import { formatCents, parseDollars } from "../../../design-system/shared/money";
 import { ErrorBanner, Field, Modal, Switch } from "../ui";
 
 interface Props {
@@ -67,7 +67,7 @@ export default function ItemEditor(props: Props) {
   async function save() {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = "Name is required.";
-    const cents = parseMoney(price);
+    const cents = parseDollars(price);
     if (cents === null) errs.price = "Enter a price like 12.50.";
     for (const g of groups) {
       if (!g.name.trim()) errs.groups = "Every option group needs a name.";
@@ -105,7 +105,7 @@ export default function ItemEditor(props: Props) {
     }
   }
 
-  const previewCents = parseMoney(price);
+  const previewCents = parseDollars(price);
 
   return (
     <Modal
@@ -329,7 +329,7 @@ export default function ItemEditor(props: Props) {
                         : ""
                     }
                     onChange={(e) => {
-                      const cents = parseMoney(e.target.value) ?? 0;
+                      const cents = parseDollars(e.target.value) ?? 0;
                       patchGroup(gi, {
                         choices: g.choices.map((x, i) =>
                           i === ci ? { ...x, price_delta_cents: cents } : x,

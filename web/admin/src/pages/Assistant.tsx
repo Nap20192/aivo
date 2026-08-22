@@ -1,7 +1,7 @@
 import { Paperclip, Send, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import { ApiError } from "../api/error";
+import { ApiError } from "../../../design-system/shared/api";
 import type {
   AssistantAction,
   AssistantApplyResult,
@@ -11,7 +11,7 @@ import type {
   MenuItem,
 } from "../api/types";
 import { useRestaurant } from "../auth";
-import { formatCents } from "../lib/money";
+import { formatCents } from "../../../design-system/shared/money";
 import { useLoad } from "../lib/useLoad";
 import { EmptyState, ErrorBanner, LoadingPage } from "../ui";
 

@@ -1,32 +1,14 @@
 // Live phone-frame preview of the diner menu. Mirrors
-// docs/prototypes/aivo-menu-prototype.dc.html — same themeVars mapping,
-// same card markup, driven by the restaurant's real categories and items.
+// docs/prototypes/aivo-menu-prototype.dc.html — canonical themeVars from the
+// shared module (case-insensitive accents), same card markup, driven by the
+// restaurant's real categories and items.
 import { CSSProperties, useState } from "react";
-import type { Accent, Category, MenuItem, Theme } from "../api/types";
-import { formatCents } from "../lib/money";
+import type { Category, MenuItem, Theme } from "../api/types";
+import { formatCents } from "../../../design-system/shared/money";
+import { themeVars as sharedThemeVars } from "../../../design-system/shared/theme";
 
-const ACCENT_MAP: Record<Accent, [string, string, string, string, string]> = {
-  "Blood red": ["--red-600", "--red-700", "--red-800", "--red-100", "--red-50"],
-  Olive: ["--olive-600", "--olive-700", "--olive-800", "--olive-100", "--olive-100"],
-  Wine: ["--wine-600", "--wine-700", "--wine-800", "--wine-100", "--wine-100"],
-  Fire: ["--orange-600", "--orange-700", "--orange-800", "--orange-100", "--orange-100"],
-};
-
-// Exactly the prototype's themeVars, then custom overrides on top.
-export function themeVars(theme: Theme): CSSProperties {
-  const [solid, hover, active, soft, wash] =
-    ACCENT_MAP[theme.accent] ?? ACCENT_MAP["Blood red"];
-  const vars: Record<string, string> = {
-    "--accent-solid": `var(${solid})`,
-    "--accent-solid-hover": `var(${hover})`,
-    "--accent-solid-active": `var(${active})`,
-    "--accent-soft": `var(${soft})`,
-    "--red-50": `var(${wash})`,
-    "--text-link": `var(${hover})`,
-    "--text-link-hover": `var(${active})`,
-    ...theme.css_vars,
-  };
-  return vars as CSSProperties;
+function themeVars(theme: Theme): CSSProperties {
+  return sharedThemeVars(theme) as CSSProperties;
 }
 
 export default function MenuPreview(props: {

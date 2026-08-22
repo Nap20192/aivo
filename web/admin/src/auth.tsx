@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { api } from "./api/client";
-import { ApiError } from "./api/error";
+import { ApiError } from "../../design-system/shared/api";
 import type { Me, Restaurant } from "./api/types";
 
 interface AuthState {

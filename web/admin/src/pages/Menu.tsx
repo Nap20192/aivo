@@ -10,10 +10,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api/client";
-import { ApiError } from "../api/error";
+import { ApiError } from "../../../design-system/shared/api";
 import type { Category, Menu as MenuType, MenuItem } from "../api/types";
 import { useRestaurant } from "../auth";
-import { formatCents } from "../lib/money";
+import { formatCents } from "../../../design-system/shared/money";
 import { useLoad } from "../lib/useLoad";
 import {
   Badge,
