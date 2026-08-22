@@ -1,39 +1,11 @@
+import { ApiError, request } from "../../design-system/shared/api";
 import type { HandoffPreview, Me, NewLine, PosApi, PosState, PostedShift } from "./types.ts";
 import { mockApi } from "./mock.ts";
 
-export class ApiError extends Error {
-  code: string;
-  status: number;
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.code = code;
-    this.status = status;
-  }
-}
+export { ApiError };
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch("/api/v1" + path, {
-    method,
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!res.ok) throw await toApiError(res);
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
-}
-
-async function toApiError(res: Response): Promise<ApiError> {
-  let code = "error";
-  let message = res.statusText;
-  try {
-    const e = (await res.json()) as { error?: { code?: string; message?: string } };
-    code = e.error?.code ?? code;
-    message = e.error?.message ?? message;
-  } catch {
-    /* non-JSON error body */
-  }
-  return new ApiError(res.status, code, message);
-}
+const req = <T>(method: string, path: string, body?: unknown): Promise<T> =>
+  request<T>("/api/v1" + path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 
 // pos/state conditional fetch: If-None-Match with the last ETag, and raw-body
 // dedupe when the server sends no ETag. null = unchanged, skip the re-render.
@@ -46,11 +18,27 @@ export function invalidateStateCache(): void {
 }
 
 async function fetchPosState(): Promise<PosState | null> {
-  const res = await fetch("/api/v1/pos/state", {
-    headers: stateEtag ? { "If-None-Match": stateEtag } : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch("/api/v1/pos/state", {
+      headers: stateEtag ? { "If-None-Match": stateEtag } : undefined,
+    });
+  } catch {
+    throw new ApiError(0, "network", "No connection");
+  }
   if (res.status === 304) return null;
-  if (!res.ok) throw await toApiError(res);
+  if (!res.ok) {
+    let code = "http_" + res.status;
+    let message = res.statusText;
+    try {
+      const body = await res.json();
+      code = body.error?.code ?? code;
+      message = body.error?.message ?? message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, code, message);
+  }
   stateEtag = res.headers.get("ETag");
   const text = await res.text();
   if (text === stateBody) return null;
@@ -79,7 +67,7 @@ export function isMock(): boolean {
 }
 
 // Real API by contract; falls over to mock fixtures when the API is unreachable
-// (network-level failure, not HTTP errors).
+// (network-level failure — ApiError status 0 — not HTTP errors).
 export const api: PosApi = new Proxy(realApi, {
   get(target, prop: keyof PosApi) {
     return async (...args: never[]) => {
@@ -87,7 +75,7 @@ export const api: PosApi = new Proxy(realApi, {
       try {
         return await (target[prop] as (...a: never[]) => Promise<unknown>)(...args);
       } catch (e) {
-        if (e instanceof TypeError) {
+        if (e instanceof ApiError && e.status === 0) {
           mockActive = true;
           return (mockApi[prop] as (...a: never[]) => unknown)(...args);
         }
