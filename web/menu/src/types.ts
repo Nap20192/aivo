@@ -79,6 +79,8 @@ export interface TableSession {
   theme: Theme;
   /** Ordered by position, default menu first. */
   menus: Menu[];
+  /** Server order-debounce window; countdown fallback is 30s when absent. */
+  cooldown_seconds?: number;
   /** Open service requests for this table ("one open request per table" state). */
   open_requests: OpenRequest[];
 }

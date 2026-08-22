@@ -73,6 +73,7 @@ export const demoSession: TableSession = {
   table: { id: "table-12", label: "Table 12" },
   theme: { brand_name: "Ember & Bone", accent: "Blood red", bold: false },
   open_requests: [],
+  cooldown_seconds: 30,
   menus: [
     {
       id: "menu-dinner",

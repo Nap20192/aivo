@@ -4,9 +4,11 @@ import {
   clearHandoff,
   handoffExpired,
   loadCart,
+  loadCooldownUntil,
   loadHandoff,
   loadSentAt,
   saveCart,
+  saveCooldownUntil,
   saveHandoff,
   saveSentAt,
   type CartLine,
@@ -27,7 +29,8 @@ import { ServiceScreen } from "./screens/ServiceScreen";
 import { themeVars } from "./theme";
 import type { CustomerMe, TableSession } from "./types";
 
-const COOLDOWN_MS = 90_000;
+/** Fallback when the server sends neither cooldown_seconds nor retry_after_seconds. */
+const FALLBACK_COOLDOWN_S = 30;
 
 type Screen = "landing" | "menu" | "item" | "cart" | "sent" | "service" | "account" | "handoff";
 
@@ -67,6 +70,7 @@ export default function App() {
   const [note, setNote] = useState("");
   const [sent, setSent] = useState<SentOrder | null>(null);
   const [lastSentAt, setLastSentAt] = useState<number | null>(() => (token ? loadSentAt(token) : null));
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(() => (token ? loadCooldownUntil(token) : null));
   const [waiterAt, setWaiterAt] = useState<string | null>(null);
   const [billAt, setBillAt] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -166,7 +170,7 @@ export default function App() {
     if (token) saveCart(token, cart);
   }, [token, cart]);
 
-  const cooldownLeft = lastSentAt ? Math.max(0, COOLDOWN_MS - (now - lastSentAt)) : 0;
+  const cooldownLeft = cooldownUntil ? Math.max(0, cooldownUntil - now) : 0;
   const rateLimited = cooldownLeft > 0;
 
   const setSentTimestamp = useCallback(
@@ -175,6 +179,25 @@ export default function App() {
       if (token) saveSentAt(token, at);
     },
     [token],
+  );
+
+  // The server owns the debounce window; the client only mirrors it.
+  const startCooldown = useCallback(
+    (seconds: number) => {
+      const until = Date.now() + seconds * 1000;
+      setCooldownUntil(until);
+      if (token) saveCooldownUntil(token, until);
+    },
+    [token],
+  );
+
+  const handle429 = useCallback(
+    (e: ApiError) => {
+      startCooldown(e.retryAfterSeconds ?? FALLBACK_COOLDOWN_S);
+      // Another phone at the table may have sent it; approximate for the card copy.
+      setLastSentAt((t) => t ?? Date.now());
+    },
+    [startCooldown],
   );
 
   async function sendOrder() {
@@ -196,12 +219,11 @@ export default function App() {
       setNote("");
       setCartNotice(null);
       setSentTimestamp(at);
+      startCooldown(session?.cooldown_seconds ?? FALLBACK_COOLDOWN_S);
       setScreen("sent");
     } catch (e) {
       if (e instanceof ApiError && e.status === 429) {
-        // Trust the server clock: align the local countdown with retry-after.
-        const leftMs = (e.retryAfterSeconds ?? COOLDOWN_MS / 1000) * 1000;
-        setSentTimestamp(Date.now() - (COOLDOWN_MS - leftMs));
+        handle429(e);
       } else {
         setCartError(e instanceof ApiError ? e.message : "Something went wrong — nothing was sent. Try again.");
       }
@@ -227,7 +249,11 @@ export default function App() {
       setCartNotice(null);
       setScreen("handoff");
     } catch (e) {
-      setCartError(e instanceof ApiError ? e.message : "Something went wrong — nothing was sent. Try again.");
+      if (e instanceof ApiError && e.status === 429) {
+        handle429(e);
+      } else {
+        setCartError(e instanceof ApiError ? e.message : "Something went wrong — nothing was sent. Try again.");
+      }
     } finally {
       setSending(false);
     }

@@ -9,7 +9,8 @@ import type {
   TableSession,
 } from "./types";
 
-const COOLDOWN_MS = 90_000;
+// Matches the server's 30s order debounce (CONTEXT.md diner session).
+const MOCK_COOLDOWN_MS = 30_000;
 
 export class ApiError extends Error {
   constructor(
@@ -183,7 +184,7 @@ export const mockClient: Client = {
   },
   async submitOrder(token) {
     const last = Number(sessionStorage.getItem(mockKey(token, "order-at")));
-    const left = last > 0 ? COOLDOWN_MS - (Date.now() - last) : 0;
+    const left = last > 0 ? MOCK_COOLDOWN_MS - (Date.now() - last) : 0;
     if (left > 0) {
       throw new ApiError(
         "rate_limited",
