@@ -345,15 +345,21 @@ func (h *handler) uploadImage(w http.ResponseWriter, r *http.Request, _ domain.U
 	}
 	defer file.Close()
 
-	ct := header.Header.Get("Content-Type")
-	switch ct {
+	// Never trust the declared multipart type: sniff the bytes, require
+	// a real image, store the sniffed type.
+	reader, sniffed, err := sniffUpload(file, header.Header.Get("Content-Type"))
+	if err != nil {
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
+		return
+	}
+	switch sniffed {
 	case "image/jpeg", "image/png", "image/webp", "image/gif":
 	default:
-		writeErr(w, http.StatusUnprocessableEntity, "invalid", "content type must be an image (jpeg, png, webp, gif)")
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", "content must be an image (jpeg, png, webp, gif)")
 		return
 	}
 
-	url, err := h.Images.Put(r.Context(), rest.ID, header.Filename, ct, file, header.Size)
+	url, err := h.Images.Put(r.Context(), rest.ID, header.Filename, sniffed, reader, header.Size)
 	if writeAppErr(w, err) {
 		return
 	}

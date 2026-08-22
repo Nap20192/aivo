@@ -1,7 +1,11 @@
 package http
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"aivo/internal/platform/app"
@@ -16,15 +20,7 @@ import (
 const CustomerCookie = "aivo_customer"
 
 func setCustomerCookie(w http.ResponseWriter, token string, ttl time.Duration) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     CustomerCookie,
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(ttl.Seconds()),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	setAuthCookie(w, CustomerCookie, token, ttl)
 }
 
 // customerFromRequest resolves the aivo_customer cookie to a customer,
@@ -266,6 +262,29 @@ func (h *handler) patchGuest(w http.ResponseWriter, r *http.Request, _ domain.Us
 		return
 	}
 	writeJSON(w, http.StatusOK, h.guestDetailResponse(p, sum, orders))
+}
+
+// sniffUpload reads the first 512 bytes and content-sniffs them
+// (http.DetectContentType). The declared multipart type is never
+// trusted: the sniffed type must be in the same class the caller
+// expects, and the SNIFFED type is what gets stored — no text/html
+// hosted on the public image origin.
+func sniffUpload(f io.Reader, declared string) (io.Reader, string, error) {
+	buf := make([]byte, 512)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return nil, "", err
+	}
+	sniffed := http.DetectContentType(buf[:n])
+	reader := io.MultiReader(bytes.NewReader(buf[:n]), f)
+
+	declaredClass := strings.SplitN(declared, "/", 2)[0]
+	sniffedClass := strings.SplitN(sniffed, "/", 2)[0]
+	// CSV/markdown sniff as text/plain — same class is the contract.
+	if declaredClass != sniffedClass {
+		return nil, "", fmt.Errorf("declared %s but content is %s", declared, sniffed)
+	}
+	return reader, sniffed, nil
 }
 
 func atoiOr(s string, def int) int {
