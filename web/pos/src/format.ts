@@ -15,6 +15,11 @@ export function waiting(createdAtMs: number, now: number = Date.now()): string {
   return "waiting " + min + " min";
 }
 
+/** Default single-select mod for a menu item: its own first label, verbatim. */
+export function defaultMod(item: { mods?: string[] }): string | null {
+  return item.mods?.[0] ?? null;
+}
+
 /** "150.00" (or "150", "150.5") -> 15000; null when not a number */
 export function parseDollars(s: string): number | null {
   if (!/^\d+(\.\d*)?$/.test(s)) return null;
