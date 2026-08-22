@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { fmtCents } from "../format";
+import { formatCents } from "../../../design-system/shared/money";
 import { hasFromPrice } from "../cart";
 import type { MenuItem, TableSession } from "../types";
 import { Badge, Button, Placeholder } from "../ui";
@@ -108,7 +108,7 @@ export function MenuScreen({
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                     <span style={{ font: "600 15px/1.25 var(--font-sans)", color: "var(--ink-900)" }}>{it.name}</span>
                     <span className="aivo-num" style={{ font: "var(--type-numeric)", color: "var(--ink-900)" }}>
-                      {(hasFromPrice(it) ? "from " : "") + fmtCents(it.price_cents)}
+                      {(hasFromPrice(it) ? "from " : "") + formatCents(it.price_cents)}
                     </span>
                   </div>
                   <span style={{ font: "var(--weight-regular) 13px/1.45 var(--font-sans)", color: "var(--ink-500)", textWrap: "pretty" }}>

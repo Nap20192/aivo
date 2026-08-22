@@ -53,3 +53,7 @@ fixtures if the API is unreachable.
   mapping as the prototype's `themeVars`.
 - Design tokens come from `web/design-system/styles.css` — imported directly,
   not forked.
+- Shared frontend modules live in `web/design-system/shared/` (money, theme,
+  api error/request, icon glyph table) — plain TS imported by relative path,
+  canonical across the menu/POS/admin SPAs. Their tests run from this app's
+  vitest config (`vitest.config.ts`).

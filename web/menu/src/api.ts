@@ -9,19 +9,12 @@ import type {
   TableSession,
 } from "./types";
 
+import { ApiError, request } from "../../design-system/shared/api";
+
+export { ApiError };
+
 // Matches the server's 30s order debounce (CONTEXT.md diner session).
 const MOCK_COOLDOWN_MS = 30_000;
-
-export class ApiError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public status = 0,
-    public retryAfterSeconds?: number,
-  ) {
-    super(message);
-  }
-}
 
 export interface Client {
   getSession(token: string): Promise<TableSession>;
@@ -36,49 +29,8 @@ export interface Client {
   submitHandoff(token: string, order: OrderInput): Promise<Handoff>;
 }
 
-/** Tolerate a backend that still returns the pre-multi-menu flat `menu`. */
-export function normalizeSession(raw: TableSession & { menu?: unknown }): TableSession {
-  if (!raw.menus && Array.isArray(raw.menu)) {
-    return {
-      ...raw,
-      menus: [{ id: "default", slug: "menu", name: "Menu", is_default: true, categories: raw.menu }],
-    };
-  }
-  return raw;
-}
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(path, {
-      headers: { "content-type": "application/json" },
-      ...init,
-    });
-  } catch {
-    throw new ApiError("network", "No connection", 0);
-  }
-  if (res.ok) return res.status === 204 ? (undefined as T) : res.json();
-  let code = "http_" + res.status;
-  let message = res.statusText;
-  let retry: number | undefined;
-  try {
-    const body = await res.json();
-    code = body.error?.code ?? code;
-    message = body.error?.message ?? message;
-    retry = body.error?.retry_after_seconds;
-  } catch {
-    // non-JSON error body
-  }
-  if (res.status === 429 && retry === undefined) {
-    const h = Number(res.headers.get("retry-after"));
-    if (h > 0) retry = h;
-  }
-  throw new ApiError(code, message, res.status, retry);
-}
-
 export const httpClient: Client = {
-  getSession: async (token) =>
-    normalizeSession(await request(`/api/v1/t/${encodeURIComponent(token)}`)),
+  getSession: (token) => request(`/api/v1/t/${encodeURIComponent(token)}`),
   getBrowse: (restaurantSlug, menuSlug) =>
     request(`/api/v1/m/${encodeURIComponent(restaurantSlug)}/${encodeURIComponent(menuSlug)}`),
   submitOrder: (token, order) =>
@@ -161,7 +113,7 @@ export function pseudoQrDataUri(code: string): string {
 }
 
 // Mock client: same contract against sessionStorage, so the full flow —
-// including the 90s resend cooldown and one-open-request-per-table — is
+// including the 30s resend cooldown and one-open-request-per-table — is
 // demoable without a backend.
 const mockKey = (token: string, k: string) => `aivo:mock:${token}:${k}`;
 
@@ -179,7 +131,7 @@ export const mockClient: Client = {
       restaurantSlug === demoSession.restaurant.slug
         ? demoSession.menus.find((m) => m.slug === menuSlug)
         : undefined;
-    if (!menu) throw new ApiError("not_found", "Unknown menu", 404);
+    if (!menu) throw new ApiError(404, "not_found", "Unknown menu");
     return { restaurant: demoSession.restaurant, theme: demoSession.theme, menu };
   },
   async submitOrder(token) {
@@ -187,9 +139,9 @@ export const mockClient: Client = {
     const left = last > 0 ? MOCK_COOLDOWN_MS - (Date.now() - last) : 0;
     if (left > 0) {
       throw new ApiError(
+        429,
         "rate_limited",
         "An order from this table just went in.",
-        429,
         Math.ceil(left / 1000),
       );
     }
@@ -213,11 +165,11 @@ export const mockClient: Client = {
       sessionStorage.setItem(MOCK_CUSTOMER_KEY, JSON.stringify(demoCustomer));
       return demoCustomer;
     }
-    throw new ApiError("invalid_credentials", "Wrong email or password.", 401);
+    throw new ApiError(401, "invalid_credentials", "Wrong email or password.");
   },
   async register(email, password, name) {
     if (!email.includes("@") || password.length < 8 || !name.trim()) {
-      throw new ApiError("invalid", "Email, a name, and a password of 8+ characters.", 422);
+      throw new ApiError(422, "invalid", "Email, a name, and a password of 8+ characters.");
     }
     const customer: Customer = { id: "cust-" + Date.now(), email: email.toLowerCase(), name: name.trim() };
     sessionStorage.setItem(MOCK_CUSTOMER_KEY, JSON.stringify(customer));

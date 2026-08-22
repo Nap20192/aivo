@@ -1,5 +1,5 @@
 import type { CartLine } from "../cart";
-import { fmtCents } from "../format";
+import { formatCents } from "../../../design-system/shared/money";
 import { Button, EmptyState, Icon, QtyStepper } from "../ui";
 
 export function CartScreen({
@@ -95,7 +95,7 @@ export function CartScreen({
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                   <span style={{ font: "600 15px/1.25 var(--font-sans)", color: "var(--ink-900)" }}>{l.name}</span>
                   <span className="aivo-num" style={{ font: "var(--type-numeric)", color: "var(--ink-900)" }}>
-                    {fmtCents(l.unitCents * l.qty)}
+                    {formatCents(l.unitCents * l.qty)}
                   </span>
                 </div>
                 {l.detail ? (
@@ -148,7 +148,7 @@ export function CartScreen({
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ font: "var(--type-label)", color: "var(--ink-700)" }}>Total</span>
                 <span className="aivo-num" style={{ font: "600 18px/1.3 var(--font-mono)", color: "var(--ink-900)" }}>
-                  {fmtCents(total)}
+                  {formatCents(total)}
                 </span>
               </div>
               <div style={{ font: "var(--weight-regular) 12px/1.5 var(--font-sans)", color: "var(--ink-500)", marginTop: 6 }}>

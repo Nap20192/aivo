@@ -8,7 +8,7 @@ import {
   type MultiSel,
   type SingleSel,
 } from "../cart";
-import { fmtCents } from "../format";
+import { formatCents } from "../../../design-system/shared/money";
 import type { MenuItem, OptionGroup } from "../types";
 import { Badge, Button, Icon, Placeholder, QtyStepper } from "../ui";
 
@@ -68,7 +68,7 @@ function SingleGroup({
                 className="aivo-num"
                 style={{ font: "var(--type-numeric)", color: o.price_delta_cents ? "var(--ink-700)" : "var(--ink-400)" }}
               >
-                {o.price_delta_cents ? "+" + fmtCents(o.price_delta_cents) : allFree ? "" : "included"}
+                {o.price_delta_cents ? "+" + formatCents(o.price_delta_cents) : allFree ? "" : "included"}
               </span>
             </div>
           );
@@ -125,7 +125,7 @@ function MultiGroup({
               </span>
               <span style={{ flex: 1, font: "var(--type-label)", color: "var(--ink-800)" }}>{o.label}</span>
               <span className="aivo-num" style={{ font: "var(--type-numeric)", color: "var(--ink-700)" }}>
-                +{fmtCents(o.price_delta_cents)}
+                +{formatCents(o.price_delta_cents)}
               </span>
             </div>
           );
@@ -181,7 +181,7 @@ export function ItemScreen({
               {item.name}
             </h2>
             <span className="aivo-num" style={{ font: "500 15px/1.3 var(--font-mono)", color: "var(--ink-900)", flex: "none" }}>
-              {(hasFromPrice(item) ? "from " : "") + fmtCents(item.price_cents)}
+              {(hasFromPrice(item) ? "from " : "") + formatCents(item.price_cents)}
             </span>
           </div>
           {soldOut ? (
@@ -259,7 +259,7 @@ export function ItemScreen({
                 })
               }
             >
-              Add · {fmtCents(unit * qty)}
+              Add · {formatCents(unit * qty)}
             </Button>
           </div>
         </div>
