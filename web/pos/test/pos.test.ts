@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaultMod, fmt, parseDollars, waiting } from "../src/format.ts";
+import { formatCents as fmt, parseDollars } from "../../design-system/shared/money.ts";
+import { defaultMod, waiting } from "../src/format.ts";
 import { mockApi } from "../src/mock.ts";
 
 test("money formatting", () => {

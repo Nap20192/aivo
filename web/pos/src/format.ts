@@ -1,7 +1,4 @@
-/** $12.34 / -$12.34 from integer cents, same shape as the prototype. */
-export function fmt(cents: number): string {
-  return (cents < 0 ? "-$" : "$") + (Math.abs(cents) / 100).toFixed(2);
-}
+// Money helpers live in web/design-system/shared/money.ts (canonical).
 
 /** "20:16" */
 export function timeHM(t: number | Date = new Date()): string {
@@ -18,11 +15,4 @@ export function waiting(createdAtMs: number, now: number = Date.now()): string {
 /** Default single-select mod for a menu item: its own first label, verbatim. */
 export function defaultMod(item: { mods?: string[] }): string | null {
   return item.mods?.[0] ?? null;
-}
-
-/** "150.00" (or "150", "150.5") -> 15000; null when not a number */
-export function parseDollars(s: string): number | null {
-  if (!/^\d+(\.\d*)?$/.test(s)) return null;
-  const n = parseFloat(s);
-  return Number.isNaN(n) ? null : Math.round(n * 100);
 }

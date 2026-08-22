@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, invalidateStateCache } from "./api.ts";
 import type { HandoffPreview, Me, NewLine, PosRequest, PosState, PostedShift, Table } from "./types.ts";
-import { defaultMod, fmt, parseDollars, timeHM, waiting } from "./format.ts";
+import { formatCents as fmt, parseDollars } from "../../design-system/shared/money";
+import { defaultMod, timeHM, waiting } from "./format.ts";
 import { Badge, Button, EmptyState, Icon, StatusPill } from "./ui.tsx";
 
 type Route =
