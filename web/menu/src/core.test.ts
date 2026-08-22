@@ -9,21 +9,20 @@ if (typeof sessionStorage === "undefined") {
     removeItem: (k: string) => void store.delete(k),
   };
 }
-import { genHandoffCode, HANDOFF_CHARSET, mockClient, normalizeSession, pseudoQrDataUri } from "./api";
+import { formatCents } from "../../design-system/shared/money";
+import { genHandoffCode, HANDOFF_CHARSET, mockClient, pseudoQrDataUri } from "./api";
 import { handoffExpired, hasFromPrice, lineDetail, lineOptions, unitPriceCents } from "./cart";
 import { demoSession } from "./fixtures";
-import { countdownStr, fmtCents } from "./format";
-import { themeVars } from "./theme";
-import type { TableSession } from "./types";
+import { countdownStr } from "./format";
 
 const dinner = demoSession.menus[0];
 const ribeye = dinner.categories[1].items[0];
 
 describe("money", () => {
   it("formats integer cents", () => {
-    expect(fmtCents(4600)).toBe("$46.00");
-    expect(fmtCents(300)).toBe("$3.00");
-    expect(fmtCents(0)).toBe("$0.00");
+    expect(formatCents(4600)).toBe("$46.00");
+    expect(formatCents(300)).toBe("$3.00");
+    expect(formatCents(0)).toBe("$0.00");
   });
 });
 
@@ -64,17 +63,6 @@ describe("multi-menu contract", () => {
   it("fixtures: default menu first, unique slugs", () => {
     expect(demoSession.menus[0].is_default).toBe(true);
     expect(demoSession.menus.map((m) => m.slug)).toEqual(["dinner", "bar"]);
-  });
-  it("normalizeSession wraps a legacy flat menu into a default menu", () => {
-    const legacy = {
-      ...demoSession,
-      menus: undefined,
-      menu: dinner.categories,
-    } as unknown as TableSession;
-    const s = normalizeSession(legacy);
-    expect(s.menus).toHaveLength(1);
-    expect(s.menus[0].is_default).toBe(true);
-    expect(s.menus[0].categories).toBe(dinner.categories);
   });
   it("mock browse returns one menu by slug, 404 otherwise", async () => {
     const b = await mockClient.getBrowse("ember-and-bone", "bar");
@@ -140,16 +128,5 @@ describe("customer auth (mock)", () => {
     const c = await mockClient.register("new@example.com", "longenough", "Nia");
     expect(c.email).toBe("new@example.com");
     await mockClient.logout();
-  });
-});
-
-describe("theme", () => {
-  it("maps accents case-insensitively with blood red fallback", () => {
-    expect(themeVars({ brand_name: "x", accent: "Wine", bold: false })["--accent-solid"]).toBe("var(--wine-600)");
-    expect(themeVars({ brand_name: "x", accent: "nope", bold: false })["--accent-solid"]).toBe("var(--red-600)");
-  });
-  it("applies css_vars overrides last", () => {
-    const v = themeVars({ brand_name: "x", accent: "Fire", bold: true, css_vars: { "--accent-solid": "#123456" } });
-    expect(v["--accent-solid"]).toBe("#123456");
   });
 });

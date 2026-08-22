@@ -1,6 +1,4 @@
-export function fmtCents(cents: number): string {
-  return "$" + (cents / 100).toFixed(2);
-}
+// Money helpers live in web/design-system/shared/money.ts.
 
 export function hhmm(t: number | string | Date): string {
   const d = new Date(t);

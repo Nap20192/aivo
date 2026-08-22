@@ -1,4 +1,4 @@
-import { fmtCents } from "../format";
+import { formatCents } from "../../../design-system/shared/money";
 import type { CustomerMe } from "../types";
 import { Button, EmptyState } from "../ui";
 
@@ -38,7 +38,7 @@ export function AccountScreen({
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                 <span style={{ font: "600 15px/1.25 var(--font-sans)", color: "var(--ink-900)" }}>{o.restaurant_name}</span>
                 <span className="aivo-num" style={{ font: "var(--type-numeric)", color: "var(--ink-900)" }}>
-                  {fmtCents(o.total_cents)}
+                  {formatCents(o.total_cents)}
                 </span>
               </div>
               <div style={{ font: "var(--weight-regular) 12px/1.4 var(--font-sans)", color: "var(--ink-400)", marginTop: 2 }}>

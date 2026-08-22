@@ -14,8 +14,9 @@ import {
   type CartLine,
   type StoredHandoff,
 } from "./cart";
+import { formatCents } from "../../design-system/shared/money";
+import { themeVars } from "../../design-system/shared/theme";
 import { countdownStr, hhmm } from "./format";
-import { fmtCents } from "./format";
 import { AccountScreen } from "./screens/AccountScreen";
 import { AuthSheet } from "./screens/AuthSheet";
 import { CartScreen } from "./screens/CartScreen";
@@ -26,7 +27,6 @@ import { Landing } from "./screens/Landing";
 import { MenuScreen } from "./screens/MenuScreen";
 import { SentScreen } from "./screens/SentScreen";
 import { ServiceScreen } from "./screens/ServiceScreen";
-import { themeVars } from "./theme";
 import type { CustomerMe, TableSession } from "./types";
 
 /** Fallback when the server sends neither cooldown_seconds nor retry_after_seconds. */
@@ -396,7 +396,7 @@ export default function App() {
         }}
         cat={cat}
         onPickCat={setCat}
-        cartLabel={cartCount ? "Cart · " + fmtCents(cartTotal) : "Cart"}
+        cartLabel={cartCount ? "Cart · " + formatCents(cartTotal) : "Cart"}
         accountLabel={accountLabel}
         onAccount={onAccount}
         onOpenItem={(it) => {
