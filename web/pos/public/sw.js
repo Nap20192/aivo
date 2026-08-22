@@ -1,5 +1,7 @@
-// App shell cached, API always network.
-const CACHE = "aivo-pos-v1";
+// App shell cached, API always network. Cache is versioned by the build id
+// (?v= on the registration URL): a new deploy installs a new SW whose activate
+// drops every older cache, so stale hashed bundles never accumulate.
+const CACHE = "aivo-pos-" + (new URL(location.href).searchParams.get("v") || "dev");
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["./"])));

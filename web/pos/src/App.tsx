@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { api } from "./api.ts";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, invalidateStateCache } from "./api.ts";
 import type { HandoffPreview, Me, NewLine, PosRequest, PosState, PostedShift, Table } from "./types.ts";
 import { defaultMod, fmt, parseDollars, timeHM, waiting } from "./format.ts";
 import { Badge, Button, EmptyState, Icon, StatusPill } from "./ui.tsx";
@@ -20,9 +20,23 @@ export default function App() {
   const [pos, setPos] = useState<PosState | null>(null);
   const [posted, setPosted] = useState<PostedShift | null>(null);
   const [route, setRoute] = useState<Route>({ name: "floor" });
-  const [now, setNow] = useState(Date.now());
+  const lastBody = useRef("");
 
-  const refresh = useCallback(() => api.state().then(setPos).catch(() => {}), []);
+  // skip the setState (and the whole-tree re-render) when the poll returns the same state
+  const refresh = useCallback(
+    () =>
+      api
+        .state()
+        .then((s) => {
+          if (!s) return; // 304 / unchanged raw body, handled in the client
+          const body = JSON.stringify(s);
+          if (body === lastBody.current) return;
+          lastBody.current = body;
+          setPos(s);
+        })
+        .catch(() => {}),
+    []
+  );
 
   useEffect(() => {
     api
@@ -33,11 +47,6 @@ export default function App() {
       })
       .catch(() => setAuth("login"));
   }, [refresh]);
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   // poll every 5s while visible
   useEffect(() => {
@@ -62,15 +71,18 @@ export default function App() {
         apply(c);
         return c;
       });
+      // optimistic state diverged — next poll must apply server truth even if unchanged
+      lastBody.current = "";
+      invalidateStateCache();
       call().then(refresh, refresh);
     },
     [refresh]
   );
 
-  if (auth === "loading") return <Frame clock={timeHM(now)} context="aivo · waiter" />;
+  if (auth === "loading") return <Frame context="aivo · waiter" />;
   if (auth === "login")
     return (
-      <Frame clock={timeHM(now)} context="aivo · waiter">
+      <Frame context="aivo · waiter">
         <Login
           onDone={(me) => {
             setAuth(me);
@@ -79,12 +91,12 @@ export default function App() {
         />
       </Frame>
     );
-  if (!pos) return <Frame clock={timeHM(now)} context="aivo · waiter" />;
+  if (!pos) return <Frame context="aivo · waiter" />;
 
   if (posted) {
     const variance = posted.declared_cents - posted.expected_cents;
     return (
-      <Frame clock={timeHM(now)} context={`${posted.number} · accepted`}>
+      <Frame context={`${posted.number} · accepted`}>
         <div className="screen">
           <div className="screen-body" style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px" }}>
             <div
@@ -145,7 +157,7 @@ export default function App() {
 
   if (!pos.shift)
     return (
-      <Frame clock={timeHM(now)} context="aivo · waiter">
+      <Frame context="aivo · waiter">
         <OpenShift pos={pos} onOpened={refresh} />
       </Frame>
     );
@@ -208,7 +220,6 @@ export default function App() {
     screen = (
       <Requests
         pos={pos}
-        now={now}
         onBack={goFloor}
         onDismiss={(r) =>
           mutate(
@@ -314,18 +325,32 @@ export default function App() {
   }
 
   return (
-    <Frame clock={timeHM(now)} context={contexts[route.name]}>
+    <Frame context={contexts[route.name]}>
       {screen}
     </Frame>
   );
 }
 
-function Frame({ clock, context, children }: { clock: string; context: string; children?: React.ReactNode }) {
+/** Minute-precision ticker, isolated so interval ticks re-render only the consumer. */
+function useNow(ms: number) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(t);
+  }, [ms]);
+  return now;
+}
+
+function Clock() {
+  return <span>{timeHM(useNow(30_000))}</span>;
+}
+
+function Frame({ context, children }: { context: string; children?: React.ReactNode }) {
   return (
     <div className="app-outer">
       <div className="app-frame">
         <div className="statusbar">
-          <span>{clock}</span>
+          <Clock />
           <span>{context}</span>
         </div>
         {children}
@@ -654,19 +679,18 @@ function Ticket({ table, onBack, onAdd, onFire }: { table: Table; onBack: () => 
 
 function Requests({
   pos,
-  now,
   onBack,
   onDismiss,
   onAck,
   onTakeBill,
 }: {
   pos: PosState;
-  now: number;
   onBack: () => void;
   onDismiss: (r: PosRequest) => void;
   onAck: (r: PosRequest) => void;
   onTakeBill: (r: PosRequest) => void;
 }) {
+  const now = useNow(30_000); // request ages are minute-precision
   const waiter = pos.requests.filter((r) => r.kind === "waiter");
   const bills = pos.requests.filter((r) => r.kind === "bill");
   return (
