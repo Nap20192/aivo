@@ -2,6 +2,9 @@ package http
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -78,9 +81,12 @@ type posShiftView struct {
 }
 
 func (h *handler) toPosShiftView(ctx context.Context, s posdomain.Shift, number, expectedCents int) posShiftView {
-	cashier := ""
-	if u, err := h.Platform.User(ctx, s.OpenedBy); err == nil {
-		cashier = displayName(u.Email)
+	cashier := s.Cashier // denormalized at open time
+	if cashier == "" {
+		// Shifts opened before the cashier column existed.
+		if u, err := h.Platform.User(ctx, s.OpenedBy); err == nil {
+			cashier = displayName(u.Email)
+		}
 	}
 	return posShiftView{
 		ID: s.ID, Number: fmt.Sprintf("shift-%d", number), Till: 1, Cashier: cashier,
@@ -280,7 +286,9 @@ func (h *handler) posState(w http.ResponseWriter, r *http.Request, u domain.User
 	}
 	menu := posMenu(menus, cats, items)
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	// ETag on the 5s poll: hash the body, If-None-Match hit → 304 and no
+	// bytes. No caching layers — just a hash compare per request.
+	body, err := json.Marshal(map[string]any{
 		"restaurant":       map[string]any{"id": rest.ID, "slug": rest.Slug, "name": rest.Name},
 		"till":             1,
 		"cashier":          displayName(u.Email),
@@ -290,6 +298,19 @@ func (h *handler) posState(w http.ResponseWriter, r *http.Request, u domain.User
 		"requests":         requests,
 		"menu":             menu,
 	})
+	if writeAppErr(w, err) {
+		return
+	}
+	sum := sha256.Sum256(body)
+	etag := `"` + hex.EncodeToString(sum[:16]) + `"`
+	w.Header().Set("ETag", etag)
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
 }
 
 func (h *handler) posOpenShift(w http.ResponseWriter, r *http.Request, u domain.User, restaurantID uuid.UUID) {
@@ -299,7 +320,7 @@ func (h *handler) posOpenShift(w http.ResponseWriter, r *http.Request, u domain.
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	sh, err := h.Pos.OpenShift(r.Context(), restaurantID, u.ID, req.OpeningFloatCents)
+	sh, err := h.Pos.OpenShift(r.Context(), restaurantID, u.ID, displayName(u.Email), req.OpeningFloatCents)
 	if writeAppErr(w, err) {
 		return
 	}

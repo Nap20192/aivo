@@ -142,16 +142,17 @@ func run() error {
 	}
 
 	apiV1 := platformhttp.NewMux(platformhttp.Deps{
-		Platform:    platformApplication,
-		Pos:         posApplication,
-		Menu:        menuStore,
-		MenuAdmin:   menuStore,
-		MenuApp:     menuApplication,
-		Images:      images,
-		Assistant:   assistant,
-		ImagePrefix: imagePrefix,
-		BaseURL:     baseURL,
-		POSLocation: posLocation,
+		Platform:       platformApplication,
+		Pos:            posApplication,
+		Menu:           menuStore,
+		MenuAdmin:      menuStore,
+		MenuApp:        menuApplication,
+		Images:         images,
+		Assistant:      assistant,
+		AssistantStore: platformStore,
+		ImagePrefix:    imagePrefix,
+		BaseURL:        baseURL,
+		POSLocation:    posLocation,
 	})
 
 	mux := http.NewServeMux()

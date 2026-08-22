@@ -6,9 +6,7 @@ package app
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +18,7 @@ import (
 
 	"aivo/internal/platform/domain"
 	"aivo/internal/platform/ports"
+	"aivo/pkg/crypto"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -83,6 +82,11 @@ func (a *App) GenerateTheme(ctx context.Context, restaurantID uuid.UUID) (domain
 	return proposal, nil
 }
 
+// dummyBcryptHash burns comparable time on unknown-principal logins so
+// an attacker can't tell a wrong email from a wrong password by latency.
+// Shared by staff and customer login.
+const dummyBcryptHash = "$2a$10$0123456789012345678901uCsB6zwzoiZ9BvbVHGwFzLB1p9PY0P2"
+
 // hashToken is the storage form of a session token: SHA-256, so a DB
 // leak doesn't leak usable cookies.
 func hashToken(token string) []byte {
@@ -90,13 +94,7 @@ func hashToken(token string) []byte {
 	return h[:]
 }
 
-func newToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("app: token: %w", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
+func newToken() (string, error) { return crypto.Token(32) }
 
 func validEmail(e string) bool {
 	if len(e) > 254 {
@@ -181,9 +179,8 @@ func (a *App) Register(ctx context.Context, orgName, restaurantName, email, pass
 }
 
 func randomSuffix() string {
-	b := make([]byte, 3)
-	rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(b) // 4 chars
+	s, _ := crypto.Token(3) // 4 chars
+	return s
 }
 
 func (a *App) startSession(ctx context.Context, userID uuid.UUID) (string, error) {
@@ -207,9 +204,7 @@ func (a *App) startSession(ctx context.Context, userID uuid.UUID) (string, error
 func (a *App) Login(ctx context.Context, email, password string) (domain.User, string, error) {
 	u, err := a.store.UserByEmail(ctx, strings.ToLower(strings.TrimSpace(email)))
 	if errors.Is(err, ports.ErrNotFound) {
-		// Burn a comparable amount of time so an attacker can't tell a
-		// wrong email from a wrong password by latency.
-		bcrypt.CompareHashAndPassword([]byte("$2a$10$0123456789012345678901uCsB6zwzoiZ9BvbVHGwFzLB1p9PY0P2"), []byte(password))
+		bcrypt.CompareHashAndPassword([]byte(dummyBcryptHash), []byte(password))
 		return domain.User{}, "", ErrUnauthorized
 	}
 	if err != nil {
@@ -527,29 +522,6 @@ func (a *App) AddStaff(ctx context.Context, orgID, restaurantID uuid.UUID, email
 		return domain.User{}, err
 	}
 	return u, nil
-}
-
-// --- Assistant (thin store pass-throughs; orchestration lives in the
-// --- HTTP adapter, which composes menu-context data into the prompt) ---
-
-func (a *App) AssistantThread(ctx context.Context, restaurantID uuid.UUID) (uuid.UUID, error) {
-	return a.store.AssistantThread(ctx, restaurantID)
-}
-
-func (a *App) SaveAssistantMessage(ctx context.Context, restaurantID uuid.UUID, m domain.AssistantMessage) error {
-	return a.store.CreateAssistantMessage(ctx, restaurantID, m)
-}
-
-func (a *App) AssistantHistory(ctx context.Context, restaurantID uuid.UUID, limit int) ([]domain.AssistantMessage, error) {
-	return a.store.AssistantMessages(ctx, restaurantID, limit)
-}
-
-func (a *App) AssistantMessage(ctx context.Context, restaurantID, id uuid.UUID) (domain.AssistantMessage, error) {
-	return a.store.AssistantMessageByID(ctx, restaurantID, id)
-}
-
-func (a *App) SetAssistantMessageStatus(ctx context.Context, restaurantID, id uuid.UUID, status string) error {
-	return a.store.SetAssistantMessageStatus(ctx, restaurantID, id, status)
 }
 
 // ItemLimitFor returns the org's per-restaurant menu item limit

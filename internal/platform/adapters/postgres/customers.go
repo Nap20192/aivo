@@ -181,28 +181,58 @@ func (s *Store) TouchGuestProfile(ctx context.Context, restaurantID, customerID 
 	return nil
 }
 
-// guestTotals is the per-guest visits/spend aggregate over THIS
-// restaurant's linked orders only.
+// guestTotalsSQL aggregates visits/spend per guest for THIS restaurant
+// in one grouped query: linked menu orders UNION accepted-handoff ticket
+// sales (tickets carry customer_id since a customer's handoff was
+// accepted — a handoff-only regular must not read 0 visits / $0).
 const guestTotalsSQL = `
-	SELECT count(DISTINCT o.id) AS visits,
-	       COALESCE(sum((ol.unit_price_cents + COALESCE(d.delta, 0)) * ol.qty), 0) AS spent
-	FROM orders o
-	LEFT JOIN order_lines ol ON ol.order_id = o.id
-	LEFT JOIN LATERAL (
-	    SELECT sum(olo.price_delta_cents) AS delta
-	    FROM order_line_options olo WHERE olo.order_line_id = ol.id
-	) d ON true
-	WHERE o.restaurant_id = $1 AND o.customer_id = $2`
+	SELECT customer_id, count(DISTINCT src_id) AS visits, COALESCE(sum(amt), 0) AS spent
+	FROM (
+	    SELECT o.customer_id, o.id AS src_id,
+	           (ol.unit_price_cents + COALESCE(d.delta, 0)) * ol.qty AS amt
+	    FROM orders o
+	    JOIN order_lines ol ON ol.order_id = o.id
+	    LEFT JOIN LATERAL (
+	        SELECT sum(olo.price_delta_cents) AS delta
+	        FROM order_line_options olo WHERE olo.order_line_id = ol.id
+	    ) d ON true
+	    WHERE o.restaurant_id = $1 AND o.customer_id = ANY($2)
+	  UNION ALL
+	    SELECT t.customer_id, t.id,
+	           (tl.unit_price_cents + COALESCE(td.delta, 0)) * tl.qty
+	    FROM tickets t
+	    JOIN ticket_lines tl ON tl.ticket_id = t.id
+	    LEFT JOIN LATERAL (
+	        SELECT sum((o2->>'price_delta_cents')::int) AS delta
+	        FROM jsonb_array_elements(tl.options) o2
+	    ) td ON true
+	    WHERE t.restaurant_id = $1 AND t.customer_id = ANY($2)
+	) src GROUP BY customer_id`
 
-func (s *Store) guestSummary(ctx context.Context, restaurantID uuid.UUID, c domain.Customer, tags []string, lastSeen sql.NullTime) (domain.GuestSummary, error) {
-	var visits, spent int
-	if err := s.db.QueryRowContext(ctx, guestTotalsSQL, restaurantID, c.ID).Scan(&visits, &spent); err != nil {
-		return domain.GuestSummary{}, fmt.Errorf("store: guest totals: %w", err)
+type guestTotals struct{ visits, spent int }
+
+// guestTotalsFor runs the grouped aggregate once for the whole id set
+// (kills the per-guest N+1). IDs absent from the result have no
+// activity yet ({0, 0}).
+func (s *Store) guestTotalsFor(ctx context.Context, restaurantID uuid.UUID, customerIDs []uuid.UUID) (map[uuid.UUID]guestTotals, error) {
+	out := map[uuid.UUID]guestTotals{}
+	if len(customerIDs) == 0 {
+		return out, nil
 	}
-	if tags == nil {
-		tags = []string{}
+	rows, err := s.db.QueryContext(ctx, guestTotalsSQL, restaurantID, customerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("store: guest totals: %w", err)
 	}
-	return domain.GuestSummary{Customer: c, Visits: visits, TotalSpentCents: spent, LastSeen: lastSeen.Time, Tags: tags}, nil
+	defer rows.Close()
+	for rows.Next() {
+		var id uuid.UUID
+		var t guestTotals
+		if err := rows.Scan(&id, &t.visits, &t.spent); err != nil {
+			return nil, fmt.Errorf("store: guest totals: scan: %w", err)
+		}
+		out[id] = t
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) Guests(ctx context.Context, restaurantID uuid.UUID, query string, limit int) ([]domain.GuestSummary, error) {
@@ -241,13 +271,25 @@ func (s *Store) Guests(ctx context.Context, restaurantID uuid.UUID, query string
 		return nil, err
 	}
 
+	ids := make([]uuid.UUID, len(found))
+	for i, r := range found {
+		ids[i] = r.c.ID
+	}
+	totals, err := s.guestTotalsFor(ctx, restaurantID, ids)
+	if err != nil {
+		return nil, err
+	}
 	out := []domain.GuestSummary{}
 	for _, r := range found {
-		sum, err := s.guestSummary(ctx, restaurantID, r.c, r.tags, r.lastSeen)
-		if err != nil {
-			return nil, err
+		tags := r.tags
+		if tags == nil {
+			tags = []string{}
 		}
-		out = append(out, sum)
+		t := totals[r.c.ID]
+		out = append(out, domain.GuestSummary{
+			Customer: r.c, Visits: t.visits, TotalSpentCents: t.spent,
+			LastSeen: r.lastSeen.Time, Tags: tags,
+		})
 	}
 	return out, nil
 }
@@ -274,10 +316,16 @@ func (s *Store) GuestProfile(ctx context.Context, restaurantID, customerID uuid.
 	if err != nil {
 		return domain.GuestProfile{}, domain.GuestSummary{}, err
 	}
-	sum, err := s.guestSummary(ctx, restaurantID, c, p.Tags, sql.NullTime{Time: p.LastSeen, Valid: true})
+	totals, err := s.guestTotalsFor(ctx, restaurantID, []uuid.UUID{customerID})
 	if err != nil {
 		return domain.GuestProfile{}, domain.GuestSummary{}, err
 	}
+	tags := p.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+	t := totals[customerID]
+	sum := domain.GuestSummary{Customer: c, Visits: t.visits, TotalSpentCents: t.spent, LastSeen: p.LastSeen, Tags: tags}
 	return p, sum, nil
 }
 

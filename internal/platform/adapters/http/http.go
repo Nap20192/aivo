@@ -6,6 +6,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -24,21 +25,35 @@ import (
 	posdomain "aivo/internal/pos/domain"
 	posports "aivo/internal/pos/ports"
 	"aivo/pkg/session"
+
+	"github.com/google/uuid"
 )
 
 // SessionCookie is the platform login cookie (HttpOnly, server-side
 // sessions in Postgres).
 const SessionCookie = "aivo_session"
 
+// AssistantStore is the narrow slice of platform persistence the
+// assistant chat handlers need (precedent: Deps.Menu/MenuAdmin) — no
+// one-line pass-throughs on the App.
+type AssistantStore interface {
+	AssistantThread(ctx context.Context, restaurantID uuid.UUID) (uuid.UUID, error)
+	CreateAssistantMessage(ctx context.Context, restaurantID uuid.UUID, m domain.AssistantMessage) error
+	AssistantMessages(ctx context.Context, restaurantID uuid.UUID, limit int) ([]domain.AssistantMessage, error)
+	AssistantMessageByID(ctx context.Context, restaurantID, id uuid.UUID) (domain.AssistantMessage, error)
+	SetAssistantMessageStatus(ctx context.Context, restaurantID, id uuid.UUID, status string) error
+}
+
 // Deps is everything the API needs, wired by cmd/aivo-server.
 type Deps struct {
-	Platform  *app.App
-	Pos       *posapp.App
-	Menu      menuports.Store
-	MenuAdmin menuports.AdminStore
-	MenuApp   menuapp.Application
-	Images    platformports.ImageStore // nil disables image upload (503)
-	Assistant platformports.Assistant  // nil disables the admin assistant (503)
+	Platform       *app.App
+	Pos            *posapp.App
+	Menu           menuports.Store
+	MenuAdmin      menuports.AdminStore
+	MenuApp        menuapp.Application
+	Images         platformports.ImageStore // nil disables image upload (503)
+	Assistant      platformports.Assistant  // nil disables the admin assistant (503)
+	AssistantStore AssistantStore           // chat thread/message persistence
 	// ImagePrefix is the public URL prefix of our image bucket
 	// (e.g. "http://localhost:9000/aivo-menu-images/") — the only host
 	// assistant-proposed image_url values may point at.
@@ -137,9 +152,10 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/guests/{customerID}", h.restaurant(true, h.getGuest))
 	mux.HandleFunc("PATCH /api/v1/restaurants/{id}/guests/{customerID}", h.restaurant(true, h.patchGuest))
 
-	// POS handoff pickup.
-	mux.HandleFunc("GET /api/v1/pos/handoff/{code}", h.pos(h.posHandoffPreview))
-	mux.HandleFunc("POST /api/v1/pos/handoff/{code}/accept", h.pos(h.posHandoffAccept))
+	// POS handoff pickup — IP-limited on top of staff auth: 6-char codes
+	// must not be brute-forceable even by a hostile staff session.
+	mux.HandleFunc("GET /api/v1/pos/handoff/{code}", public(h.pos(h.posHandoffPreview)))
+	mux.HandleFunc("POST /api/v1/pos/handoff/{code}/accept", public(h.pos(h.posHandoffAccept)))
 
 	// Diner (table-token scoped, anonymous; per-IP limited).
 	mux.HandleFunc("GET /api/v1/m/{restaurantSlug}/{menuSlug}", public(h.dinerBrowseMenu))

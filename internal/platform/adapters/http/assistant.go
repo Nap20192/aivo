@@ -53,7 +53,7 @@ func toAssistantMessageView(m domain.AssistantMessage) assistantMessageView {
 // GET /api/v1/restaurants/{id}/assistant/messages?limit=50
 func (h *handler) assistantHistory(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	msgs, err := h.Platform.AssistantHistory(r.Context(), rest.ID, limit)
+	msgs, err := h.AssistantStore.AssistantMessages(r.Context(), rest.ID, limit)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -113,32 +113,48 @@ func (h *handler) assistantSend(w http.ResponseWriter, r *http.Request, _ domain
 			writeAppErr(w, err)
 			return
 		}
-		var content []byte
 		if isText {
-			content, err = io.ReadAll(io.LimitReader(f, maxTextAttachment+1))
+			content, err := io.ReadAll(io.LimitReader(f, maxTextAttachment+1))
+			f.Close()
 			if err != nil {
-				f.Close()
 				writeAppErr(w, err)
 				return
 			}
-			f.Close()
-			url, err := h.Images.Put(r.Context(), rest.ID, fh.Filename, ct, strings.NewReader(string(content)), int64(len(content)))
+			// Sniff: a "text/*" declaration hiding non-text bytes is
+			// rejected; the sniffed type is what gets stored.
+			sniffed := http.DetectContentType(content)
+			if !strings.HasPrefix(sniffed, "text/") {
+				writeErr(w, http.StatusUnprocessableEntity, "invalid", fmt.Sprintf("%s: declared text but content is %s", fh.Filename, sniffed))
+				return
+			}
+			url, err := h.Images.Put(r.Context(), rest.ID, fh.Filename, sniffed, strings.NewReader(string(content)), int64(len(content)))
 			if writeAppErr(w, err) {
 				return
 			}
-			attachments = append(attachments, domain.Attachment{Name: fh.Filename, URL: url, Mime: ct})
+			attachments = append(attachments, domain.Attachment{Name: fh.Filename, URL: url, Mime: sniffed})
 			textInlines = append(textInlines, fh.Filename+":\n"+string(content))
 			continue
 		}
-		url, err := h.Images.Put(r.Context(), rest.ID, fh.Filename, ct, f, fh.Size)
+		reader, sniffed, err := sniffUpload(f, ct)
+		if err != nil {
+			f.Close()
+			writeErr(w, http.StatusUnprocessableEntity, "invalid", fh.Filename+": "+err.Error())
+			return
+		}
+		if !strings.HasPrefix(sniffed, "image/") {
+			f.Close()
+			writeErr(w, http.StatusUnprocessableEntity, "invalid", fh.Filename+": content is not an image")
+			return
+		}
+		url, err := h.Images.Put(r.Context(), rest.ID, fh.Filename, sniffed, reader, fh.Size)
 		f.Close()
 		if writeAppErr(w, err) {
 			return
 		}
-		attachments = append(attachments, domain.Attachment{Name: fh.Filename, URL: url, Mime: ct})
+		attachments = append(attachments, domain.Attachment{Name: fh.Filename, URL: url, Mime: sniffed})
 	}
 
-	threadID, err := h.Platform.AssistantThread(r.Context(), rest.ID)
+	threadID, err := h.AssistantStore.AssistantThread(r.Context(), rest.ID)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -146,7 +162,7 @@ func (h *handler) assistantSend(w http.ResponseWriter, r *http.Request, _ domain
 		ID: uuid.New(), ThreadID: threadID, Role: domain.AssistantRoleUser,
 		Text: text, Attachments: attachments,
 	}
-	if writeAppErr(w, h.Platform.SaveAssistantMessage(r.Context(), rest.ID, userMsg)) {
+	if writeAppErr(w, h.AssistantStore.CreateAssistantMessage(r.Context(), rest.ID, userMsg)) {
 		return
 	}
 
@@ -173,7 +189,7 @@ func (h *handler) assistantSend(w http.ResponseWriter, r *http.Request, _ domain
 		ID: uuid.New(), ThreadID: threadID, Role: domain.AssistantRoleAssistant,
 		Text: reply, Actions: actions,
 	}
-	if writeAppErr(w, h.Platform.SaveAssistantMessage(r.Context(), rest.ID, asstMsg)) {
+	if writeAppErr(w, h.AssistantStore.CreateAssistantMessage(r.Context(), rest.ID, asstMsg)) {
 		return
 	}
 	actionsJSON, _ := domain.EncodeActions(actions)
@@ -199,7 +215,7 @@ func (h *handler) assistantPrompt(r *http.Request, rest domain.Restaurant, text 
 	if err != nil {
 		return "", domain.ActionRefs{}, err
 	}
-	history, err := h.Platform.AssistantHistory(r.Context(), rest.ID, assistantHistoryLen)
+	history, err := h.AssistantStore.AssistantMessages(r.Context(), rest.ID, assistantHistoryLen)
 	if err != nil {
 		return "", domain.ActionRefs{}, err
 	}
@@ -325,17 +341,29 @@ func (h *handler) assistantApply(w http.ResponseWriter, r *http.Request, u domai
 	// ponytail: sequential stop-on-first-failure, not one transaction —
 	// each apply goes through the existing store commands. Batch tx if
 	// this ever bites.
+	// Tenant refs computed once for the whole batch (~6 queries), and
+	// refreshed only after an action that creates a referenceable id.
+	refs, err := h.currentRefs(r, rest)
+	if writeAppErr(w, err) {
+		return
+	}
 	failed, succeeded := false, 0
 	for _, i := range selected {
 		a := msg.Actions[i]
 		res := result{Index: i, Type: a.Type, OK: true}
 		if failed {
 			res.OK, res.Error = false, "skipped: earlier action failed"
-		} else if err := h.applyAction(r, rest, a); err != nil {
+		} else if err := h.applyAction(r, rest, a, refs); err != nil {
 			res.OK, res.Error = false, err.Error()
 			failed = true
 		} else {
 			succeeded++
+			if a.Type == domain.ActionCreateMenu || a.Type == domain.ActionCreateCategory {
+				if refs, err = h.currentRefs(r, rest); err != nil {
+					writeAppErr(w, err)
+					return
+				}
+			}
 		}
 		results = append(results, res)
 	}
@@ -344,7 +372,7 @@ func (h *handler) assistantApply(w http.ResponseWriter, r *http.Request, u domai
 	// retry after fixing the cause; mark applied only on real effect.
 	status := domain.ActionStatusApplied
 	if succeeded > 0 {
-		if writeAppErr(w, h.Platform.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, domain.ActionStatusApplied)) {
+		if writeAppErr(w, h.AssistantStore.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, domain.ActionStatusApplied)) {
 			return
 		}
 	} else {
@@ -377,7 +405,7 @@ func (h *handler) assistantDiscard(w http.ResponseWriter, r *http.Request, _ dom
 	if !ok {
 		return
 	}
-	if writeAppErr(w, h.Platform.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, domain.ActionStatusDiscarded)) {
+	if writeAppErr(w, h.AssistantStore.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, domain.ActionStatusDiscarded)) {
 		return
 	}
 	slog.Info("assistant actions discarded", "restaurant_id", rest.ID, "message_id", msg.ID)
@@ -392,7 +420,7 @@ func (h *handler) assistantDecidableMessage(w http.ResponseWriter, r *http.Reque
 		writeErr(w, http.StatusNotFound, "not_found", "not found")
 		return domain.AssistantMessage{}, false
 	}
-	msg, err := h.Platform.AssistantMessage(r.Context(), rest.ID, id)
+	msg, err := h.AssistantStore.AssistantMessageByID(r.Context(), rest.ID, id)
 	if writeAppErr(w, err) {
 		return domain.AssistantMessage{}, false
 	}
@@ -408,15 +436,11 @@ func (h *handler) assistantDecidableMessage(w http.ResponseWriter, r *http.Reque
 }
 
 // applyAction executes one validated action through the existing
-// store/app commands. References are re-validated against fresh data.
-func (h *handler) applyAction(r *http.Request, rest domain.Restaurant, a domain.AssistantAction) error {
+// store/app commands. refs is the caller's tenant-ref snapshot (computed
+// once per batch; the caller refreshes it after create actions).
+func (h *handler) applyAction(r *http.Request, rest domain.Restaurant, a domain.AssistantAction, refs domain.ActionRefs) error {
 	ctx := r.Context()
 	if err := domain.ValidateAction(a); err != nil {
-		return err
-	}
-	// Fresh tenant-scope check (state may have changed since proposal).
-	refs, err := h.currentRefs(r, rest)
-	if err != nil {
 		return err
 	}
 	if err := domain.ValidateActionRefs(a, refs); err != nil {

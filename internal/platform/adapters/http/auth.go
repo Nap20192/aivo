@@ -74,9 +74,12 @@ func (h *handler) sessionUser(r *http.Request) (domain.User, error) {
 	return h.Platform.UserByToken(r.Context(), c.Value)
 }
 
-func setSessionCookie(w http.ResponseWriter, token string, ttl time.Duration) {
+// setAuthCookie is the single cookie helper for both auth surfaces
+// (staff aivo_session, customer aivo_customer) — same attributes, only
+// the name differs. Negative ttl deletes.
+func setAuthCookie(w http.ResponseWriter, name, token string, ttl time.Duration) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookie,
+		Name:     name,
 		Value:    token,
 		Path:     "/",
 		MaxAge:   int(ttl.Seconds()),
@@ -84,6 +87,10 @@ func setSessionCookie(w http.ResponseWriter, token string, ttl time.Duration) {
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func setSessionCookie(w http.ResponseWriter, token string, ttl time.Duration) {
+	setAuthCookie(w, SessionCookie, token, ttl)
 }
 
 // --- Views -------------------------------------------------------------
