@@ -106,6 +106,14 @@ describe("handoff", () => {
     expect(handoffExpired(stored, t - 1)).toBe(false);
     expect(handoffExpired(stored, t)).toBe(true);
   });
+  it("mock order cooldown matches the server's 30s debounce via retry_after", async () => {
+    await mockClient.submitOrder("cool-token", { lines: [] });
+    const err = await mockClient.submitOrder("cool-token", { lines: [] }).catch((e) => e);
+    expect(err.status).toBe(429);
+    expect(err.retryAfterSeconds).toBeGreaterThan(0);
+    expect(err.retryAfterSeconds).toBeLessThanOrEqual(30);
+    expect(demoSession.cooldown_seconds).toBe(30);
+  });
   it("mock handoff replaces the previous active code", async () => {
     const order = { lines: [] };
     const a = await mockClient.submitHandoff("tt", order);

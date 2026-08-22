@@ -80,6 +80,20 @@ export function hasFromPrice(item: MenuItem): boolean {
 
 const cartKey = (token: string) => `aivo:cart:${token}`;
 const sentKey = (token: string) => `aivo:sent-at:${token}`;
+const cooldownKey = (token: string) => `aivo:cooldown-until:${token}`;
+
+export function loadCooldownUntil(token: string): number | null {
+  const v = Number(sessionStorage.getItem(cooldownKey(token)));
+  return v > 0 ? v : null;
+}
+
+export function saveCooldownUntil(token: string, t: number): void {
+  try {
+    sessionStorage.setItem(cooldownKey(token), String(t));
+  } catch {
+    // ignore
+  }
+}
 
 export function loadCart(token: string): CartLine[] {
   try {
