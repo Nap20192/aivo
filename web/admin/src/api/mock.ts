@@ -263,14 +263,26 @@ export const mockApi = {
 
   async createMenu(
     id: string,
-    input: { name: string; slug: string },
+    input: { name: string; slug?: string },
   ): Promise<Menu> {
     requireRestaurant(id);
-    if (db.menus.some((m) => m.slug === input.slug))
+    let slug = input.slug;
+    if (!slug) {
+      // Mirrors server app.Slugify: "&" → "and" as its own word.
+      slug = input.name
+        .toLowerCase()
+        .replace(/&/g, " and ")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      let n = 2;
+      const base = slug;
+      while (db.menus.some((m) => m.slug === slug)) slug = `${base}-${n++}`;
+    } else if (db.menus.some((m) => m.slug === slug)) {
       throw new ApiError("conflict", "A menu with that slug already exists.", 422);
+    }
     const menu: Menu = {
       id: uid("menu"),
-      slug: input.slug,
+      slug,
       name: input.name,
       position: db.menus.length,
       is_default: false,

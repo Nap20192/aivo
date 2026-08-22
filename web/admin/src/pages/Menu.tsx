@@ -515,14 +515,6 @@ export function ItemsTab() {
   );
 }
 
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
 function MenuModal(props: {
   restaurantId: string;
   menu: MenuType | null; // null = create
@@ -536,7 +528,6 @@ function MenuModal(props: {
   const { menu } = props;
   const [name, setName] = useState(menu?.name ?? "");
   const [slug, setSlug] = useState(menu?.slug ?? "");
-  const [slugTouched, setSlugTouched] = useState(!!menu);
   const [makeDefault, setMakeDefault] = useState(menu?.is_default ?? false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -549,7 +540,8 @@ function MenuModal(props: {
   async function save() {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = "Name is required.";
-    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug))
+    // Empty slug on create = server generates the canonical one.
+    if ((slug || menu) && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug))
       errs.slug = "Lowercase letters, numbers and hyphens only.";
     setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -564,7 +556,7 @@ function MenuModal(props: {
       } else {
         let saved = await api.createMenu(props.restaurantId, {
           name: name.trim(),
-          slug,
+          ...(slug ? { slug } : {}),
         });
         if (makeDefault)
           saved = await api.updateMenu(props.restaurantId, saved.id, {
@@ -679,25 +671,26 @@ function MenuModal(props: {
             autoFocus={!menu}
             aria-invalid={!!errors.name}
             placeholder="Lunch"
-            onChange={(e) => {
-              setName(e.target.value);
-              if (!slugTouched) setSlug(slugify(e.target.value));
-            }}
+            onChange={(e) => setName(e.target.value)}
           />
         </Field>
         <Field
           label="Slug"
-          hint={`Shareable at /m/${slug || "…"}`}
+          hint={
+            slug
+              ? `Shareable at /m/${slug}`
+              : menu
+                ? "Shareable at /m/…"
+                : "Leave empty — the server generates it from the name."
+          }
           error={errors.slug}
         >
           <input
             className="input input-mono"
             value={slug}
             aria-invalid={!!errors.slug}
-            onChange={(e) => {
-              setSlugTouched(true);
-              setSlug(e.target.value.toLowerCase());
-            }}
+            placeholder={menu ? undefined : "generated from name"}
+            onChange={(e) => setSlug(e.target.value.toLowerCase())}
           />
         </Field>
         <div className="row">
