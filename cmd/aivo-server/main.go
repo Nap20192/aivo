@@ -156,6 +156,8 @@ func run() error {
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/v1/", apiV1)
+	// Unknown /api/* must 404, not fall through to the tenant SPA catch-all.
+	mux.Handle("/api/", http.NotFoundHandler())
 	mux.Handle("/admin/", http.StripPrefix("/admin", spaFileServer("web/admin/dist")))
 	mux.Handle("/admin", http.RedirectHandler("/admin/", http.StatusMovedPermanently))
 	mux.Handle("/pos/", http.StripPrefix("/pos", spaFileServer("web/pos/dist")))
