@@ -1,8 +1,6 @@
 package http
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,6 +9,7 @@ import (
 	menudomain "aivo/internal/menu/domain"
 	"aivo/internal/platform/app"
 	"aivo/internal/platform/domain"
+	"aivo/pkg/crypto"
 	"aivo/pkg/qrcode"
 
 	"github.com/google/uuid"
@@ -517,15 +516,9 @@ func (h *handler) deleteItem(w http.ResponseWriter, r *http.Request, _ domain.Us
 
 // --- Tables ------------------------------------------------------------
 
-// newTableToken returns a ~128-bit random URL-safe table token, per
-// internal/menu/CONTEXT.md "Table link".
-func newTableToken() (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("table token: %w", err)
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
+// newTableToken returns a ~128-bit (16-byte) random URL-safe table
+// token, per internal/menu/CONTEXT.md "Table link".
+func newTableToken() (string, error) { return crypto.Token(16) }
 
 type tableView struct {
 	ID        uuid.UUID `json:"id"`

@@ -163,7 +163,8 @@ a guest_profile row — created lazily on first linked order/handoff — and
 only its own orders; waiters see the name only via the handoff preview):
 - `GET /api/v1/restaurants/{id}/guests?query=&limit=` → sorted by
   last_seen desc: `[{customer: {id, name, email, phone}, visits,
-  total_spent_cents, last_seen, tags}]`
+  total_spent_cents, last_seen, tags}]`. Visits/spend cover linked menu
+  orders AND accepted-handoff ticket sales at this restaurant.
 - `GET /api/v1/restaurants/{id}/guests/{customer_id}` → `{customer,
   visits, total_spent_cents, first_seen, last_seen, notes, tags, orders:
   [{id, created_at, table_label, total_cents, lines: [{name, qty,
@@ -207,6 +208,8 @@ POS (session cookie, waiter+):
   includes option deltas. Client types: `web/pos/src/types.ts`.
   Close returns the PostedShift shape (`number`, `expected_cents`,
   `declared_cents`, `variance_cents`, `posted_at`, `gl_lines`).
+  pos/state supports ETag: send `If-None-Match` with the last ETag and an
+  unchanged state answers 304 with no body (the 5s poll costs ~nothing).
 - `POST /api/v1/pos/shifts` {opening_float_cents} / `POST /api/v1/pos/shifts/{id}/close` {declared_cents}
 - `POST /api/v1/pos/tables/{table_id}/lines` — add order lines (menu_item_id, qty, options)
 - `POST /api/v1/pos/tickets/{id}/fire`

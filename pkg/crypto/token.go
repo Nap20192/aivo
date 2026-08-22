@@ -9,11 +9,23 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 )
+
+// Token returns nBytes of crypto/rand entropy, base64url-encoded — the
+// one random-token generator (sessions use 32 bytes, table tokens 16
+// per CONTEXT.md "Table link" ~128 bits).
+func Token(nBytes int) (string, error) {
+	b := make([]byte, nBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("crypto: token: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
 
 // Encrypt seals plaintext under key (must be 32 bytes, AES-256), binding
 // the ciphertext to restaurantID via AEAD additional data. The returned

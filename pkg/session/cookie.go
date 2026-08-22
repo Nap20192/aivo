@@ -7,10 +7,11 @@
 package session
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"net/http"
 	"time"
+
+	"aivo/pkg/crypto"
 )
 
 const (
@@ -43,13 +44,13 @@ func IssueOrRefresh(w http.ResponseWriter, r *http.Request) (sessionID string) {
 }
 
 func newToken() string {
-	b := make([]byte, tokenBytes)
-	if _, err := rand.Read(b); err != nil {
-		// crypto/rand.Read only fails if the OS RNG is broken, which
-		// leaves the process unable to do anything security-sensitive.
+	t, err := crypto.Token(tokenBytes)
+	if err != nil {
+		// crypto/rand only fails if the OS RNG is broken, which leaves
+		// the process unable to do anything security-sensitive.
 		panic("session: crypto/rand unavailable: " + err.Error())
 	}
-	return base64.RawURLEncoding.EncodeToString(b)
+	return t
 }
 
 // isValidToken checks the cookie is a well-formed token of ours, not that

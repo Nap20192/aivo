@@ -65,8 +65,7 @@ func (a *App) startCustomerSession(ctx context.Context, customerID uuid.UUID) (s
 func (a *App) LoginCustomer(ctx context.Context, email, password string) (domain.Customer, string, error) {
 	c, err := a.store.CustomerByEmail(ctx, strings.ToLower(strings.TrimSpace(email)))
 	if errors.Is(err, ports.ErrNotFound) {
-		// Same timing-evening trick as staff login.
-		bcrypt.CompareHashAndPassword([]byte("$2a$10$0123456789012345678901uCsB6zwzoiZ9BvbVHGwFzLB1p9PY0P2"), []byte(password))
+		bcrypt.CompareHashAndPassword([]byte(dummyBcryptHash), []byte(password))
 		return domain.Customer{}, "", ErrUnauthorized
 	}
 	if err != nil {
