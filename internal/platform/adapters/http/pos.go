@@ -17,7 +17,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Shapes here match the POS client (web/pos/src/types.ts): display
+// Shapes here match the POS client (frontend/pos/src/types.ts): display
 // times as "HH:MM" strings, options as labels, unit prices inclusive of
 // option deltas. v1 models a single till per restaurant: till is always
 // 1 and other_till_shift always null.

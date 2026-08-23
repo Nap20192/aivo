@@ -160,7 +160,7 @@ func (h *handler) dinerHandoffQR(w http.ResponseWriter, r *http.Request) {
 // --- POS side ----------------------------------------------------------
 
 // handoffPreview matches the POS client's HandoffPreview type
-// (web/pos/src/types.ts): flat table fields, lines in the ticket-line
+// (frontend/pos/src/types.ts): flat table fields, lines in the ticket-line
 // shape (labels, unit price inclusive of option deltas), note null when
 // empty.
 func (h *handler) handoffPreview(r *http.Request, restaurantID uuid.UUID, handoff menudomain.Handoff) (map[string]any, error) {

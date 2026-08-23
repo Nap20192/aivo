@@ -15,7 +15,7 @@ import (
 
 // Diner entry points, table-token scoped and anonymous: the token IS the
 // credential. Shapes match the menu stream's client types
-// (web/menu/src/types.ts). Everything here resolves the token first and
+// (frontend/menu/src/types.ts). Everything here resolves the token first and
 // returns the same generic 404 whether the token is unknown or foreign.
 
 type dinerHoursRow struct {
@@ -273,7 +273,7 @@ func (h *handler) dinerBrowseMenu(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/v1/t/{token}/orders — body per web/menu/src/types.ts
+// POST /api/v1/t/{token}/orders — body per frontend/menu/src/types.ts
 // OrderInput; options come grouped, the flat option-ID list is what the
 // menu app validates.
 func (h *handler) dinerOrder(w http.ResponseWriter, r *http.Request) {

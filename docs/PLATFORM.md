@@ -30,9 +30,9 @@ service with a phone POS for waiters.
   (Go 1.22+ pattern matching). No new frameworks.
 - Migrations: numbered SQL files in `internal/<context>/adapters/postgres/migrations/`.
   Platform migrations start at `internal/platform/adapters/postgres/migrations/0001_init.sql`.
-- Frontends: static SPAs under `web/<name>/` (vanilla Vite + React + TypeScript),
+- Frontends: static SPAs under `frontend/<name>/` (vanilla Vite + React + TypeScript),
   served by the Go binary (`/admin`, `/pos`) or at tenant routes (menu).
-  Design tokens imported from `web/design-system/` (do not fork token values).
+  Design tokens imported from `frontend/design-system/` (do not fork token values).
 
 ## Tenancy & routing
 
@@ -82,7 +82,7 @@ Public (diner, table-token scoped — existing menu handlers keep their shapes):
 - `GET  /api/v1/t/{table_token}` → restaurant, table, theme (flat),
   `menus`: `[{id, slug, name, is_default, categories: [...]}]` (default
   first, then position — replaces the old flat `menu` array),
-  `open_requests`. Client types: `web/menu/src/types.ts`.
+  `open_requests`. Client types: `frontend/menu/src/types.ts`.
 - `GET  /api/v1/m/{restaurant_slug}/{menu_slug}` — public read-only
   browse of one menu (no table, no session): `{restaurant, theme, menu:
   {id, slug, name, categories}}`, 404 unknown. Served by the diner SPA
@@ -100,7 +100,7 @@ Platform (session cookie):
   admin-stream shapes (implemented): `hours` is `[{label, open, close}]`,
   `phone`/`instagram`/`custom_domain` are flat fields; lists are bare
   arrays; auth responses are `{user, org, restaurants}` (+ `restaurant`
-  for POS). Client types: `web/admin/src/api/types.ts`.
+  for POS). Client types: `frontend/admin/src/api/types.ts`.
 - `GET/PUT  /api/v1/restaurants/{id}/theme` — flat Theme object
   `{brand_name, accent, bold, banner_url, css_vars, design_md}` (stored
   as theme JSON + design_md text)
@@ -205,7 +205,7 @@ POS (session cookie, waiter+):
   one till per restaurant); shift carries server-computed running
   `expected_cents` and a display `number` ("shift-N"). Display times are
   local "HH:MM" strings. Line `options` are labels; `unit_price_cents`
-  includes option deltas. Client types: `web/pos/src/types.ts`.
+  includes option deltas. Client types: `frontend/pos/src/types.ts`.
   Close returns the PostedShift shape (`number`, `expected_cents`,
   `declared_cents`, `variance_cents`, `posted_at`, `gl_lines`).
   pos/state supports ETag: send `If-None-Match` with the last ETag and an
@@ -221,7 +221,7 @@ Money: integer cents everywhere. IDs: uuid strings. Errors:
 
 ## Design source of truth
 
-- Tokens/bundle: `web/design-system/` (styles.css, tokens/, _ds_bundle.js, support.js).
+- Tokens/bundle: `frontend/design-system/` (styles.css, tokens/, _ds_bundle.js, support.js).
 - Screen specs: `docs/prototypes/aivo-menu-prototype.dc.html` (diner menu),
   `docs/prototypes/aivo-pos-prototype.dc.html` (waiter POS),
   `docs/prototypes/aivo-menu-screen-board.dc.html` (screen board),
@@ -234,10 +234,10 @@ Money: integer cents everywhere. IDs: uuid strings. Errors:
 
 | Stream | Owns | Must not touch |
 |---|---|---|
-| backend | `internal/platform`, `internal/pos`, `cmd/aivo-server`, menu context changes, migrations, docker-compose | `web/*` except serving |
-| admin | `web/admin/` | Go code, other SPAs |
-| menu | `web/menu/` (rebuild as Vite SPA) | Go code, other SPAs |
-| pos | `web/pos/` | Go code, other SPAs |
+| backend | `internal/platform`, `internal/pos`, `cmd/aivo-server`, menu context changes, migrations, docker-compose | `frontend/*` except serving |
+| admin | `frontend/admin/` | Go code, other SPAs |
+| menu | `frontend/menu/` (rebuild as Vite SPA) | Go code, other SPAs |
+| pos | `frontend/pos/` | Go code, other SPAs |
 
 Frontends develop against this contract with a local mock (msw or a tiny
 fetch wrapper with fixtures) so they never block on backend; wire to real API

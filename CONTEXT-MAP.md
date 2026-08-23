@@ -10,6 +10,6 @@ _None yet — Menu is the first context. Future satellite services (backoffice, 
 
 ## Code layout
 
-All satellite services share one Go module at the repo root (module `aivo`) rather than one module per service — see `README.md`. One command per binary under `cmd/<service>-<binary>/`, one domain-scoped package tree per service under `internal/<service>/`, static frontends under `web/<service>/`. A service's context docs (`CONTEXT.md`, `docs/adr/`) live beside its code at `internal/<service>/`.
+All satellite services share one Go module at the repo root (module `aivo`) rather than one module per service — see `README.md`. One command per binary under `cmd/<service>-<binary>/`, one domain-scoped package tree per service under `internal/<service>/`, static frontends under `frontend/<service>/`. A service's context docs (`CONTEXT.md`, `docs/adr/`) live beside its code at `internal/<service>/`.
 
 Domain model lives apart from the services: `internal/sharedkernel/` holds the DDD building blocks shared by every context (ID, Entity, AggregateRoot, DomainEvent), and `internal/domain/{platform,menu,pos}/` holds each context's business entities. Contexts (`internal/<service>/{app,ports,adapters}`) import their domain package; domain packages import only `internal/sharedkernel` and the standard library.

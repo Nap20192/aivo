@@ -12,23 +12,23 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /out/aivo-server ./cmd/aivo-server
 
-FROM node:22-alpine AS webbuild
-WORKDIR /web
-# The SPAs import shared tokens from web/design-system — copy the whole
-# web tree so relative imports resolve.
-COPY web ./
+FROM node:22-alpine AS frontendbuild
+WORKDIR /frontend
+# The SPAs import shared tokens from frontend/design-system — copy the whole
+# frontend tree so relative imports resolve.
+COPY frontend ./
 RUN for app in admin menu pos; do \
-      cd /web/$app && npm ci && npm run build; \
+      cd /frontend/$app && npm ci && npm run build; \
     done
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
 COPY --from=build /out/aivo-server /usr/local/bin/aivo-server
-# main.go serves the SPAs from relative paths ("web/<app>/dist"), so the
-# dists live under /web given WORKDIR /.
-COPY --from=webbuild /web/admin/dist /web/admin/dist
-COPY --from=webbuild /web/menu/dist /web/menu/dist
-COPY --from=webbuild /web/pos/dist /web/pos/dist
+# main.go serves the SPAs from relative paths ("frontend/<app>/dist"), so the
+# dists live under /frontend given WORKDIR /.
+COPY --from=frontendbuild /frontend/admin/dist /frontend/admin/dist
+COPY --from=frontendbuild /frontend/menu/dist /frontend/menu/dist
+COPY --from=frontendbuild /frontend/pos/dist /frontend/pos/dist
 WORKDIR /
 EXPOSE 8080
 ENTRYPOINT ["aivo-server"]

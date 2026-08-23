@@ -149,7 +149,7 @@ func (s *Subscription) Transition(next SubscriptionStatus) error {
 }
 
 // HoursRow is one opening-hours line (e.g. Kitchen 17:00–22:30). Shape
-// matches the admin client (web/admin/src/api/types.ts).
+// matches the admin client (frontend/admin/src/api/types.ts).
 type HoursRow struct {
 	Label string `json:"label"`
 	Open  string `json:"open"`

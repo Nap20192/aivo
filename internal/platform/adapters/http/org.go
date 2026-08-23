@@ -34,7 +34,7 @@ func toSubscriptionView(s domain.Subscription) subscriptionView {
 }
 
 // restaurantView matches the admin client's Restaurant shape
-// (web/admin/src/api/types.ts): structured hours, flat phone/instagram,
+// (frontend/admin/src/api/types.ts): structured hours, flat phone/instagram,
 // custom_domain inline.
 type restaurantView struct {
 	ID           uuid.UUID         `json:"id"`

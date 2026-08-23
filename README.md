@@ -42,7 +42,7 @@ for the menu domain glossary.
 
 3. Open `http://localhost:8080/admin` (admin), `/pos` (POS), or a printed
    table link (diner menu). SPA routes answer 503 until the corresponding
-   `web/<app>/dist` exists (`npm run build` in each app).
+   `frontend/<app>/dist` exists (`npm run build` in each app).
 
 Env vars (native `go run ./cmd/aivo-server` instead of docker-compose):
 

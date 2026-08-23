@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Shapes here match the admin client (web/admin/src/api/types.ts): bare
+// Shapes here match the admin client (frontend/admin/src/api/types.ts): bare
 // arrays for lists, option groups as {name, type: single|multi, choices}.
 
 // --- Menus -------------------------------------------------------------

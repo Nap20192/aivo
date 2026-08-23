@@ -159,14 +159,14 @@ func run() error {
 	mux.Handle("/api/v1/", apiV1)
 	// Unknown /api/* must 404, not fall through to the tenant SPA catch-all.
 	mux.Handle("/api/", http.NotFoundHandler())
-	mux.Handle("/admin/", http.StripPrefix("/admin", spaFileServer("web/admin/dist")))
+	mux.Handle("/admin/", http.StripPrefix("/admin", spaFileServer("frontend/admin/dist")))
 	mux.Handle("/admin", http.RedirectHandler("/admin/", http.StatusMovedPermanently))
-	mux.Handle("/pos/", http.StripPrefix("/pos", spaFileServer("web/pos/dist")))
+	mux.Handle("/pos/", http.StripPrefix("/pos", spaFileServer("frontend/pos/dist")))
 	mux.Handle("/pos", http.RedirectHandler("/pos/", http.StatusMovedPermanently))
 	// Tenant routes (/{slug}, /{slug}/menu, /{slug}/t/{token},
 	// /{slug}/m/{menu}) are client-side routes of the menu SPA — served
 	// from its Vite build only (the Dockerfile builds it; 503 until then).
-	mux.Handle("/", spaFileServer("web/menu/dist"))
+	mux.Handle("/", spaFileServer("frontend/menu/dist"))
 
 	root := customDomainMiddleware(platformStore, baseURL, mux)
 
