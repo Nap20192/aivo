@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
 )
 
 // Assistant message roles.
@@ -55,9 +55,9 @@ type AssistantAction struct {
 	Type string `json:"type"`
 
 	// References into the restaurant's data.
-	ID         *uuid.UUID `json:"id,omitempty"`          // rename/delete category, item ops
-	MenuID     *uuid.UUID `json:"menu_id,omitempty"`     // create_category
-	CategoryID *uuid.UUID `json:"category_id,omitempty"` // create_item
+	ID         *sharedkernel.ID `json:"id,omitempty"`          // rename/delete category, item ops
+	MenuID     *sharedkernel.ID `json:"menu_id,omitempty"`     // create_category
+	CategoryID *sharedkernel.ID `json:"category_id,omitempty"` // create_item
 
 	// Content fields.
 	Name        string   `json:"name,omitempty"`
@@ -207,9 +207,9 @@ func ValidateAction(a AssistantAction) error {
 // by the caller from the store, plus the allowed public image URL
 // prefix ("" = no image storage configured, image_url rejected).
 type ActionRefs struct {
-	MenuIDs     map[uuid.UUID]bool
-	CategoryIDs map[uuid.UUID]bool
-	ItemIDs     map[uuid.UUID]bool
+	MenuIDs     map[sharedkernel.ID]bool
+	CategoryIDs map[sharedkernel.ID]bool
+	ItemIDs     map[sharedkernel.ID]bool
 	ImagePrefix string
 }
 
@@ -250,8 +250,8 @@ func ValidateActionRefs(a AssistantAction, refs ActionRefs) error {
 // assistant messages that propose changes; ActionStatus tracks the
 // admin's decision.
 type AssistantMessage struct {
-	ID           uuid.UUID
-	ThreadID     uuid.UUID
+	ID           sharedkernel.ID
+	ThreadID     sharedkernel.ID
 	Role         string
 	Text         string
 	Attachments  []Attachment

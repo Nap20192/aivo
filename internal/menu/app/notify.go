@@ -5,7 +5,7 @@ import (
 	"errors"
 	"log"
 
-	"aivo/internal/menu/domain"
+	"aivo/internal/domain/menu"
 	"aivo/internal/menu/ports"
 	"aivo/pkg/crypto"
 

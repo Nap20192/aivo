@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"aivo/internal/menu/domain"
+	"aivo/internal/domain/menu"
 )
 
 // Notifier sends Menu alerts (new Order, Service request) to a

@@ -4,13 +4,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
 )
 
 func ptr[T any](v T) *T { return &v }
 
 func TestValidateActionAllowlist(t *testing.T) {
-	id := uuid.New()
+	id := sharedkernel.NewID()
 	valid := []AssistantAction{
 		{Type: ActionCreateCategory, MenuID: &id, Name: "Starters"},
 		{Type: ActionRenameCategory, ID: &id, Name: "Snacks"},
@@ -62,11 +62,11 @@ func TestValidCSSVarRejectsBackslashEscapes(t *testing.T) {
 }
 
 func TestValidateActionRefsTenantScoping(t *testing.T) {
-	ours, foreign := uuid.New(), uuid.New()
+	ours, foreign := sharedkernel.NewID(), sharedkernel.NewID()
 	refs := ActionRefs{
-		MenuIDs:     map[uuid.UUID]bool{ours: true},
-		CategoryIDs: map[uuid.UUID]bool{ours: true},
-		ItemIDs:     map[uuid.UUID]bool{ours: true},
+		MenuIDs:     map[sharedkernel.ID]bool{ours: true},
+		CategoryIDs: map[sharedkernel.ID]bool{ours: true},
+		ItemIDs:     map[sharedkernel.ID]bool{ours: true},
 		ImagePrefix: "http://localhost:9000/aivo-menu-images/",
 	}
 

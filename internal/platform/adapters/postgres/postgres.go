@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"aivo/internal/platform/domain"
+	"aivo/internal/domain/platform"
 	"aivo/internal/platform/ports"
 
 	"github.com/google/uuid"

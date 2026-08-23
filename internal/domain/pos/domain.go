@@ -7,16 +7,16 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
 )
 
 // Shift is one cash shift at a restaurant. Closing posts
 // Expected/Declared/Variance immutably — a closed Shift is never updated
 // again.
 type Shift struct {
-	ID                uuid.UUID
-	RestaurantID      uuid.UUID
-	OpenedBy          uuid.UUID
+	ID                sharedkernel.ID
+	RestaurantID      sharedkernel.ID
+	OpenedBy          sharedkernel.ID
 	Cashier           string // display name, denormalized at open time
 	OpenedAt          time.Time
 	OpeningFloatCents int
@@ -63,11 +63,11 @@ const (
 // Ticket is the running order for one table during a shift. At most one
 // open Ticket per table at a time.
 type Ticket struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
-	ShiftID      uuid.UUID
-	TableID      uuid.UUID
-	CustomerID   *uuid.UUID // linked when a customer's handoff was accepted
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
+	ShiftID      sharedkernel.ID
+	TableID      sharedkernel.ID
+	CustomerID   *sharedkernel.ID // linked when a customer's handoff was accepted
 	Status       string
 	Note         string // diner note from a cart handoff, "" otherwise
 	Lines        []TicketLine
@@ -93,9 +93,9 @@ type LineOption struct {
 // moment a waiter adds it — later menu edits never alter it. FiredAt is
 // set when the line is sent to the kitchen.
 type TicketLine struct {
-	ID             uuid.UUID
-	TicketID       uuid.UUID
-	MenuItemID     uuid.UUID
+	ID             sharedkernel.ID
+	TicketID       sharedkernel.ID
+	MenuItemID     sharedkernel.ID
 	Name           string
 	UnitPriceCents int
 	Qty            int

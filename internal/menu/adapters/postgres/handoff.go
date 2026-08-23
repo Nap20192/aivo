@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"aivo/internal/menu/domain"
+	"aivo/internal/domain/menu"
 	"aivo/internal/menu/ports"
 
 	"github.com/google/uuid"

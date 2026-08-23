@@ -3,7 +3,7 @@ package http
 import (
 	"testing"
 
-	menudomain "aivo/internal/menu/domain"
+	menudomain "aivo/internal/domain/menu"
 
 	"github.com/google/uuid"
 )

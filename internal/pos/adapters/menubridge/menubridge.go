@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	menudomain "aivo/internal/menu/domain"
+	menudomain "aivo/internal/domain/menu"
 	menuports "aivo/internal/menu/ports"
 	"aivo/internal/pos/ports"
 

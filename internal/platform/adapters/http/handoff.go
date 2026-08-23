@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	menudomain "aivo/internal/menu/domain"
+	menudomain "aivo/internal/domain/menu"
+	"aivo/internal/domain/platform"
 	menuports "aivo/internal/menu/ports"
-	"aivo/internal/platform/domain"
 	posapp "aivo/internal/pos/app"
 	"aivo/pkg/qrcode"
 	"aivo/pkg/session"

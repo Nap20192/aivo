@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"aivo/internal/domain/menu"
 	"aivo/internal/menu/adapters/memory"
 	"aivo/internal/menu/adapters/telegram"
 	"aivo/internal/menu/app"
-	"aivo/internal/menu/domain"
 
 	"github.com/google/uuid"
 )

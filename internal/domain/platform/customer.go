@@ -3,14 +3,14 @@ package domain
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
 )
 
 // Customer is a platform-global diner account (optional — the anonymous
 // diner flow stays). Entirely separate from staff Users: different
 // table, different session store, different cookie.
 type Customer struct {
-	ID           uuid.UUID
+	ID           sharedkernel.ID
 	Email        string
 	PasswordHash []byte
 	Name         string
@@ -39,8 +39,8 @@ type CustomerOrderLine struct {
 // customer. Created lazily on the first linked order/handoff; the row's
 // existence IS the privacy boundary — no row, no visibility.
 type GuestProfile struct {
-	RestaurantID uuid.UUID
-	CustomerID   uuid.UUID
+	RestaurantID sharedkernel.ID
+	CustomerID   sharedkernel.ID
 	Notes        string
 	Tags         []string
 	FirstSeen    time.Time
@@ -59,7 +59,7 @@ type GuestSummary struct {
 
 // GuestOrder is one order in the CRM guest detail (this restaurant only).
 type GuestOrder struct {
-	ID         uuid.UUID
+	ID         sharedkernel.ID
 	CreatedAt  time.Time
 	TableLabel string
 	TotalCents int

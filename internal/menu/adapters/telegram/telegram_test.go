@@ -3,7 +3,7 @@ package telegram
 import (
 	"testing"
 
-	"aivo/internal/menu/domain"
+	"aivo/internal/domain/menu"
 
 	"github.com/google/uuid"
 )

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"aivo/internal/pos/domain"
+	"aivo/internal/domain/pos"
 	"aivo/internal/pos/ports"
 
 	"github.com/google/uuid"

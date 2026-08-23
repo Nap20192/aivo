@@ -7,8 +7,8 @@ import (
 	"context"
 	"errors"
 
-	menudomain "aivo/internal/menu/domain"
-	"aivo/internal/pos/domain"
+	menudomain "aivo/internal/domain/menu"
+	"aivo/internal/domain/pos"
 
 	"github.com/google/uuid"
 )

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	menudomain "aivo/internal/menu/domain"
-	"aivo/internal/pos/domain"
+	menudomain "aivo/internal/domain/menu"
+	"aivo/internal/domain/pos"
 	"aivo/internal/pos/ports"
 
 	"github.com/google/uuid"

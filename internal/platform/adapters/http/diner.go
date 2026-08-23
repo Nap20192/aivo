@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	menudomain "aivo/internal/domain/menu"
 	menuapp "aivo/internal/menu/app"
-	menudomain "aivo/internal/menu/domain"
 	"aivo/pkg/session"
 
 	"github.com/google/uuid"

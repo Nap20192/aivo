@@ -10,13 +10,13 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
 )
 
 // Organization is the billing/auth boundary. One Organization owns 1..N
 // Restaurants (operational tenants).
 type Organization struct {
-	ID        uuid.UUID
+	ID        sharedkernel.ID
 	Name      string
 	CreatedAt time.Time
 }
@@ -40,19 +40,19 @@ func ValidRole(r Role) bool {
 // for org-wide users (owners) and set for restaurant-scoped staff
 // (managers, waiters).
 type User struct {
-	ID           uuid.UUID
-	OrgID        uuid.UUID
+	ID           sharedkernel.ID
+	OrgID        sharedkernel.ID
 	Email        string
 	PasswordHash []byte
 	Role         Role
-	RestaurantID *uuid.UUID
+	RestaurantID *sharedkernel.ID
 	CreatedAt    time.Time
 }
 
 // CanAccessRestaurant reports whether u may act on the given Restaurant.
 // Org scoping (the restaurant belongs to u.OrgID) is checked by the
 // store lookup; this only adds the per-restaurant staff restriction.
-func (u User) CanAccessRestaurant(restaurantID uuid.UUID) bool {
+func (u User) CanAccessRestaurant(restaurantID sharedkernel.ID) bool {
 	if u.RestaurantID == nil {
 		return true // org-wide (owner)
 	}
@@ -66,7 +66,7 @@ func (u User) CanManage() bool { return u.Role == RoleOwner || u.Role == RoleMan
 // random cookie token — the raw token is never stored.
 type Session struct {
 	TokenHash []byte
-	UserID    uuid.UUID
+	UserID    sharedkernel.ID
 	CreatedAt time.Time
 	ExpiresAt time.Time
 }
@@ -131,7 +131,7 @@ var subTransitions = map[SubscriptionStatus][]SubscriptionStatus{
 
 // Subscription is an Organization's plan + billing state. One row per org.
 type Subscription struct {
-	OrgID     uuid.UUID
+	OrgID     sharedkernel.ID
 	Plan      Plan
 	Status    SubscriptionStatus
 	UpdatedAt time.Time
@@ -160,8 +160,8 @@ type HoursRow struct {
 // and settings. The Menu context holds its own narrower view of the same
 // row (id, slug, name).
 type Restaurant struct {
-	ID        uuid.UUID
-	OrgID     uuid.UUID
+	ID        sharedkernel.ID
+	OrgID     sharedkernel.ID
 	Slug      string
 	Name      string
 	Address   string
@@ -190,7 +190,7 @@ func ValidSlug(s string) bool {
 // (accent, bold flag, banner, fonts, CSS vars — applied as CSS custom
 // properties by the menu app) plus the free-text design.md source.
 type Theme struct {
-	RestaurantID uuid.UUID
+	RestaurantID sharedkernel.ID
 	ThemeJSON    json.RawMessage
 	DesignMD     string
 	UpdatedAt    time.Time
@@ -201,7 +201,7 @@ type Theme struct {
 // of scope for v1 — see docs/PLATFORM.md).
 type CustomDomain struct {
 	Domain       string
-	RestaurantID uuid.UUID
+	RestaurantID sharedkernel.ID
 	VerifiedAt   *time.Time
 	CreatedAt    time.Time
 }

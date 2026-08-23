@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"time"
 
-	menudomain "aivo/internal/menu/domain"
-	"aivo/internal/platform/domain"
+	menudomain "aivo/internal/domain/menu"
+	"aivo/internal/domain/platform"
+	posdomain "aivo/internal/domain/pos"
 	posapp "aivo/internal/pos/app"
-	posdomain "aivo/internal/pos/domain"
 
 	"github.com/google/uuid"
 )

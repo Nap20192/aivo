@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"aivo/internal/domain/platform"
 	"aivo/internal/platform/adapters/billing"
-	"aivo/internal/platform/domain"
 	"aivo/internal/platform/ports"
 
 	"github.com/google/uuid"

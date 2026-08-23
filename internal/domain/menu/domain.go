@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
 )
 
 // Restaurant is the tenant-owning entity that self-registers and runs a
 // Menu. Every other tenant-scoped record carries a RestaurantID back to
 // this type for isolation.
 type Restaurant struct {
-	ID        uuid.UUID
+	ID        sharedkernel.ID
 	Slug      string // readable, non-sensitive identifier used in table links
 	Name      string
 	CreatedAt time.Time
@@ -26,8 +26,8 @@ type Restaurant struct {
 // random, unguessable value; regenerating it invalidates the old link
 // immediately (e.g. after a lost/compromised QR).
 type Table struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
 	Label        string // staff-facing identifier, e.g. "Table 5", for printing/mapping QR codes
 	Token        string
 	CreatedAt    time.Time
@@ -38,8 +38,8 @@ type Table struct {
 // auto-created on provisioning. Slug is unique per Restaurant and used
 // in the public browse link /{restaurant_slug}/m/{menu_slug}.
 type Menu struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
 	Slug         string
 	Name         string
 	Position     int
@@ -71,9 +71,9 @@ func CanDeleteMenu(m Menu, totalMenus, categoryCount int, force bool) error {
 // Category is a named grouping of Menu items within one of a
 // Restaurant's Menus.
 type Category struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
-	MenuID       uuid.UUID
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
+	MenuID       sharedkernel.ID
 	Name         string
 	Position     int // display order within the Menu
 }
@@ -114,7 +114,7 @@ func ValidAllergen(a Allergen) bool {
 // Option is one choice within an OptionGroup, with a label and a price
 // delta applied on top of the Menu item's base price.
 type Option struct {
-	ID              uuid.UUID
+	ID              sharedkernel.ID
 	Label           string
 	PriceDeltaCents int
 }
@@ -123,7 +123,7 @@ type Option struct {
 // "Add-ons"). Multi selects whether a diner may choose more than one
 // Option (true) or exactly one (false).
 type OptionGroup struct {
-	ID      uuid.UUID
+	ID      sharedkernel.ID
 	Name    string
 	Multi   bool
 	Options []Option
@@ -131,9 +131,9 @@ type OptionGroup struct {
 
 // MenuItem is a single purchasable dish or drink.
 type MenuItem struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
-	CategoryID   uuid.UUID
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
+	CategoryID   sharedkernel.ID
 	Name         string
 	Description  string
 	PriceCents   int
@@ -154,7 +154,7 @@ type OrderLineOption struct {
 // OrderLine is a snapshot of a Menu item (name, price, chosen Options)
 // captured at Order submission, plus a reference to the source MenuItem.
 type OrderLine struct {
-	MenuItemID     uuid.UUID
+	MenuItemID     sharedkernel.ID
 	Name           string
 	UnitPriceCents int
 	Qty            int
@@ -176,7 +176,7 @@ var (
 // This is the one place an OrderLine gets constructed, which is what makes
 // it a true snapshot: a later edit to item can never retroactively change
 // an OrderLine built before that edit (see CONTEXT.md "Order line").
-func NewOrderLine(item MenuItem, optionIDs []uuid.UUID, qty int) (OrderLine, error) {
+func NewOrderLine(item MenuItem, optionIDs []sharedkernel.ID, qty int) (OrderLine, error) {
 	if qty < 1 {
 		return OrderLine{}, ErrInvalidQty
 	}
@@ -184,7 +184,7 @@ func NewOrderLine(item MenuItem, optionIDs []uuid.UUID, qty int) (OrderLine, err
 		return OrderLine{}, fmt.Errorf("menu item %q is %w", item.Name, ErrItemUnavailable)
 	}
 
-	optionsByID := make(map[uuid.UUID]Option)
+	optionsByID := make(map[sharedkernel.ID]Option)
 	for _, g := range item.OptionGroups {
 		for _, o := range g.Options {
 			optionsByID[o.ID] = o
@@ -212,10 +212,10 @@ func NewOrderLine(item MenuItem, optionIDs []uuid.UUID, qty int) (OrderLine, err
 // optional free-text comment. Carries no payment fields — payment happens
 // in person, outside the Menu context (see docs/adr/0002).
 type Order struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
-	TableID      uuid.UUID
-	CustomerID   *uuid.UUID // set when a logged-in customer ordered (see platform customers)
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
+	TableID      sharedkernel.ID
+	CustomerID   *sharedkernel.ID // set when a logged-in customer ordered (see platform customers)
 	Lines        []OrderLine
 	Comment      string
 	CreatedAt    time.Time
@@ -241,9 +241,9 @@ const (
 // waiter" or "request bill". Deduped per Table (not per diner session):
 // at most one open (pending) request of a given Kind per Table.
 type ServiceRequest struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
-	TableID      uuid.UUID
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
+	TableID      sharedkernel.ID
 	Kind         ServiceRequestKind
 	Status       string // "pending" or "acknowledged", see ServiceRequestPending/Acknowledged
 	CreatedAt    time.Time
@@ -275,8 +275,8 @@ const (
 // Banner and free_text are repeatable (a Restaurant may place several);
 // the rest are single-instance facts about the Restaurant.
 type LandingBlock struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
 	Type         LandingBlockType
 	Position     int
 	Data         map[string]string
@@ -289,7 +289,7 @@ type LandingBlock struct {
 // KeyVersion identifies which master key version encrypted the token, so
 // a future key rotation can re-wrap rows without a schema migration.
 type NotificationChannel struct {
-	RestaurantID      uuid.UUID
+	RestaurantID      sharedkernel.ID
 	TelegramChatID    string
 	EncryptedBotToken []byte
 	KeyVersion        int

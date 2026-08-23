@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"aivo/internal/domain/platform"
 	"aivo/internal/platform/app"
-	"aivo/internal/platform/domain"
 
 	"github.com/google/uuid"
 )

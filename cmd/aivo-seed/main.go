@@ -22,12 +22,12 @@ import (
 	"log"
 	"os"
 
+	menudomain "aivo/internal/domain/menu"
+	platformdomain "aivo/internal/domain/platform"
 	menupg "aivo/internal/menu/adapters/postgres"
-	menudomain "aivo/internal/menu/domain"
 	"aivo/internal/platform/adapters/billing"
 	platformpg "aivo/internal/platform/adapters/postgres"
 	platformapp "aivo/internal/platform/app"
-	platformdomain "aivo/internal/platform/domain"
 	pospg "aivo/internal/pos/adapters/postgres"
 	"aivo/pkg/migrate"
 

@@ -15,14 +15,14 @@ import (
 	"strconv"
 	"time"
 
+	menudomain "aivo/internal/domain/menu"
+	"aivo/internal/domain/platform"
+	posdomain "aivo/internal/domain/pos"
 	menuapp "aivo/internal/menu/app"
-	menudomain "aivo/internal/menu/domain"
 	menuports "aivo/internal/menu/ports"
 	"aivo/internal/platform/app"
-	"aivo/internal/platform/domain"
 	platformports "aivo/internal/platform/ports"
 	posapp "aivo/internal/pos/app"
-	posdomain "aivo/internal/pos/domain"
 	posports "aivo/internal/pos/ports"
 	"aivo/pkg/session"
 

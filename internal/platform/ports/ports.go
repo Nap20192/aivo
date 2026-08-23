@@ -8,7 +8,7 @@ import (
 	"errors"
 	"io"
 
-	"aivo/internal/platform/domain"
+	"aivo/internal/domain/platform"
 
 	"github.com/google/uuid"
 )

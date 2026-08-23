@@ -15,8 +15,8 @@ import (
 	"net/http"
 	"time"
 
+	"aivo/internal/domain/menu"
 	"aivo/internal/menu/app"
-	"aivo/internal/menu/domain"
 	"aivo/internal/menu/ports"
 	"aivo/pkg/session"
 

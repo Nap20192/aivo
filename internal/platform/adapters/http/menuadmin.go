@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	menudomain "aivo/internal/menu/domain"
+	menudomain "aivo/internal/domain/menu"
+	"aivo/internal/domain/platform"
 	"aivo/internal/platform/app"
-	"aivo/internal/platform/domain"
 	"aivo/pkg/crypto"
 	"aivo/pkg/qrcode"
 

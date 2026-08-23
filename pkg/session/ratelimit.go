@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"aivo/internal/menu/domain"
+	"aivo/internal/domain/menu"
 
 	"github.com/google/uuid"
 )

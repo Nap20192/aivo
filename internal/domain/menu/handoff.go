@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
 )
 
 // HandoffTTL is how long a pickup code stays valid.
@@ -35,8 +35,8 @@ func NewHandoffCode() (string, error) {
 // (name/price/options, validated at creation) plus the source ids so
 // accepting re-runs the normal POS add-lines path.
 type HandoffLine struct {
-	MenuItemID     uuid.UUID         `json:"menu_item_id"`
-	OptionIDs      []uuid.UUID       `json:"option_ids,omitempty"`
+	MenuItemID     sharedkernel.ID   `json:"menu_item_id"`
+	OptionIDs      []sharedkernel.ID `json:"option_ids,omitempty"`
 	Qty            int               `json:"qty"`
 	Name           string            `json:"name"`
 	UnitPriceCents int               `json:"unit_price_cents"`
@@ -47,10 +47,10 @@ type HandoffLine struct {
 // by the diner to the waiter who pulls it into the table ticket.
 // Single-use (UsedAt), TTL-bound, at most one active per Table.
 type Handoff struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
-	TableID      uuid.UUID
-	CustomerID   *uuid.UUID
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
+	TableID      sharedkernel.ID
+	CustomerID   *sharedkernel.ID
 	Code         string
 	Lines        []HandoffLine
 	Note         string
