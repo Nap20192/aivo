@@ -1,0 +1,12 @@
+# tbls (github.com/k1LoW/tbls) — generates docs/db/ (ERD + per-table docs)
+# from the live dev database:
+#   docker compose -f deploy/docker-compose.yml up -d postgres aivo-server
+#   go run github.com/k1LoW/tbls@latest doc --force
+dsn: postgres://aivo:aivo@localhost:5432/aivo?sslmode=disable
+docPath: docs/db
+
+er:
+  format: svg
+
+exclude:
+  - schema_migrations

@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIVO RMS — database schema</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+:root{
+  --paper-0:#ffffff;--paper-1:#faf8f5;--paper-2:#f4f1ec;--paper-3:#ece7df;
+  --ink-900:#12100f;--ink-700:#3a3531;--ink-500:#6f6962;--ink-400:#928b82;--ink-300:#b3aca3;
+  --red-700:#99101a;--red-600:#bd1220;--red-100:#fce8e4;--red-50:#fdf5f2;
+  --border-subtle:#eae4db;--border-default:#ded8ce;
+  --font-display:"Newsreader",ui-serif,Georgia,serif;
+  --font-sans:"Hanken Grotesk",-apple-system,"Segoe UI",Helvetica,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--paper-1);color:var(--ink-900);font-family:var(--font-sans);display:flex;flex-direction:column;overflow:hidden}
+header{padding:20px 32px 12px;display:flex;align-items:baseline;gap:24px;flex-wrap:wrap;border-bottom:1px solid var(--border-subtle)}
+.eyebrow{font:600 11px/1.2 var(--font-sans);letter-spacing:.07em;text-transform:uppercase;color:var(--red-700)}
+h1{font:400 27px/1.28 var(--font-display)}
+.sub{font-size:13px;color:var(--ink-500)}
+.controls{margin-left:auto;display:flex;align-items:center;gap:12px}
+.controls input[type=search]{font:400 13px var(--font-sans);padding:6px 10px;border:1px solid var(--border-default);border-radius:6px;background:var(--paper-0);color:var(--ink-900);width:200px;outline:none}
+.controls input[type=search]:focus{border-color:var(--red-600);box-shadow:0 0 0 3px #f8cec9}
+.controls label{font-size:12px;color:var(--ink-500);display:flex;gap:6px;align-items:center;cursor:pointer;user-select:none}
+.controls button{font:500 13px var(--font-sans);border:1px solid var(--border-default);background:var(--paper-0);color:var(--ink-700);border-radius:6px;padding:4px 10px;cursor:pointer}
+.controls button:hover{background:var(--paper-2)}
+#viewport{flex:1;overflow:hidden;cursor:grab;position:relative}
+#viewport.panning{cursor:grabbing}
+#hint{position:absolute;right:16px;bottom:12px;font:400 11px var(--font-mono);color:var(--ink-400);pointer-events:none}
+footer{border-top:1px solid var(--border-subtle);padding:10px 32px;display:flex;gap:28px;align-items:center;flex-wrap:wrap;background:var(--paper-1)}
+footer .lg{font:500 11px var(--font-mono);letter-spacing:.14em;color:var(--ink-500)}
+.li{display:flex;gap:7px;align-items:center;font:400 11px var(--font-mono);color:var(--ink-500)}
+.sw{width:14px;height:9px;border-radius:2px;display:inline-block}
+.li svg{overflow:visible}
+.colophon{margin-left:auto;font:400 10px var(--font-mono);color:var(--ink-400)}
+.colophon a{color:inherit}
+
+/* SVG interaction states */
+.tbl{cursor:pointer}
+.tbl rect.box{transition:opacity .12s}
+svg.focus .tbl{opacity:.18}
+svg.focus .tbl.lit{opacity:1}
+svg.searching .tbl{opacity:.15}
+svg.searching .tbl.hit{opacity:1}
+.edge{stroke:var(--ink-400);fill:none;stroke-width:1.1;opacity:0;pointer-events:none;transition:opacity .12s}
+.edge.dashed{stroke-dasharray:5 4}
+svg.showall .edge{opacity:.16}
+svg .edge.lit{opacity:1;stroke:var(--red-600)}
+.etag{opacity:0;pointer-events:none;transition:opacity .12s}
+svg .etag.lit{opacity:1}
+@media (prefers-reduced-motion:reduce){.tbl rect.box,.edge,.etag{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div><p class="eyebrow">AIVO RMS</p><h1>Database schema</h1></div>
+  <p class="sub" id="stats"></p>
+  <div class="controls">
+    <input id="q" type="search" placeholder="table or column…" autocomplete="off">
+    <label><input id="all" type="checkbox"> all relations</label>
+    <button id="zin" title="zoom in">+</button><button id="zout" title="zoom out">−</button><button id="zfit">fit</button>
+  </div>
+</header>
+<div id="viewport"><div id="hint">drag to pan · wheel to zoom · hover a table for its relations · click to pin</div></div>
+<footer>
+  <span class="lg">LEGEND</span>
+  <span class="li"><span class="sw" style="background:#7d1a49"></span>platform</span>
+  <span class="li"><span class="sw" style="background:#bd1220"></span>restaurant</span>
+  <span class="li"><span class="sw" style="background:#6b7a2f"></span>menu</span>
+  <span class="li"><span class="sw" style="background:#e2560f"></span>ordering</span>
+  <span class="li"><span class="sw" style="background:#a8790a"></span>guests</span>
+  <span class="li"><span class="sw" style="background:#2c7a3d"></span>pos</span>
+  <span class="li"><span class="sw" style="background:#2f6bb3"></span>ai / events</span>
+  <span class="li"># primary key</span>
+  <span class="li">→ foreign key</span>
+  <span class="li"><svg width="26" height="6" aria-hidden="true"><line x1="0" y1="3" x2="26" y2="3" stroke="#928b82" stroke-dasharray="5 4"/></svg>nullable FK</span>
+  <span class="li">C cascade · SN set null</span>
+  <span class="colophon">generated from <a href="db/schema.json">docs/db/schema.json</a> (tbls) · static: <a href="db/schema.svg">schema.svg</a></span>
+</footer>
+<noscript><p style="padding:16px 32px">Interactive view needs JavaScript — see the static <a href="db/schema.svg">docs/db/schema.svg</a>.</p></noscript>
+<script>
+// ---- data (from docs/db/schema.json; regen: go run github.com/k1LoW/tbls@latest doc --force, then re-embed) ----
+const TABLES = [{"n":"restaurants","c":[{"n":"id","t":"uuid","nn":true},{"n":"slug","t":"text","nn":true},{"n":"name","t":"text","nn":true},{"n":"created_at","t":"timestamptz","nn":true},{"n":"org_id","t":"uuid","nn":false},{"n":"address","t":"text","nn":true},{"n":"hours","t":"jsonb","nn":true},{"n":"contacts","t":"jsonb","nn":true}],"pk":["id"]},{"n":"tables","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"label","t":"text","nn":true},{"n":"token","t":"text","nn":true},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["id"]},{"n":"categories","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"name","t":"text","nn":true},{"n":"position","t":"integer","nn":true},{"n":"menu_id","t":"uuid","nn":true}],"pk":["id"]},{"n":"menu_items","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"category_id","t":"uuid","nn":true},{"n":"name","t":"text","nn":true},{"n":"description","t":"text","nn":true},{"n":"price_cents","t":"integer","nn":true},{"n":"image_url","t":"text","nn":true},{"n":"available","t":"boolean","nn":true}],"pk":["id"]},{"n":"menu_item_allergens","c":[{"n":"menu_item_id","t":"uuid","nn":true},{"n":"allergen","t":"text","nn":true}],"pk":["menu_item_id","allergen"]},{"n":"option_groups","c":[{"n":"id","t":"uuid","nn":true},{"n":"menu_item_id","t":"uuid","nn":true},{"n":"name","t":"text","nn":true},{"n":"multi","t":"boolean","nn":true},{"n":"position","t":"integer","nn":true}],"pk":["id"]},{"n":"options","c":[{"n":"id","t":"uuid","nn":true},{"n":"option_group_id","t":"uuid","nn":true},{"n":"label","t":"text","nn":true},{"n":"price_delta_cents","t":"integer","nn":true},{"n":"position","t":"integer","nn":true}],"pk":["id"]},{"n":"orders","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"table_id","t":"uuid","nn":true},{"n":"comment","t":"text","nn":true},{"n":"created_at","t":"timestamptz","nn":true},{"n":"customer_id","t":"uuid","nn":false}],"pk":["id"]},{"n":"order_lines","c":[{"n":"id","t":"uuid","nn":true},{"n":"order_id","t":"uuid","nn":true},{"n":"menu_item_id","t":"uuid","nn":true},{"n":"name","t":"text","nn":true},{"n":"unit_price_cents","t":"integer","nn":true},{"n":"qty","t":"integer","nn":true}],"pk":["id"]},{"n":"order_line_options","c":[{"n":"id","t":"uuid","nn":true},{"n":"order_line_id","t":"uuid","nn":true},{"n":"label","t":"text","nn":true},{"n":"price_delta_cents","t":"integer","nn":true}],"pk":["id"]},{"n":"service_requests","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"table_id","t":"uuid","nn":true},{"n":"kind","t":"text","nn":true},{"n":"status","t":"text","nn":true},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["id"]},{"n":"landing_blocks","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"type","t":"text","nn":true},{"n":"position","t":"integer","nn":true},{"n":"data","t":"jsonb","nn":true}],"pk":["id"]},{"n":"notification_channels","c":[{"n":"restaurant_id","t":"uuid","nn":true},{"n":"telegram_chat_id","t":"text","nn":true},{"n":"encrypted_bot_token","t":"bytea","nn":true},{"n":"key_version","t":"integer","nn":true}],"pk":["restaurant_id"]},{"n":"menus","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"slug","t":"text","nn":true},{"n":"name","t":"text","nn":true},{"n":"position","t":"integer","nn":true},{"n":"is_default","t":"boolean","nn":true}],"pk":["id"]},{"n":"cart_handoffs","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"table_id","t":"uuid","nn":true},{"n":"customer_id","t":"uuid","nn":false},{"n":"code","t":"text","nn":true},{"n":"lines","t":"jsonb","nn":true},{"n":"note","t":"text","nn":true},{"n":"expires_at","t":"timestamptz","nn":true},{"n":"used_at","t":"timestamptz","nn":false},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["id"]},{"n":"organizations","c":[{"n":"id","t":"uuid","nn":true},{"n":"name","t":"text","nn":true},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["id"]},{"n":"users","c":[{"n":"id","t":"uuid","nn":true},{"n":"org_id","t":"uuid","nn":true},{"n":"email","t":"text","nn":true},{"n":"password_hash","t":"bytea","nn":true},{"n":"role","t":"text","nn":true},{"n":"restaurant_id","t":"uuid","nn":false},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["id"]},{"n":"sessions","c":[{"n":"token_hash","t":"bytea","nn":true},{"n":"user_id","t":"uuid","nn":true},{"n":"created_at","t":"timestamptz","nn":true},{"n":"expires_at","t":"timestamptz","nn":true}],"pk":["token_hash"]},{"n":"subscriptions","c":[{"n":"org_id","t":"uuid","nn":true},{"n":"plan","t":"text","nn":true},{"n":"status","t":"text","nn":true},{"n":"updated_at","t":"timestamptz","nn":true}],"pk":["org_id"]},{"n":"restaurant_themes","c":[{"n":"restaurant_id","t":"uuid","nn":true},{"n":"theme","t":"jsonb","nn":true},{"n":"design_md","t":"text","nn":true},{"n":"updated_at","t":"timestamptz","nn":true}],"pk":["restaurant_id"]},{"n":"custom_domains","c":[{"n":"domain","t":"text","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"verified_at","t":"timestamptz","nn":false},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["domain"]},{"n":"assistant_threads","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["id"]},{"n":"assistant_messages","c":[{"n":"id","t":"uuid","nn":true},{"n":"thread_id","t":"uuid","nn":true},{"n":"role","t":"text","nn":true},{"n":"text","t":"text","nn":true},{"n":"attachments","t":"jsonb","nn":true},{"n":"actions","t":"jsonb","nn":true},{"n":"action_status","t":"text","nn":false},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["id"]},{"n":"customers","c":[{"n":"id","t":"uuid","nn":true},{"n":"email","t":"text","nn":true},{"n":"password_hash","t":"bytea","nn":true},{"n":"name","t":"text","nn":true},{"n":"phone","t":"text","nn":false},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["id"]},{"n":"customer_sessions","c":[{"n":"token_hash","t":"bytea","nn":true},{"n":"customer_id","t":"uuid","nn":true},{"n":"created_at","t":"timestamptz","nn":true},{"n":"expires_at","t":"timestamptz","nn":true}],"pk":["token_hash"]},{"n":"guest_profiles","c":[{"n":"restaurant_id","t":"uuid","nn":true},{"n":"customer_id","t":"uuid","nn":true},{"n":"notes","t":"text","nn":true},{"n":"tags","t":"jsonb","nn":true},{"n":"first_seen","t":"timestamptz","nn":true},{"n":"last_seen","t":"timestamptz","nn":true}],"pk":["restaurant_id","customer_id"]},{"n":"shifts","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"opened_by","t":"uuid","nn":true},{"n":"opened_at","t":"timestamptz","nn":true},{"n":"opening_float_cents","t":"integer","nn":true},{"n":"closed_at","t":"timestamptz","nn":false},{"n":"declared_cents","t":"integer","nn":false},{"n":"expected_cents","t":"integer","nn":false},{"n":"variance_cents","t":"integer","nn":false},{"n":"cashier","t":"text","nn":true}],"pk":["id"]},{"n":"tickets","c":[{"n":"id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":true},{"n":"shift_id","t":"uuid","nn":true},{"n":"table_id","t":"uuid","nn":true},{"n":"status","t":"text","nn":true},{"n":"created_at","t":"timestamptz","nn":true},{"n":"note","t":"text","nn":true},{"n":"customer_id","t":"uuid","nn":false}],"pk":["id"]},{"n":"ticket_lines","c":[{"n":"id","t":"uuid","nn":true},{"n":"ticket_id","t":"uuid","nn":true},{"n":"menu_item_id","t":"uuid","nn":true},{"n":"name","t":"text","nn":true},{"n":"unit_price_cents","t":"integer","nn":true},{"n":"qty","t":"integer","nn":true},{"n":"options","t":"jsonb","nn":true},{"n":"fired_at","t":"timestamptz","nn":false},{"n":"created_at","t":"timestamptz","nn":true}],"pk":["id"]},{"n":"events","c":[{"n":"id","t":"uuid","nn":true},{"n":"name","t":"text","nn":true},{"n":"aggregate_type","t":"text","nn":true},{"n":"aggregate_id","t":"uuid","nn":true},{"n":"restaurant_id","t":"uuid","nn":false},{"n":"payload","t":"jsonb","nn":true},{"n":"occurred_at","t":"timestamptz","nn":true},{"n":"published_at","t":"timestamptz","nn":false}],"pk":["id"]}];
+// [child, fk column, parent, on-delete] — "" = NO ACTION
+const FKS = [
+["assistant_messages","thread_id","assistant_threads","C"],
+["assistant_threads","restaurant_id","restaurants","C"],
+["cart_handoffs","restaurant_id","restaurants","C"],
+["cart_handoffs","table_id","tables","C"],
+["categories","menu_id","menus","C"],
+["categories","restaurant_id","restaurants","C"],
+["custom_domains","restaurant_id","restaurants","C"],
+["customer_sessions","customer_id","customers","C"],
+["guest_profiles","customer_id","customers","C"],
+["guest_profiles","restaurant_id","restaurants","C"],
+["landing_blocks","restaurant_id","restaurants","C"],
+["menu_item_allergens","menu_item_id","menu_items","C"],
+["menu_items","category_id","categories","C"],
+["menu_items","restaurant_id","restaurants","C"],
+["menus","restaurant_id","restaurants","C"],
+["notification_channels","restaurant_id","restaurants","C"],
+["option_groups","menu_item_id","menu_items","C"],
+["options","option_group_id","option_groups","C"],
+["order_line_options","order_line_id","order_lines","C"],
+["order_lines","menu_item_id","menu_items",""],
+["order_lines","order_id","orders","C"],
+["orders","customer_id","customers","SN"],
+["orders","restaurant_id","restaurants","C"],
+["orders","table_id","tables","C"],
+["restaurants","org_id","organizations","C"],
+["restaurant_themes","restaurant_id","restaurants","C"],
+["service_requests","restaurant_id","restaurants","C"],
+["service_requests","table_id","tables","C"],
+["sessions","user_id","users","C"],
+["shifts","opened_by","users",""],
+["shifts","restaurant_id","restaurants","C"],
+["subscriptions","org_id","organizations","C"],
+["tables","restaurant_id","restaurants","C"],
+["ticket_lines","menu_item_id","menu_items",""],
+["ticket_lines","ticket_id","tickets","C"],
+["tickets","restaurant_id","restaurants","C"],
+["tickets","shift_id","shifts","C"],
+["tickets","table_id","tables","C"],
+["users","org_id","organizations","C"],
+["users","restaurant_id","restaurants","C"]];
+const ZONES = [
+ {name:"PLATFORM", color:"#7d1a49", tables:["organizations","subscriptions","users","sessions"]},
+ {name:"RESTAURANT", color:"#bd1220", tables:["restaurants","tables","custom_domains","restaurant_themes","landing_blocks","notification_channels"]},
+ {name:"MENU", color:"#6b7a2f", tables:["menus","categories","menu_items","menu_item_allergens","option_groups","options"]},
+ {name:"ORDERING", color:"#e2560f", tables:["orders","order_lines","order_line_options","cart_handoffs","service_requests"]},
+ {name:"GUESTS", color:"#a8790a", tables:["customers","customer_sessions","guest_profiles"]},
+ {name:"POS", color:"#2c7a3d", tables:["shifts","tickets","ticket_lines"]},
+ {name:"AI · EVENTS", color:"#2f6bb3", tables:["assistant_threads","assistant_messages","events"]}];
+const FOCAL = "restaurants";
+
+// ---- layout ----
+const COLW=240, GAP=72, ROWH=18, HDR=32, PADB=10, VGAP=28, TOP=56, LEFT=40;
+const byName = Object.fromEntries(TABLES.map(t=>[t.n,t]));
+const fkCols = {}; FKS.forEach(([c,col])=> (fkCols[c] ??= new Set()).add(col));
+const pos = {};
+let maxY = 0;
+ZONES.forEach((z,zi)=>{
+  const x = LEFT + zi*(COLW+GAP);
+  let y = TOP;
+  z.tables.forEach(name=>{
+    const t = byName[name];
+    const h = HDR + t.c.length*ROWH + PADB;
+    pos[name] = {x, y, w:COLW, h, zone:z};
+    y += h + VGAP;
+  });
+  maxY = Math.max(maxY, y);
+});
+const W = LEFT + ZONES.length*(COLW+GAP) - GAP + LEFT, H = maxY + 24;
+
+// ---- render ----
+const esc = s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+let sv = `<svg id="erd" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"
+ role="img" aria-labelledby="aivo-erd-title aivo-erd-desc" font-family="'JetBrains Mono',monospace">
+<title id="aivo-erd-title">AIVO RMS database schema</title>
+<desc id="aivo-erd-desc">Entity-relationship diagram of 30 PostgreSQL tables grouped into platform, restaurant, menu, ordering, guests, POS and AI/events domains; foreign-key relations highlight on hover.</desc>`;
+
+// zone labels
+ZONES.forEach((z,zi)=>{
+  const x = LEFT + zi*(COLW+GAP);
+  sv += `<text x="${x}" y="${TOP-20}" font-size="10" font-weight="600" letter-spacing=".14em" fill="${z.color}">${z.name}</text>
+<line x1="${x}" y1="${TOP-12}" x2="${x+COLW}" y2="${TOP-12}" stroke="${z.color}" stroke-opacity=".35" stroke-width="1"/>`;
+});
+
+// edges (drawn before boxes; visibility handled by CSS classes)
+const rowY = (t,col)=>{ const i = byName[t].c.findIndex(c=>c.n===col); return pos[t].y + HDR + (i<0?-HDR/2:i*ROWH + ROWH/2); };
+let edges = "";
+FKS.forEach(([child,col,parent,od],i)=>{
+  const c = pos[child], p = pos[parent];
+  const y1 = rowY(child,col), y2 = p.y + HDR/2;
+  let x1, x2, path;
+  if (p.x > c.x) { x1 = c.x+c.w; x2 = p.x; }
+  else if (p.x < c.x) { x1 = c.x; x2 = p.x+p.w; }
+  else { x1 = c.x; x2 = p.x; } // same column: bow out left
+  const nullable = !byName[child].c.find(cc=>cc.n===col).nn;
+  if (x1 !== x2 && p.x !== c.x) {
+    const midx = (x1+x2)/2;
+    path = `M${x1} ${y1} C ${midx} ${y1}, ${midx} ${y2}, ${x2} ${y2}`;
+  } else {
+    const bow = c.x - 28 - (i%4)*8;
+    path = `M${x1} ${y1} C ${bow} ${y1}, ${bow} ${y2}, ${x2} ${y2}`;
+  }
+  const cls = `edge${nullable||od==="SN"?" dashed":""}`;
+  edges += `<path class="${cls}" data-c="${child}" data-p="${parent}" d="${path}"/>`;
+  // cardinality + on-delete tags
+  const d1 = x1===c.x? -14 : 14, d2 = x2===p.x? -14 : 14;
+  edges += `<g class="etag" data-c="${child}" data-p="${parent}" font-size="9" fill="#99101a">
+<text x="${x1+d1}" y="${y1-4}" text-anchor="middle">N</text>
+<text x="${x2+d2}" y="${y2-4}" text-anchor="middle">1</text>`;
+  if (od) edges += `<text x="${(x1+x2)/2}" y="${(y1+y2)/2-6}" text-anchor="middle" font-size="8" letter-spacing=".06em">${od}</text>`;
+  edges += `</g>`;
+});
+sv += edges;
+
+// table boxes
+TABLES.forEach(t=>{
+  const {x,y,w,h,zone} = pos[t.n];
+  const focal = t.n===FOCAL;
+  sv += `<g class="tbl" id="t-${t.n}" data-t="${t.n}" tabindex="0">
+<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="#ffffff" stroke="${focal?"#bd1220":"#ded8ce"}" stroke-width="${focal?1.4:1}"/>
+<path d="M${x} ${y+HDR} h${w}" stroke="#eae4db"/>
+<rect x="${x}" y="${y}" width="4" height="${h}" rx="2" fill="${zone.color}" fill-opacity=".85"/>
+<rect x="${x}" y="${y}" width="${w}" height="${HDR}" rx="6" fill="${focal?"#fce8e4":zone.color}" fill-opacity="${focal?1:.07}"/>
+<text x="${x+16}" y="${y+21}" font-family="'Hanken Grotesk',sans-serif" font-size="13" font-weight="600" fill="#12100f">${t.n}</text>`;
+  t.c.forEach((c,i)=>{
+    const cy = y + HDR + 13 + i*ROWH;
+    const ispk = t.pk.includes(c.n), isfk = fkCols[t.n]?.has(c.n);
+    const mark = ispk? "#" : isfk? "→" : "";
+    sv += `<text x="${x+16}" y="${cy}" font-size="10" fill="${ispk?"#12100f":"#3a3531"}" font-weight="${ispk?600:400}">${mark? mark+" ":""}${esc(c.n)}</text>
+<text x="${x+w-12}" y="${cy}" font-size="9" fill="${c.nn?"#928b82":"#b3aca3"}" text-anchor="end">${esc(c.t)}${c.nn?"":"?"}</text>`;
+  });
+  sv += `</g>`;
+});
+sv += `</svg>`;
+
+const vp = document.getElementById("viewport");
+vp.insertAdjacentHTML("afterbegin", sv);
+const svg = document.getElementById("erd");
+document.getElementById("stats").textContent = `${TABLES.length} tables · ${FKS.length} foreign keys · public schema`;
+
+// ---- interaction: highlight ----
+const edgeEls = [...svg.querySelectorAll(".edge,.etag")];
+const tblEls = [...svg.querySelectorAll(".tbl")];
+let pinned = null;
+function focus(name){
+  svg.classList.toggle("focus", !!name);
+  tblEls.forEach(el=>el.classList.remove("lit"));
+  edgeEls.forEach(el=>el.classList.remove("lit"));
+  if(!name) return;
+  const lit = new Set([name]);
+  edgeEls.forEach(el=>{
+    if(el.dataset.c===name || el.dataset.p===name){
+      el.classList.add("lit"); lit.add(el.dataset.c); lit.add(el.dataset.p);
+    }
+  });
+  lit.forEach(n=>document.getElementById("t-"+n)?.classList.add("lit"));
+}
+tblEls.forEach(el=>{
+  el.addEventListener("mouseenter",()=>{ if(!pinned) focus(el.dataset.t); });
+  el.addEventListener("mouseleave",()=>{ if(!pinned) focus(null); });
+  el.addEventListener("focus",()=>{ if(!pinned) focus(el.dataset.t); });
+  el.addEventListener("blur",()=>{ if(!pinned) focus(null); });
+  el.addEventListener("click",e=>{
+    e.stopPropagation();
+    pinned = pinned===el.dataset.t? null : el.dataset.t;
+    focus(pinned);
+  });
+});
+svg.addEventListener("click",()=>{ pinned=null; focus(null); });
+document.getElementById("all").addEventListener("change",e=>svg.classList.toggle("showall",e.target.checked));
+
+// ---- search ----
+document.getElementById("q").addEventListener("input",e=>{
+  const q = e.target.value.trim().toLowerCase();
+  svg.classList.toggle("searching", !!q);
+  tblEls.forEach(el=>{
+    const t = byName[el.dataset.t];
+    const hit = q && (t.n.includes(q) || t.c.some(c=>c.n.includes(q)));
+    el.classList.toggle("hit", hit);
+  });
+});
+
+// ---- pan / zoom ----
+let scale = 1, tx = 0, ty = 0;
+function apply(){ svg.style.transformOrigin="0 0"; svg.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`; }
+function fit(){ scale = Math.min(vp.clientWidth/W, vp.clientHeight/H, 1); tx = Math.max(0,(vp.clientWidth - W*scale)/2); ty = 8; apply(); }
+function zoom(f, cx, cy){
+  const s = Math.min(2.5, Math.max(.2, scale*f));
+  tx = cx - (cx-tx)*(s/scale); ty = cy - (cy-ty)*(s/scale); scale = s; apply();
+}
+vp.addEventListener("wheel",e=>{ e.preventDefault(); const r=vp.getBoundingClientRect(); zoom(e.deltaY<0?1.12:1/1.12, e.clientX-r.left, e.clientY-r.top); },{passive:false});
+document.getElementById("zin").onclick = ()=>zoom(1.25, vp.clientWidth/2, vp.clientHeight/2);
+document.getElementById("zout").onclick = ()=>zoom(1/1.25, vp.clientWidth/2, vp.clientHeight/2);
+document.getElementById("zfit").onclick = fit;
+let drag = null;
+vp.addEventListener("pointerdown",e=>{ if(e.target.closest(".tbl"))return; drag={x:e.clientX-tx,y:e.clientY-ty}; vp.classList.add("panning"); vp.setPointerCapture(e.pointerId); });
+vp.addEventListener("pointermove",e=>{ if(!drag)return; tx=e.clientX-drag.x; ty=e.clientY-drag.y; apply(); });
+vp.addEventListener("pointerup",()=>{ drag=null; vp.classList.remove("panning"); });
+fit();
+addEventListener("resize",fit);
+</script>
+</body>
+</html>

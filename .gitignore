@@ -145,3 +145,4 @@ dist
 
 ### Worktrees ###
 .worktrees/
+site/

@@ -1,0 +1,3180 @@
+{
+  "name": "aivo",
+  "tables": [
+    {
+      "name": "public.restaurants",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "org_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "hours",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb"
+        },
+        {
+          "name": "contacts",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "restaurants_pkey",
+          "def": "CREATE UNIQUE INDEX restaurants_pkey ON public.restaurants USING btree (id)",
+          "table": "public.restaurants",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "restaurants_slug_key",
+          "def": "CREATE UNIQUE INDEX restaurants_slug_key ON public.restaurants USING btree (slug)",
+          "table": "public.restaurants",
+          "columns": [
+            "slug"
+          ]
+        },
+        {
+          "name": "restaurants_org_id_idx",
+          "def": "CREATE INDEX restaurants_org_id_idx ON public.restaurants USING btree (org_id)",
+          "table": "public.restaurants",
+          "columns": [
+            "org_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "restaurants_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.restaurants",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "restaurants_slug_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (slug)",
+          "table": "public.restaurants",
+          "referenced_table": "",
+          "columns": [
+            "slug"
+          ]
+        },
+        {
+          "name": "restaurants_org_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE",
+          "table": "public.restaurants",
+          "referenced_table": "public.organizations",
+          "columns": [
+            "org_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.tables",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "token",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "tables_pkey",
+          "def": "CREATE UNIQUE INDEX tables_pkey ON public.tables USING btree (id)",
+          "table": "public.tables",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "tables_restaurant_id_token_idx",
+          "def": "CREATE UNIQUE INDEX tables_restaurant_id_token_idx ON public.tables USING btree (restaurant_id, token)",
+          "table": "public.tables",
+          "columns": [
+            "restaurant_id",
+            "token"
+          ]
+        },
+        {
+          "name": "tables_token_idx",
+          "def": "CREATE UNIQUE INDEX tables_token_idx ON public.tables USING btree (token)",
+          "table": "public.tables",
+          "columns": [
+            "token"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "tables_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.tables",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "tables_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.tables",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.categories",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "menu_id",
+          "type": "uuid",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "categories_pkey",
+          "def": "CREATE UNIQUE INDEX categories_pkey ON public.categories USING btree (id)",
+          "table": "public.categories",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "categories_restaurant_id_idx",
+          "def": "CREATE INDEX categories_restaurant_id_idx ON public.categories USING btree (restaurant_id)",
+          "table": "public.categories",
+          "columns": [
+            "restaurant_id"
+          ]
+        },
+        {
+          "name": "categories_menu_id_idx",
+          "def": "CREATE INDEX categories_menu_id_idx ON public.categories USING btree (menu_id)",
+          "table": "public.categories",
+          "columns": [
+            "menu_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "categories_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.categories",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "categories_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.categories",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "categories_menu_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE",
+          "table": "public.categories",
+          "referenced_table": "public.menus",
+          "columns": [
+            "menu_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.menu_items",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "category_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "price_cents",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "image_url",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "available",
+          "type": "boolean",
+          "nullable": false,
+          "default": "true"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "menu_items_pkey",
+          "def": "CREATE UNIQUE INDEX menu_items_pkey ON public.menu_items USING btree (id)",
+          "table": "public.menu_items",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "menu_items_restaurant_id_idx",
+          "def": "CREATE INDEX menu_items_restaurant_id_idx ON public.menu_items USING btree (restaurant_id)",
+          "table": "public.menu_items",
+          "columns": [
+            "restaurant_id"
+          ]
+        },
+        {
+          "name": "menu_items_category_id_idx",
+          "def": "CREATE INDEX menu_items_category_id_idx ON public.menu_items USING btree (category_id)",
+          "table": "public.menu_items",
+          "columns": [
+            "category_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "menu_items_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.menu_items",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "menu_items_category_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE",
+          "table": "public.menu_items",
+          "referenced_table": "public.categories",
+          "columns": [
+            "category_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "menu_items_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.menu_items",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.menu_item_allergens",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "menu_item_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "allergen",
+          "type": "text",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "menu_item_allergens_pkey",
+          "def": "CREATE UNIQUE INDEX menu_item_allergens_pkey ON public.menu_item_allergens USING btree (menu_item_id, allergen)",
+          "table": "public.menu_item_allergens",
+          "columns": [
+            "menu_item_id",
+            "allergen"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "menu_item_allergens_menu_item_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE",
+          "table": "public.menu_item_allergens",
+          "referenced_table": "public.menu_items",
+          "columns": [
+            "menu_item_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "menu_item_allergens_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (menu_item_id, allergen)",
+          "table": "public.menu_item_allergens",
+          "referenced_table": "",
+          "columns": [
+            "menu_item_id",
+            "allergen"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.option_groups",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "menu_item_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "multi",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false"
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "option_groups_pkey",
+          "def": "CREATE UNIQUE INDEX option_groups_pkey ON public.option_groups USING btree (id)",
+          "table": "public.option_groups",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "option_groups_menu_item_id_idx",
+          "def": "CREATE INDEX option_groups_menu_item_id_idx ON public.option_groups USING btree (menu_item_id)",
+          "table": "public.option_groups",
+          "columns": [
+            "menu_item_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "option_groups_menu_item_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE",
+          "table": "public.option_groups",
+          "referenced_table": "public.menu_items",
+          "columns": [
+            "menu_item_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "option_groups_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.option_groups",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.options",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "option_group_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "price_delta_cents",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "options_pkey",
+          "def": "CREATE UNIQUE INDEX options_pkey ON public.options USING btree (id)",
+          "table": "public.options",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "options_option_group_id_idx",
+          "def": "CREATE INDEX options_option_group_id_idx ON public.options USING btree (option_group_id)",
+          "table": "public.options",
+          "columns": [
+            "option_group_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "options_option_group_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (option_group_id) REFERENCES option_groups(id) ON DELETE CASCADE",
+          "table": "public.options",
+          "referenced_table": "public.option_groups",
+          "columns": [
+            "option_group_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "options_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.options",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.orders",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "table_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "comment",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "customer_id",
+          "type": "uuid",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "orders_pkey",
+          "def": "CREATE UNIQUE INDEX orders_pkey ON public.orders USING btree (id)",
+          "table": "public.orders",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "orders_restaurant_id_idx",
+          "def": "CREATE INDEX orders_restaurant_id_idx ON public.orders USING btree (restaurant_id)",
+          "table": "public.orders",
+          "columns": [
+            "restaurant_id"
+          ]
+        },
+        {
+          "name": "orders_table_id_idx",
+          "def": "CREATE INDEX orders_table_id_idx ON public.orders USING btree (table_id)",
+          "table": "public.orders",
+          "columns": [
+            "table_id"
+          ]
+        },
+        {
+          "name": "orders_customer_id_idx",
+          "def": "CREATE INDEX orders_customer_id_idx ON public.orders USING btree (customer_id) WHERE (customer_id IS NOT NULL)",
+          "table": "public.orders",
+          "columns": [
+            "customer_id"
+          ]
+        },
+        {
+          "name": "orders_restaurant_customer_idx",
+          "def": "CREATE INDEX orders_restaurant_customer_idx ON public.orders USING btree (restaurant_id, customer_id) WHERE (customer_id IS NOT NULL)",
+          "table": "public.orders",
+          "columns": [
+            "restaurant_id",
+            "customer_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "orders_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.orders",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "orders_table_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE",
+          "table": "public.orders",
+          "referenced_table": "public.tables",
+          "columns": [
+            "table_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "orders_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.orders",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "orders_customer_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL",
+          "table": "public.orders",
+          "referenced_table": "public.customers",
+          "columns": [
+            "customer_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.order_lines",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "menu_item_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "unit_price_cents",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "qty",
+          "type": "integer",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "order_lines_pkey",
+          "def": "CREATE UNIQUE INDEX order_lines_pkey ON public.order_lines USING btree (id)",
+          "table": "public.order_lines",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "order_lines_order_id_idx",
+          "def": "CREATE INDEX order_lines_order_id_idx ON public.order_lines USING btree (order_id)",
+          "table": "public.order_lines",
+          "columns": [
+            "order_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "order_lines_menu_item_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)",
+          "table": "public.order_lines",
+          "referenced_table": "public.menu_items",
+          "columns": [
+            "menu_item_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "order_lines_order_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE",
+          "table": "public.order_lines",
+          "referenced_table": "public.orders",
+          "columns": [
+            "order_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "order_lines_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.order_lines",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.order_line_options",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "order_line_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "price_delta_cents",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "order_line_options_pkey",
+          "def": "CREATE UNIQUE INDEX order_line_options_pkey ON public.order_line_options USING btree (id)",
+          "table": "public.order_line_options",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "order_line_options_order_line_id_idx",
+          "def": "CREATE INDEX order_line_options_order_line_id_idx ON public.order_line_options USING btree (order_line_id)",
+          "table": "public.order_line_options",
+          "columns": [
+            "order_line_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "order_line_options_order_line_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (order_line_id) REFERENCES order_lines(id) ON DELETE CASCADE",
+          "table": "public.order_line_options",
+          "referenced_table": "public.order_lines",
+          "columns": [
+            "order_line_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "order_line_options_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.order_line_options",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.service_requests",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "table_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "default": "'pending'::text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "service_requests_pkey",
+          "def": "CREATE UNIQUE INDEX service_requests_pkey ON public.service_requests USING btree (id)",
+          "table": "public.service_requests",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "service_requests_restaurant_id_idx",
+          "def": "CREATE INDEX service_requests_restaurant_id_idx ON public.service_requests USING btree (restaurant_id)",
+          "table": "public.service_requests",
+          "columns": [
+            "restaurant_id"
+          ]
+        },
+        {
+          "name": "service_requests_open_per_table_kind_idx",
+          "def": "CREATE UNIQUE INDEX service_requests_open_per_table_kind_idx ON public.service_requests USING btree (table_id, kind) WHERE (status = 'pending'::text)",
+          "table": "public.service_requests",
+          "columns": [
+            "table_id",
+            "kind"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "service_requests_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.service_requests",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "service_requests_table_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE",
+          "table": "public.service_requests",
+          "referenced_table": "public.tables",
+          "columns": [
+            "table_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "service_requests_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.service_requests",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.landing_blocks",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "data",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "landing_blocks_pkey",
+          "def": "CREATE UNIQUE INDEX landing_blocks_pkey ON public.landing_blocks USING btree (id)",
+          "table": "public.landing_blocks",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "landing_blocks_restaurant_id_idx",
+          "def": "CREATE INDEX landing_blocks_restaurant_id_idx ON public.landing_blocks USING btree (restaurant_id)",
+          "table": "public.landing_blocks",
+          "columns": [
+            "restaurant_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "landing_blocks_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.landing_blocks",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "landing_blocks_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.landing_blocks",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.notification_channels",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "telegram_chat_id",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "encrypted_bot_token",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "key_version",
+          "type": "integer",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "notification_channels_pkey",
+          "def": "CREATE UNIQUE INDEX notification_channels_pkey ON public.notification_channels USING btree (restaurant_id)",
+          "table": "public.notification_channels",
+          "columns": [
+            "restaurant_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "notification_channels_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.notification_channels",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "notification_channels_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (restaurant_id)",
+          "table": "public.notification_channels",
+          "referenced_table": "",
+          "columns": [
+            "restaurant_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.menus",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "integer",
+          "nullable": false,
+          "default": "0"
+        },
+        {
+          "name": "is_default",
+          "type": "boolean",
+          "nullable": false,
+          "default": "false"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "menus_pkey",
+          "def": "CREATE UNIQUE INDEX menus_pkey ON public.menus USING btree (id)",
+          "table": "public.menus",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "menus_restaurant_slug_idx",
+          "def": "CREATE UNIQUE INDEX menus_restaurant_slug_idx ON public.menus USING btree (restaurant_id, slug)",
+          "table": "public.menus",
+          "columns": [
+            "restaurant_id",
+            "slug"
+          ]
+        },
+        {
+          "name": "menus_default_per_restaurant_idx",
+          "def": "CREATE UNIQUE INDEX menus_default_per_restaurant_idx ON public.menus USING btree (restaurant_id) WHERE is_default",
+          "table": "public.menus",
+          "columns": [
+            "restaurant_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "menus_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.menus",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "menus_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.menus",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.cart_handoffs",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "table_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "customer_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "lines",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "cart_handoffs_pkey",
+          "def": "CREATE UNIQUE INDEX cart_handoffs_pkey ON public.cart_handoffs USING btree (id)",
+          "table": "public.cart_handoffs",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "cart_handoffs_code_active_idx",
+          "def": "CREATE UNIQUE INDEX cart_handoffs_code_active_idx ON public.cart_handoffs USING btree (code) WHERE (used_at IS NULL)",
+          "table": "public.cart_handoffs",
+          "columns": [
+            "code"
+          ]
+        },
+        {
+          "name": "cart_handoffs_table_idx",
+          "def": "CREATE INDEX cart_handoffs_table_idx ON public.cart_handoffs USING btree (table_id)",
+          "table": "public.cart_handoffs",
+          "columns": [
+            "table_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "cart_handoffs_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.cart_handoffs",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "cart_handoffs_table_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE",
+          "table": "public.cart_handoffs",
+          "referenced_table": "public.tables",
+          "columns": [
+            "table_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "cart_handoffs_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.cart_handoffs",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.organizations",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "organizations_pkey",
+          "def": "CREATE UNIQUE INDEX organizations_pkey ON public.organizations USING btree (id)",
+          "table": "public.organizations",
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "organizations_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.organizations",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.users",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "org_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "password_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "users_pkey",
+          "def": "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)",
+          "table": "public.users",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "users_email_key",
+          "def": "CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email)",
+          "table": "public.users",
+          "columns": [
+            "email"
+          ]
+        },
+        {
+          "name": "users_org_id_idx",
+          "def": "CREATE INDEX users_org_id_idx ON public.users USING btree (org_id)",
+          "table": "public.users",
+          "columns": [
+            "org_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "users_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.users",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "users_org_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE",
+          "table": "public.users",
+          "referenced_table": "public.organizations",
+          "columns": [
+            "org_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "users_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.users",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "users_email_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (email)",
+          "table": "public.users",
+          "referenced_table": "",
+          "columns": [
+            "email"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.sessions",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "token_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sessions_pkey",
+          "def": "CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (token_hash)",
+          "table": "public.sessions",
+          "columns": [
+            "token_hash"
+          ]
+        },
+        {
+          "name": "sessions_user_id_idx",
+          "def": "CREATE INDEX sessions_user_id_idx ON public.sessions USING btree (user_id)",
+          "table": "public.sessions",
+          "columns": [
+            "user_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "sessions_user_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+          "table": "public.sessions",
+          "referenced_table": "public.users",
+          "columns": [
+            "user_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "sessions_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (token_hash)",
+          "table": "public.sessions",
+          "referenced_table": "",
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.subscriptions",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "org_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "plan",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "subscriptions_pkey",
+          "def": "CREATE UNIQUE INDEX subscriptions_pkey ON public.subscriptions USING btree (org_id)",
+          "table": "public.subscriptions",
+          "columns": [
+            "org_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "subscriptions_org_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE",
+          "table": "public.subscriptions",
+          "referenced_table": "public.organizations",
+          "columns": [
+            "org_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "subscriptions_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (org_id)",
+          "table": "public.subscriptions",
+          "referenced_table": "",
+          "columns": [
+            "org_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.restaurant_themes",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "theme",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb"
+        },
+        {
+          "name": "design_md",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "restaurant_themes_pkey",
+          "def": "CREATE UNIQUE INDEX restaurant_themes_pkey ON public.restaurant_themes USING btree (restaurant_id)",
+          "table": "public.restaurant_themes",
+          "columns": [
+            "restaurant_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "restaurant_themes_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.restaurant_themes",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "restaurant_themes_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (restaurant_id)",
+          "table": "public.restaurant_themes",
+          "referenced_table": "",
+          "columns": [
+            "restaurant_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.custom_domains",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "domain",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "custom_domains_pkey",
+          "def": "CREATE UNIQUE INDEX custom_domains_pkey ON public.custom_domains USING btree (domain)",
+          "table": "public.custom_domains",
+          "columns": [
+            "domain"
+          ]
+        },
+        {
+          "name": "custom_domains_restaurant_id_idx",
+          "def": "CREATE INDEX custom_domains_restaurant_id_idx ON public.custom_domains USING btree (restaurant_id)",
+          "table": "public.custom_domains",
+          "columns": [
+            "restaurant_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "custom_domains_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.custom_domains",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "custom_domains_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (domain)",
+          "table": "public.custom_domains",
+          "referenced_table": "",
+          "columns": [
+            "domain"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.assistant_threads",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "assistant_threads_pkey",
+          "def": "CREATE UNIQUE INDEX assistant_threads_pkey ON public.assistant_threads USING btree (id)",
+          "table": "public.assistant_threads",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "assistant_threads_restaurant_idx",
+          "def": "CREATE UNIQUE INDEX assistant_threads_restaurant_idx ON public.assistant_threads USING btree (restaurant_id)",
+          "table": "public.assistant_threads",
+          "columns": [
+            "restaurant_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "assistant_threads_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.assistant_threads",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "assistant_threads_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.assistant_threads",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.assistant_messages",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "thread_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "attachments",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb"
+        },
+        {
+          "name": "actions",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb"
+        },
+        {
+          "name": "action_status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "assistant_messages_pkey",
+          "def": "CREATE UNIQUE INDEX assistant_messages_pkey ON public.assistant_messages USING btree (id)",
+          "table": "public.assistant_messages",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "assistant_messages_thread_idx",
+          "def": "CREATE INDEX assistant_messages_thread_idx ON public.assistant_messages USING btree (thread_id, created_at)",
+          "table": "public.assistant_messages",
+          "columns": [
+            "thread_id",
+            "created_at"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "assistant_messages_thread_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (thread_id) REFERENCES assistant_threads(id) ON DELETE CASCADE",
+          "table": "public.assistant_messages",
+          "referenced_table": "public.assistant_threads",
+          "columns": [
+            "thread_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "assistant_messages_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.assistant_messages",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.customers",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "password_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "customers_pkey",
+          "def": "CREATE UNIQUE INDEX customers_pkey ON public.customers USING btree (id)",
+          "table": "public.customers",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "customers_email_key",
+          "def": "CREATE UNIQUE INDEX customers_email_key ON public.customers USING btree (email)",
+          "table": "public.customers",
+          "columns": [
+            "email"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "customers_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.customers",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "customers_email_key",
+          "type": "UNIQUE",
+          "def": "UNIQUE (email)",
+          "table": "public.customers",
+          "referenced_table": "",
+          "columns": [
+            "email"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.customer_sessions",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "token_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "customer_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "customer_sessions_pkey",
+          "def": "CREATE UNIQUE INDEX customer_sessions_pkey ON public.customer_sessions USING btree (token_hash)",
+          "table": "public.customer_sessions",
+          "columns": [
+            "token_hash"
+          ]
+        },
+        {
+          "name": "customer_sessions_customer_idx",
+          "def": "CREATE INDEX customer_sessions_customer_idx ON public.customer_sessions USING btree (customer_id)",
+          "table": "public.customer_sessions",
+          "columns": [
+            "customer_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "customer_sessions_customer_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE",
+          "table": "public.customer_sessions",
+          "referenced_table": "public.customers",
+          "columns": [
+            "customer_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "customer_sessions_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (token_hash)",
+          "table": "public.customer_sessions",
+          "referenced_table": "",
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.guest_profiles",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "customer_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "tags",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb"
+        },
+        {
+          "name": "first_seen",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "last_seen",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "guest_profiles_pkey",
+          "def": "CREATE UNIQUE INDEX guest_profiles_pkey ON public.guest_profiles USING btree (restaurant_id, customer_id)",
+          "table": "public.guest_profiles",
+          "columns": [
+            "restaurant_id",
+            "customer_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "guest_profiles_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.guest_profiles",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "guest_profiles_customer_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE",
+          "table": "public.guest_profiles",
+          "referenced_table": "public.customers",
+          "columns": [
+            "customer_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "guest_profiles_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (restaurant_id, customer_id)",
+          "table": "public.guest_profiles",
+          "referenced_table": "",
+          "columns": [
+            "restaurant_id",
+            "customer_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.shifts",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "opened_by",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "opened_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "opening_float_cents",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "declared_cents",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "expected_cents",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "variance_cents",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "cashier",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "shifts_pkey",
+          "def": "CREATE UNIQUE INDEX shifts_pkey ON public.shifts USING btree (id)",
+          "table": "public.shifts",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "shifts_restaurant_id_idx",
+          "def": "CREATE INDEX shifts_restaurant_id_idx ON public.shifts USING btree (restaurant_id)",
+          "table": "public.shifts",
+          "columns": [
+            "restaurant_id"
+          ]
+        },
+        {
+          "name": "shifts_open_per_restaurant_idx",
+          "def": "CREATE UNIQUE INDEX shifts_open_per_restaurant_idx ON public.shifts USING btree (restaurant_id) WHERE (closed_at IS NULL)",
+          "table": "public.shifts",
+          "columns": [
+            "restaurant_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "shifts_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.shifts",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "shifts_opened_by_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (opened_by) REFERENCES users(id)",
+          "table": "public.shifts",
+          "referenced_table": "public.users",
+          "columns": [
+            "opened_by"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "shifts_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.shifts",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.tickets",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "shift_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "table_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "default": "'open'::text"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "nullable": false,
+          "default": "''::text"
+        },
+        {
+          "name": "customer_id",
+          "type": "uuid",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "tickets_pkey",
+          "def": "CREATE UNIQUE INDEX tickets_pkey ON public.tickets USING btree (id)",
+          "table": "public.tickets",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "tickets_restaurant_id_idx",
+          "def": "CREATE INDEX tickets_restaurant_id_idx ON public.tickets USING btree (restaurant_id)",
+          "table": "public.tickets",
+          "columns": [
+            "restaurant_id"
+          ]
+        },
+        {
+          "name": "tickets_shift_id_idx",
+          "def": "CREATE INDEX tickets_shift_id_idx ON public.tickets USING btree (shift_id)",
+          "table": "public.tickets",
+          "columns": [
+            "shift_id"
+          ]
+        },
+        {
+          "name": "tickets_open_per_table_idx",
+          "def": "CREATE UNIQUE INDEX tickets_open_per_table_idx ON public.tickets USING btree (table_id) WHERE (status = 'open'::text)",
+          "table": "public.tickets",
+          "columns": [
+            "table_id"
+          ]
+        },
+        {
+          "name": "tickets_restaurant_customer_idx",
+          "def": "CREATE INDEX tickets_restaurant_customer_idx ON public.tickets USING btree (restaurant_id, customer_id) WHERE (customer_id IS NOT NULL)",
+          "table": "public.tickets",
+          "columns": [
+            "restaurant_id",
+            "customer_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "tickets_restaurant_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE",
+          "table": "public.tickets",
+          "referenced_table": "public.restaurants",
+          "columns": [
+            "restaurant_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "tickets_table_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE",
+          "table": "public.tickets",
+          "referenced_table": "public.tables",
+          "columns": [
+            "table_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "tickets_shift_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (shift_id) REFERENCES shifts(id) ON DELETE CASCADE",
+          "table": "public.tickets",
+          "referenced_table": "public.shifts",
+          "columns": [
+            "shift_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "tickets_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.tickets",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.ticket_lines",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "ticket_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "menu_item_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "unit_price_cents",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "qty",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "options",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'[]'::jsonb"
+        },
+        {
+          "name": "fired_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ticket_lines_pkey",
+          "def": "CREATE UNIQUE INDEX ticket_lines_pkey ON public.ticket_lines USING btree (id)",
+          "table": "public.ticket_lines",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "ticket_lines_ticket_id_idx",
+          "def": "CREATE INDEX ticket_lines_ticket_id_idx ON public.ticket_lines USING btree (ticket_id)",
+          "table": "public.ticket_lines",
+          "columns": [
+            "ticket_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "ticket_lines_menu_item_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)",
+          "table": "public.ticket_lines",
+          "referenced_table": "public.menu_items",
+          "columns": [
+            "menu_item_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "ticket_lines_ticket_id_fkey",
+          "type": "FOREIGN KEY",
+          "def": "FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE",
+          "table": "public.ticket_lines",
+          "referenced_table": "public.tickets",
+          "columns": [
+            "ticket_id"
+          ],
+          "referenced_columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "ticket_lines_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.ticket_lines",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public.events",
+      "type": "BASE TABLE",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "aggregate_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "aggregate_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "restaurant_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "payload",
+          "type": "jsonb",
+          "nullable": false,
+          "default": "'{}'::jsonb"
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()"
+        },
+        {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        }
+      ],
+      "indexes": [
+        {
+          "name": "events_pkey",
+          "def": "CREATE UNIQUE INDEX events_pkey ON public.events USING btree (id)",
+          "table": "public.events",
+          "columns": [
+            "id"
+          ]
+        },
+        {
+          "name": "events_pending",
+          "def": "CREATE INDEX events_pending ON public.events USING btree (occurred_at) WHERE (published_at IS NULL)",
+          "table": "public.events",
+          "columns": [
+            "occurred_at"
+          ]
+        },
+        {
+          "name": "events_aggregate",
+          "def": "CREATE INDEX events_aggregate ON public.events USING btree (aggregate_type, aggregate_id)",
+          "table": "public.events",
+          "columns": [
+            "aggregate_type",
+            "aggregate_id"
+          ]
+        }
+      ],
+      "constraints": [
+        {
+          "name": "events_pkey",
+          "type": "PRIMARY KEY",
+          "def": "PRIMARY KEY (id)",
+          "table": "public.events",
+          "referenced_table": "",
+          "columns": [
+            "id"
+          ]
+        }
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "table": "public.restaurants",
+      "columns": [
+        "org_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.organizations",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.tables",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.categories",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.categories",
+      "columns": [
+        "menu_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.menus",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.menu_items",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.menu_items",
+      "columns": [
+        "category_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.categories",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.menu_item_allergens",
+      "columns": [
+        "menu_item_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.menu_items",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.option_groups",
+      "columns": [
+        "menu_item_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.menu_items",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (menu_item_id) REFERENCES menu_items(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.options",
+      "columns": [
+        "option_group_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.option_groups",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (option_group_id) REFERENCES option_groups(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.orders",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.orders",
+      "columns": [
+        "table_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.tables",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.orders",
+      "columns": [
+        "customer_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.customers",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL"
+    },
+    {
+      "table": "public.order_lines",
+      "columns": [
+        "menu_item_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.menu_items",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)"
+    },
+    {
+      "table": "public.order_lines",
+      "columns": [
+        "order_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.orders",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.order_line_options",
+      "columns": [
+        "order_line_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.order_lines",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (order_line_id) REFERENCES order_lines(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.service_requests",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.service_requests",
+      "columns": [
+        "table_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.tables",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.landing_blocks",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.notification_channels",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_one",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.menus",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.cart_handoffs",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.cart_handoffs",
+      "columns": [
+        "table_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.tables",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.users",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "zero_or_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.users",
+      "columns": [
+        "org_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.organizations",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.sessions",
+      "columns": [
+        "user_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.users",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.subscriptions",
+      "columns": [
+        "org_id"
+      ],
+      "cardinality": "zero_or_one",
+      "parent_table": "public.organizations",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.restaurant_themes",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_one",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.custom_domains",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.assistant_threads",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.assistant_messages",
+      "columns": [
+        "thread_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.assistant_threads",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (thread_id) REFERENCES assistant_threads(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.customer_sessions",
+      "columns": [
+        "customer_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.customers",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.guest_profiles",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.guest_profiles",
+      "columns": [
+        "customer_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.customers",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.shifts",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.shifts",
+      "columns": [
+        "opened_by"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.users",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (opened_by) REFERENCES users(id)"
+    },
+    {
+      "table": "public.tickets",
+      "columns": [
+        "restaurant_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.restaurants",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.tickets",
+      "columns": [
+        "table_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.tables",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (table_id) REFERENCES tables(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.tickets",
+      "columns": [
+        "shift_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.shifts",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (shift_id) REFERENCES shifts(id) ON DELETE CASCADE"
+    },
+    {
+      "table": "public.ticket_lines",
+      "columns": [
+        "menu_item_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.menu_items",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (menu_item_id) REFERENCES menu_items(id)"
+    },
+    {
+      "table": "public.ticket_lines",
+      "columns": [
+        "ticket_id"
+      ],
+      "cardinality": "zero_or_more",
+      "parent_table": "public.tickets",
+      "parent_columns": [
+        "id"
+      ],
+      "parent_cardinality": "exactly_one",
+      "def": "FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE"
+    }
+  ],
+  "driver": {
+    "name": "postgres",
+    "database_version": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "meta": {
+      "current_schema": "public",
+      "search_paths": [
+        "aivo",
+        "public"
+      ],
+      "dict": {
+        "Functions": "Stored procedures and functions"
+      }
+    }
+  }
+}

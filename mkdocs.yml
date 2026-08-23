@@ -1,0 +1,65 @@
+site_name: AIVO RMS
+site_description: AI-powered restaurant management system
+repo_url: https://github.com/Nap20192/aivo
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      toggle: { icon: material/brightness-7, name: Тёмная тема }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      toggle: { icon: material/brightness-4, name: Светлая тема }
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      languages:
+        - locale: ru
+          default: true
+          name: Русский
+          build: true
+        - locale: en
+          name: English
+          build: true
+          nav_translations:
+            Главная: Home
+            Ресторану: For restaurants
+            Официанту: For waiters
+            Разработчикам: For developers
+            Запуск: Running locally
+            Контракт платформы: Platform contract
+            Доменные события: Domain events
+            Схема БД: DB schema
+
+# Internal working docs stay out of the published site.
+exclude_docs: |
+  research/
+  prototypes/
+  agents/
+  erd.html
+
+nav:
+  - Главная: index.md
+  - Ресторану: user/owner.md
+  - Официанту: user/waiter.md
+  - Разработчикам:
+      - Запуск: dev/setup.md
+      - Контракт платформы: PLATFORM.md
+      - Доменные события: EVENTS.md
+      - Схема БД: db/README.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.superfences
