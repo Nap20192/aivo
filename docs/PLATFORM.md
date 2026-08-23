@@ -16,20 +16,20 @@ service with a phone POS for waiters.
 ## Architecture
 
 - One Go module (`aivo`), one HTTP server binary `cmd/aivo-server` (grows out
-  of `cmd/menu-server`). DDD contexts under `internal/<context>/` with the
+  of `cmd/menu-server`). DDD contexts under `backend/internal/<context>/` with the
   existing hexagonal layout (`domain/`, `app/`, `ports/`, `adapters/`).
 - Contexts:
-  - `internal/platform` — NEW. Organizations, users, auth, subscriptions,
+  - `backend/internal/platform` — NEW. Organizations, users, auth, subscriptions,
     restaurants (provisioning), tenant resolution, theme/design storage.
-  - `internal/menu` — EXISTS. Diner menu, orders, service requests. Becomes
+  - `backend/internal/menu` — EXISTS. Diner menu, orders, service requests. Becomes
     tenant-scoped via `restaurant_id` (already keyed by restaurant).
-  - `internal/pos` — NEW. Shifts, tickets, firing, requests inbox (waiter
+  - `backend/internal/pos` — NEW. Shifts, tickets, firing, requests inbox (waiter
     surface). Reads menu context via Go interfaces in-process, not gRPC
     (per ADR 0001 — no gRPC until a second process needs it).
 - Postgres (pgx), MinIO/S3 for images, plain `net/http` + stdlib routing
   (Go 1.22+ pattern matching). No new frameworks.
-- Migrations: numbered SQL files in `internal/<context>/adapters/postgres/migrations/`.
-  Platform migrations start at `internal/platform/adapters/postgres/migrations/0001_init.sql`.
+- Migrations: numbered SQL files in `backend/internal/<context>/adapters/postgres/migrations/`.
+  Platform migrations start at `backend/internal/platform/adapters/postgres/migrations/0001_init.sql`.
 - Frontends: static SPAs under `frontend/<name>/` (vanilla Vite + React + TypeScript),
   served by the Go binary (`/admin`, `/pos`) or at tenant routes (menu).
   Design tokens imported from `frontend/design-system/` (do not fork token values).
@@ -234,7 +234,7 @@ Money: integer cents everywhere. IDs: uuid strings. Errors:
 
 | Stream | Owns | Must not touch |
 |---|---|---|
-| backend | `internal/platform`, `internal/pos`, `cmd/aivo-server`, menu context changes, migrations, docker-compose | `frontend/*` except serving |
+| backend | `backend/internal/platform`, `backend/internal/pos`, `cmd/aivo-server`, menu context changes, migrations, docker-compose | `frontend/*` except serving |
 | admin | `frontend/admin/` | Go code, other SPAs |
 | menu | `frontend/menu/` (rebuild as Vite SPA) | Go code, other SPAs |
 | pos | `frontend/pos/` | Go code, other SPAs |
@@ -250,4 +250,4 @@ prototype fixtures (Ember & Bone).
   smallest useful test per non-trivial behavior, update docs.
 - Commit per meaningful slice on branch `feat/platform` (backend) /
   `feat/admin` / `feat/menu-app` / `feat/pos` — lead merges.
-- `go build ./... && go vet ./...` must pass; SPAs: `npm run build` must pass.
+- `go build -C backend ./... && go vet -C backend ./...` must pass; SPAs: `npm run build` must pass.

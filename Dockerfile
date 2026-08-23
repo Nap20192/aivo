@@ -7,9 +7,9 @@ FROM golang:1.26-alpine AS build
 # tag we'd have to bump in lockstep with go.mod.
 ENV GOTOOLCHAIN=auto
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
-COPY . .
+COPY backend/ .
 RUN CGO_ENABLED=0 go build -o /out/aivo-server ./cmd/aivo-server
 
 FROM node:22-alpine AS frontendbuild

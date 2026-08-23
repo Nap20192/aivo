@@ -3,17 +3,17 @@
 Multi-tenant restaurant management SaaS: restaurants self-register, build
 a digital menu, manage it from an admin panel, and run service with a
 phone POS. One Go binary (`cmd/aivo-server`) serves the whole platform —
-see `docs/PLATFORM.md` for the build contract and `internal/menu/CONTEXT.md`
+see `docs/PLATFORM.md` for the build contract and `backend/internal/menu/CONTEXT.md`
 for the menu domain glossary.
 
 ## Layout
 
-- `internal/platform` — organizations, users/auth (bcrypt + Postgres
+- `backend/internal/platform` — organizations, users/auth (bcrypt + Postgres
   sessions), subscriptions (fake billing), restaurant provisioning,
   themes, custom domains.
-- `internal/menu` — diner menu, orders, service requests (existing
+- `backend/internal/menu` — diner menu, orders, service requests (existing
   context, now tenant-scoped under the platform).
-- `internal/pos` — shifts, per-table tickets, kitchen firing; talks to
+- `backend/internal/pos` — shifts, per-table tickets, kitchen firing; talks to
   the menu context via in-process Go interfaces.
 - `cmd/aivo-server` — the API (`/api/v1`), legacy menu API, and static
   SPAs (`/admin`, `/pos`, tenant menu routes `/{slug}`, `/{slug}/t/{token}`).
@@ -33,7 +33,7 @@ for the menu domain glossary.
 2. Seed the demo tenant:
 
    ```bash
-   DATABASE_URL=postgres://aivo:aivo@localhost:5432/aivo?sslmode=disable go run ./cmd/aivo-seed
+   DATABASE_URL=postgres://aivo:aivo@localhost:5432/aivo?sslmode=disable go run -C backend ./cmd/aivo-seed
    ```
 
    Prints the table links. Demo logins: `owner@ember.test` /
@@ -44,7 +44,7 @@ for the menu domain glossary.
    table link (diner menu). SPA routes answer 503 until the corresponding
    `frontend/<app>/dist` exists (`npm run build` in each app).
 
-Env vars (native `go run ./cmd/aivo-server` instead of docker-compose):
+Env vars (native `go run -C backend ./cmd/aivo-server` instead of docker-compose):
 
 | Var | Required | Notes |
 |---|---|---|
@@ -63,9 +63,9 @@ Env vars (native `go run ./cmd/aivo-server` instead of docker-compose):
 ## Commands
 
 ```bash
-go build ./... && go vet ./... && go test ./...   # build + checks
-go run ./cmd/aivo-server                          # run the server
-go run ./cmd/aivo-seed                            # seed Ember & Bone
+go build -C backend ./... && go vet -C backend ./... && go test -C backend ./...   # build + checks
+go run -C backend ./cmd/aivo-server                          # run the server
+go run -C backend ./cmd/aivo-seed                            # seed Ember & Bone
 ```
 
 ## Image storage
