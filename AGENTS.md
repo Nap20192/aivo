@@ -52,7 +52,7 @@ Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain
 Layout: `backend/` — the Go module (`cmd/`, `internal/`, `pkg/`); `frontend/` — the three Vite SPAs (`admin`, `pos`, `menu`) plus `design-system/`.
 
 ```bash
-docker compose up -d --build                       # run the full stack
+docker compose -f deploy/docker-compose.yml up -d --build   # run the full stack
 go build -C backend ./... && go test -C backend ./...   # build + test backend
 go run -C backend ./cmd/aivo-server                # run server natively
 go run -C backend ./cmd/aivo-seed                  # seed demo tenant

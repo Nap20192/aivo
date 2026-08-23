@@ -24,7 +24,7 @@ for the menu domain glossary.
 1. Start infra + the server (Postgres, MinIO, `aivo-server`):
 
    ```bash
-   docker-compose up -d --build
+   docker compose -f deploy/docker-compose.yml up -d --build
    ```
 
    The server applies all SQL migrations itself on startup (tracked in
@@ -53,7 +53,7 @@ Env vars (native `go run -C backend ./cmd/aivo-server` instead of docker-compose
 | `BASE_URL` | no | defaults to `http://localhost:8080`; used in table links/QRs |
 | `PORT` | no | defaults to `8080` |
 | `S3_ENDPOINT` | no | e.g. `localhost:9000`; unset disables image uploads (503) |
-| `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` / `S3_PUBLIC_URL` | no | see `docker-compose.yml` for the dev values |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` / `S3_PUBLIC_URL` | no | see `deploy/docker-compose.yml` for the dev values |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | no | legacy menu notification channel (optional) |
 | `THEME_GENERATOR` | no | `claudecli` enables AI theme proposals via the `claude` CLI; unset = endpoint 503s |
 | `ASSISTANT` | no | `claudecli` enables the admin AI assistant chat; unset = endpoints 503 |
