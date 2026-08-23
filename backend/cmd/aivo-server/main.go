@@ -37,6 +37,7 @@ import (
 	"aivo/internal/pos/adapters/menubridge"
 	pospg "aivo/internal/pos/adapters/postgres"
 	posapp "aivo/internal/pos/app"
+	"aivo/migrations"
 	"aivo/pkg/migrate"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
@@ -71,9 +72,9 @@ func run() error {
 	// Migrations: menu first (owns restaurants), then platform (extends
 	// it), then pos (references both).
 	err = migrate.Apply(context.Background(), db, []migrate.Source{
-		{Name: "menu", FS: menupg.MigrationsFS, Dir: "migrations"},
-		{Name: "platform", FS: platformpg.MigrationsFS, Dir: "migrations"},
-		{Name: "pos", FS: pospg.MigrationsFS, Dir: "migrations"},
+		{Name: "menu", FS: migrations.FS, Dir: "menu"},
+		{Name: "platform", FS: migrations.FS, Dir: "platform"},
+		{Name: "pos", FS: migrations.FS, Dir: "pos"},
 	})
 	if err != nil {
 		return err

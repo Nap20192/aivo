@@ -1,7 +1,8 @@
 // Package migrate is a minimal forward-only SQL migration runner: apply
-// each embedded *.sql file once, in the order the caller lists sources,
-// tracked in a schema_migrations table. No down migrations — applied
-// files are immutable (extend via new numbered files).
+// each embedded {version}_{title}.up.sql file once, in the order the
+// caller lists sources, tracked in a schema_migrations table. Matching
+// *.down.sql files are ignored — they are documented rollbacks for
+// manual use, the runner never executes them.
 package migrate
 
 import (
@@ -10,6 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"strings"
 )
 
 // Source is one context's migration directory.
@@ -32,6 +34,14 @@ func Apply(ctx context.Context, db *sql.DB, sources []Source) error {
 		return fmt.Errorf("migrate: bookkeeping table: %w", err)
 	}
 
+	// One-time rename for rows recorded under the pre-.up.sql naming
+	// ("0001_init.sql" -> "0001_init.up.sql"); idempotent, no-op once done.
+	if _, err := db.ExecContext(ctx,
+		`UPDATE schema_migrations SET filename = replace(filename, '.sql', '.up.sql')
+		 WHERE filename NOT LIKE '%.up.sql'`); err != nil {
+		return fmt.Errorf("migrate: rename legacy rows: %w", err)
+	}
+
 	for _, src := range sources {
 		entries, err := fs.ReadDir(src.FS, src.Dir)
 		if err != nil {
@@ -39,7 +49,7 @@ func Apply(ctx context.Context, db *sql.DB, sources []Source) error {
 		}
 		names := []string{}
 		for _, e := range entries {
-			if !e.IsDir() {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".up.sql") {
 				names = append(names, e.Name())
 			}
 		}

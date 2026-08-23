@@ -1,0 +1,47 @@
+# sqlc codegen, one block per service. Schema = backend/migrations/<svc>
+# (later services also load the schemas they reference). Queries live in
+# backend/queries/<svc>/. Run from backend/: sqlc generate
+version: "2"
+sql:
+  - name: menu
+    engine: postgresql
+    schema: ["migrations/menu"]
+    queries: ["queries/menu"]
+    gen:
+      go:
+        package: menudb
+        out: internal/menu/adapters/postgres/menudb
+        overrides:
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID
+          - db_type: uuid
+            nullable: true
+            go_type: github.com/google/uuid.NullUUID
+  - name: platform
+    engine: postgresql
+    schema: ["migrations/menu", "migrations/platform"]
+    queries: ["queries/platform"]
+    gen:
+      go:
+        package: platformdb
+        out: internal/platform/adapters/postgres/platformdb
+        overrides:
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID
+          - db_type: uuid
+            nullable: true
+            go_type: github.com/google/uuid.NullUUID
+  - name: pos
+    engine: postgresql
+    schema: ["migrations/menu", "migrations/platform", "migrations/pos"]
+    queries: ["queries/pos"]
+    gen:
+      go:
+        package: posdb
+        out: internal/pos/adapters/postgres/posdb
+        overrides:
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID
+          - db_type: uuid
+            nullable: true
+            go_type: github.com/google/uuid.NullUUID

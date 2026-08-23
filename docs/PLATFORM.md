@@ -28,8 +28,8 @@ service with a phone POS for waiters.
     (per ADR 0001 — no gRPC until a second process needs it).
 - Postgres (pgx), MinIO/S3 for images, plain `net/http` + stdlib routing
   (Go 1.22+ pattern matching). No new frameworks.
-- Migrations: numbered SQL files in `backend/internal/<context>/adapters/postgres/migrations/`.
-  Platform migrations start at `backend/internal/platform/adapters/postgres/migrations/0001_init.sql`.
+- Migrations: `{version}_{title}.up.sql` / `.down.sql` files in `backend/migrations/<context>/` (runner applies up only; downs are manual rollbacks). Queries for sqlc live in `backend/queries/<context>/` (`backend/sqlc.yaml`).
+  Platform migrations start at `backend/migrations/platform/0001_init.up.sql`.
 - Frontends: static SPAs under `frontend/<name>/` (vanilla Vite + React + TypeScript),
   served by the Go binary (`/admin`, `/pos`) or at tenant routes (menu).
   Design tokens imported from `frontend/design-system/` (do not fork token values).

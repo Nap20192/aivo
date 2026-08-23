@@ -57,4 +57,5 @@ go build -C backend ./... && go test -C backend ./...   # build + test backend
 go run -C backend ./cmd/aivo-server                # run server natively
 go run -C backend ./cmd/aivo-seed                  # seed demo tenant
 cd frontend/admin && npm ci && npm run build       # build a SPA (same for pos, menu)
+cd backend && sqlc generate                        # regen query code (backend/sqlc.yaml)
 ```

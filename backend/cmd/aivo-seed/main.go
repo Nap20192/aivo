@@ -28,7 +28,7 @@ import (
 	"aivo/internal/platform/adapters/billing"
 	platformpg "aivo/internal/platform/adapters/postgres"
 	platformapp "aivo/internal/platform/app"
-	pospg "aivo/internal/pos/adapters/postgres"
+	"aivo/migrations"
 	"aivo/pkg/migrate"
 
 	"github.com/google/uuid"
@@ -59,9 +59,9 @@ func run() error {
 
 	// Same migration set as the server, so the seed works on a fresh DB.
 	err = migrate.Apply(ctx, db, []migrate.Source{
-		{Name: "menu", FS: menupg.MigrationsFS, Dir: "migrations"},
-		{Name: "platform", FS: platformpg.MigrationsFS, Dir: "migrations"},
-		{Name: "pos", FS: pospg.MigrationsFS, Dir: "migrations"},
+		{Name: "menu", FS: migrations.FS, Dir: "menu"},
+		{Name: "platform", FS: migrations.FS, Dir: "platform"},
+		{Name: "pos", FS: migrations.FS, Dir: "pos"},
 	})
 	if err != nil {
 		return err
