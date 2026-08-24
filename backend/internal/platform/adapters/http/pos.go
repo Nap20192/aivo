@@ -78,6 +78,7 @@ type posShiftView struct {
 	OpenedAt          string    `json:"opened_at"` // "16:04"
 	OpeningFloatCents int       `json:"opening_float_cents"`
 	ExpectedCents     int       `json:"expected_cents"`
+	State             string    `json:"state"` // open|closed|accepted
 }
 
 func (h *handler) toPosShiftView(ctx context.Context, s posdomain.Shift, number, expectedCents int) posShiftView {
@@ -91,6 +92,7 @@ func (h *handler) toPosShiftView(ctx context.Context, s posdomain.Shift, number,
 	return posShiftView{
 		ID: s.ID, Number: fmt.Sprintf("shift-%d", number), Till: 1, Cashier: cashier,
 		OpenedAt: hhmm(s.OpenedAt), OpeningFloatCents: s.OpeningFloatCents, ExpectedCents: expectedCents,
+		State: s.State(),
 	}
 }
 
@@ -331,8 +333,9 @@ func (h *handler) posOpenShift(w http.ResponseWriter, r *http.Request, u domain.
 	writeJSON(w, http.StatusCreated, h.toPosShiftView(r.Context(), sh, number, sh.OpeningFloatCents))
 }
 
-// posCloseShift responds with the POS client's PostedShift shape.
-func (h *handler) posCloseShift(w http.ResponseWriter, r *http.Request, _ domain.User, restaurantID uuid.UUID) {
+// posCloseShift atomically closes the shift and builds the draft
+// acceptance journal (contract §4).
+func (h *handler) posCloseShift(w http.ResponseWriter, r *http.Request, u domain.User, restaurantID uuid.UUID) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "not_found", "not found")
@@ -344,7 +347,7 @@ func (h *handler) posCloseShift(w http.ResponseWriter, r *http.Request, _ domain
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	sh, err := h.Pos.CloseShift(r.Context(), restaurantID, id, req.DeclaredCents)
+	sh, docID, err := h.Pos.CloseShift(r.Context(), restaurantID, id, u.ID, req.DeclaredCents)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -352,14 +355,113 @@ func (h *handler) posCloseShift(w http.ResponseWriter, r *http.Request, _ domain
 	if writeAppErr(w, err) {
 		return
 	}
+	writeJSON(w, http.StatusOK, map[string]any{"shift": map[string]any{
+		"id":                  sh.ID,
+		"number":              fmt.Sprintf("shift-%d", number),
+		"state":               sh.State(),
+		"expected_cents":      *sh.ExpectedCents,
+		"declared_cents":      *sh.DeclaredCents,
+		"variance_cents":      *sh.VarianceCents,
+		"closed_at":           hhmm(*sh.ClosedAt),
+		"journal_document_id": docID,
+	}})
+}
+
+// posCloseTicket records tenders and closes a ticket (contract §4).
+func (h *handler) posCloseTicket(w http.ResponseWriter, r *http.Request, u domain.User, restaurantID uuid.UUID) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	var req struct {
+		Payments []struct {
+			MethodID    uuid.UUID `json:"method_id"`
+			AmountCents int       `json:"amount_cents"`
+			TipCents    int       `json:"tip_cents"`
+		} `json:"payments"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	tenders := make([]posdomain.Tender, len(req.Payments))
+	for i, p := range req.Payments {
+		tenders[i] = posdomain.Tender{MethodID: p.MethodID, AmountCents: p.AmountCents, TipCents: p.TipCents}
+	}
+	t, err := h.Pos.CloseTicket(r.Context(), restaurantID, id, u.ID, tenders)
+	if writeAppErr(w, err) {
+		return
+	}
+	// tenders now carry resolved payment groups (mutated in place).
+	payments := make([]map[string]any, len(tenders))
+	for i, td := range tenders {
+		payments[i] = map[string]any{
+			"method_id": td.MethodID, "payment_group": td.PaymentGroup,
+			"amount_cents": td.AmountCents, "tip_cents": td.TipCents,
+		}
+	}
+	closedAt := ""
+	if t.ClosedAt != nil {
+		closedAt = hhmm(*t.ClosedAt)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ticket": map[string]any{
+		"id": t.ID, "status": t.Status, "closed_at": closedAt,
+		"total_cents": t.TotalCents(), "payments": payments,
+	}})
+}
+
+// posCashOperation records a pay-in/out/drop (contract §4).
+func (h *handler) posCashOperation(w http.ResponseWriter, r *http.Request, u domain.User, restaurantID uuid.UUID) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	var req struct {
+		Kind        string `json:"kind"`
+		AmountCents int    `json:"amount_cents"`
+		Reason      string `json:"reason"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	op, err := h.Pos.RecordCashOperation(r.Context(), restaurantID, id, u.ID, req.Kind, req.AmountCents, req.Reason)
+	if writeAppErr(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"cash_operation": map[string]any{
+		"id": op.ID, "kind": op.Kind, "amount_cents": op.AmountCents,
+		"reason": op.Reason, "recorded_at": op.RecordedAt,
+	}})
+}
+
+// posZReport is the cashier's shift breakdown (contract §4).
+func (h *handler) posZReport(w http.ResponseWriter, r *http.Request, _ domain.User, restaurantID uuid.UUID) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+		return
+	}
+	z, err := h.Pos.ZReport(r.Context(), restaurantID, id)
+	if writeAppErr(w, err) {
+		return
+	}
+	tenders := make([]map[string]any, len(z.Tenders))
+	for i, g := range z.Tenders {
+		tenders[i] = map[string]any{"payment_group": g.Group, "amount_cents": g.AmountCents, "tip_cents": g.TipCents}
+	}
+	ops := make([]map[string]any, len(z.CashOps))
+	for i, op := range z.CashOps {
+		ops[i] = map[string]any{"kind": op.Kind, "amount_cents": op.AmountCents}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"number":         fmt.Sprintf("shift-%d", number),
-		"expected_cents": *sh.ExpectedCents,
-		"declared_cents": *sh.DeclaredCents,
-		"variance_cents": *sh.VarianceCents,
-		"posted_at":      hhmm(*sh.ClosedAt),
-		// Fake GL posting: one cash line + one sales line.
-		"gl_lines": 2,
+		"opening_float_cents": z.OpeningFloatCents,
+		"tenders":             tenders,
+		"cash_operations":     ops,
+		"expected_cash_cents": z.ExpectedCashCents,
+		"declared_cents":      z.DeclaredCents,
+		"variance_cents":      z.VarianceCents,
+		"state":               z.State,
 	})
 }
 

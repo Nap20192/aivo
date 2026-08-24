@@ -206,18 +206,50 @@ POS (session cookie, waiter+):
   `expected_cents` and a display `number` ("shift-N"). Display times are
   local "HH:MM" strings. Line `options` are labels; `unit_price_cents`
   includes option deltas. Client types: `frontend/pos/src/types.ts`.
-  Close returns the PostedShift shape (`number`, `expected_cents`,
-  `declared_cents`, `variance_cents`, `posted_at`, `gl_lines`).
+  The shift also carries `state` (`open|closed|accepted`, D6).
   pos/state supports ETag: send `If-None-Match` with the last ETag and an
   unchanged state answers 304 with no body (the 5s poll costs ~nothing).
-- `POST /api/v1/pos/shifts` {opening_float_cents} / `POST /api/v1/pos/shifts/{id}/close` {declared_cents}
+- `POST /api/v1/pos/shifts` {opening_float_cents}
+- `POST /api/v1/pos/shifts/{id}/close` {declared_cents} — atomic close; returns
+  `{shift:{id,number,state,expected_cents,declared_cents,variance_cents,closed_at,
+  journal_document_id}}`. expected cash = float + cash tenders + pay_in − pay_out −
+  drop (card/other tenders never hit the drawer). Builds a draft GL acceptance
+  journal. 409 `open_tickets_unpaid`.
+- `POST /api/v1/pos/tickets/{id}/close` {payments:[{method_id,amount_cents,tip_cents}]}
+  — close a ticket with tenders. 422 `tenders_mismatch`, 409 `ticket_closed`,
+  409 `shift_not_open`.
+- `POST /api/v1/pos/shifts/{id}/cash-operations` {kind:pay_in|pay_out|drop,amount_cents,reason}
+  — 422 `invalid`, 409 `shift_not_open`.
+- `GET /api/v1/pos/shifts/{id}/z-report` — cashier breakdown (tenders by group,
+  cash operations, expected/declared/variance, state).
 - `POST /api/v1/pos/tables/{table_id}/lines` — add order lines (menu_item_id, qty, options)
 - `POST /api/v1/pos/tickets/{id}/fire`
 - `POST /api/v1/pos/requests/{id}/ack|dismiss`
 - Poll `GET /api/v1/pos/state` every 5s for v1; SSE later.
 
+### Shift acceptance + ledger (manager+, restaurant-scoped)
+
+Double-entry GL (context `ledger`): append-only journal documents (draft → posted →
+cancelled), two dates per document (accounting + recorded), fixed dimensions
+(restaurant_id + cost_center_id). Corrections are reversals, never edits.
+
+- `GET /api/v1/restaurants/{id}/shifts?state=closed|accepted` — acceptance queue.
+- `GET|PATCH /api/v1/restaurants/{id}/shifts/{shift_id}/acceptance` — review / override
+  the draft journal's account/cost-center per line (draft only; 409 `document_posted`).
+- `POST /api/v1/restaurants/{id}/shifts/{shift_id}/accept` — post the journal to the GL,
+  mark the shift accepted (atomic; 409 `shift_not_closed`/`already_accepted`).
+- `GET /api/v1/restaurants/{id}/ledger/accounts` — chart of accounts.
+- `GET|PUT /api/v1/restaurants/{id}/ledger/account-map` — per-restaurant GL-semantics
+  config (purpose → account; 422 `unknown_purpose`/`account_not_postable`).
+- `GET /api/v1/restaurants/{id}/ledger/journals?from=&account=&source=` — posted list.
+- `GET /api/v1/restaurants/{id}/ledger/journals/{doc_id}` — document with lines.
+- `POST /api/v1/restaurants/{id}/ledger/journals?post=1` — manual journal (imbalance =
+  422 `unbalanced`, no auto-balance for manual).
+- `POST /api/v1/restaurants/{id}/ledger/journals/{doc_id}/cancel` — reversal (409
+  `already_cancelled`/`not_posted`).
+
 Money: integer cents everywhere. IDs: uuid strings. Errors:
-`{"error": {"code": "...", "message": "..."}}`, 401/403/404/422.
+`{"error": {"code": "...", "message": "..."}}`, 401/403/404/409/422.
 
 ## Design source of truth
 

@@ -24,6 +24,8 @@ import (
 
 	menudomain "aivo/internal/domain/menu"
 	platformdomain "aivo/internal/domain/platform"
+	ledgerpg "aivo/internal/ledger/adapters/postgres"
+	ledgerapp "aivo/internal/ledger/app"
 	menupg "aivo/internal/menu/adapters/postgres"
 	"aivo/internal/platform/adapters/billing"
 	platformpg "aivo/internal/platform/adapters/postgres"
@@ -61,6 +63,7 @@ func run() error {
 	err = migrate.Apply(ctx, db, []migrate.Source{
 		{Name: "menu", FS: migrations.FS, Dir: "menu"},
 		{Name: "platform", FS: migrations.FS, Dir: "platform"},
+		{Name: "ledger", FS: migrations.FS, Dir: "ledger"},
 		{Name: "pos", FS: migrations.FS, Dir: "pos"},
 	})
 	if err != nil {
@@ -110,6 +113,9 @@ func run() error {
 	}
 
 	if err := seedMenu(ctx, menuStore, rest.ID); err != nil {
+		return err
+	}
+	if err := seedLedger(ctx, db, rest.ID); err != nil {
 		return err
 	}
 	if err := seedCustomer(ctx, db, menuStore, platform, rest.ID); err != nil {
@@ -310,6 +316,28 @@ func seedCustomer(ctx context.Context, db *sql.DB, store *menupg.PostgresStore, 
 		return fmt.Errorf("seed: guest profile: %w", err)
 	}
 	fmt.Println("Demo customer: guest@ember.test / embertest1 (2 historical orders)")
+	return nil
+}
+
+// seedLedger provisions the restaurant's chart of accounts + account map
+// + "main" cost center (via ledger app), and the pos payment_methods
+// (cash, card). Mirrors what restaurant provisioning will do.
+func seedLedger(ctx context.Context, db *sql.DB, restaurantID uuid.UUID) error {
+	ledger := ledgerapp.New(ledgerpg.NewStore(db))
+	if err := ledger.SeedRestaurant(ctx, restaurantID); err != nil {
+		return fmt.Errorf("seed: ledger: %w", err)
+	}
+	for _, m := range []struct{ code, name, group string }{
+		{"cash", "Cash", "cash"},
+		{"card", "Card", "card"},
+	} {
+		if _, err := db.ExecContext(ctx,
+			`INSERT INTO payment_methods (id, restaurant_id, code, name, payment_group) VALUES ($1, $2, $3, $4, $5)`,
+			uuid.New(), restaurantID, m.code, m.name, m.group); err != nil {
+			return fmt.Errorf("seed: payment method %s: %w", m.code, err)
+		}
+	}
+	fmt.Println("Seeded ledger: chart of accounts + account-map + cost-center main + payment methods (cash, card)")
 	return nil
 }
 

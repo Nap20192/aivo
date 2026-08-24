@@ -1,0 +1,67 @@
+package app
+
+import (
+	"context"
+
+	ledger "aivo/internal/domain/ledger"
+	"aivo/internal/ledger/ports"
+
+	"uuid"
+)
+
+// defaultAccounts is the per-restaurant chart of accounts seed (contract §6).
+var defaultAccounts = []ledger.Account{
+	{Code: "1000", Name: "Cash on hand (drawer)", Type: ledger.TypeAsset, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "1010", Name: "Card clearing", Type: ledger.TypeAsset, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "1020", Name: "Undeposited funds", Type: ledger.TypeAsset, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "1100", Name: "House account receivable", Type: ledger.TypeAsset, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "2000", Name: "Gift card liability", Type: ledger.TypeLiability, NormalSide: ledger.SideCredit, Postable: true},
+	{Code: "4000", Name: "Sales revenue", Type: ledger.TypeRevenue, NormalSide: ledger.SideCredit, Postable: true},
+	{Code: "4900", Name: "Comps / contra-revenue", Type: ledger.TypeRevenue, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "5900", Name: "Cash over/short", Type: ledger.TypeExpense, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "6000", Name: "Cash movements (pay in/out)", Type: ledger.TypeExpense, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "9999", Name: "Unassigned / rounding", Type: ledger.TypeExpense, NormalSide: ledger.SideDebit, Postable: true},
+}
+
+// defaultMap is the per-restaurant purpose→account-code seed (contract §6).
+// void has no mapping (creates no postings).
+var defaultMap = []struct{ purpose, code string }{
+	{"sales_revenue", "4000"},
+	{"cash_drawer", "1000"},
+	{"cash_over_short", "5900"},
+	{"cash_movement", "6000"},
+	{"rounding_unassigned", "9999"},
+	{"tender:cash", "1000"},
+	{"tender:card", "1010"},
+	{"tender:gift_card", "2000"},
+	{"tender:comp", "4900"},
+	{"tender:house_account", "1100"},
+}
+
+// SeedRestaurant provisions the default chart of accounts, the "main"
+// cost center, and the account map for a restaurant. Runs in one
+// transaction. Not idempotent (unique code) — call once at provisioning.
+func (a *App) SeedRestaurant(ctx context.Context, restaurantID uuid.UUID) error {
+	return a.store.InTx(ctx, func(st ports.Store) error {
+		codeToID := map[string]uuid.UUID{}
+		for _, acc := range defaultAccounts {
+			acc.ID = a.newID()
+			acc.RestaurantID = restaurantID
+			if err := st.InsertAccount(ctx, acc); err != nil {
+				return err
+			}
+			codeToID[acc.Code] = acc.ID
+		}
+		if err := st.InsertCostCenter(ctx, ledger.CostCenter{
+			ID: a.newID(), RestaurantID: restaurantID, Code: CostCenterMain, Name: "Main",
+		}); err != nil {
+			return err
+		}
+		for _, m := range defaultMap {
+			if err := st.PutAccountMap(ctx, restaurantID, m.purpose, codeToID[m.code]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}

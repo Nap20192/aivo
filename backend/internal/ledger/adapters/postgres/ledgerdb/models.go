@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.31.1
 
-package posdb
+package ledgerdb
 
 import (
 	"database/sql"
@@ -265,19 +265,6 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
-type Shift struct {
-	ID                uuid.UUID
-	RestaurantID      uuid.UUID
-	OpenedBy          uuid.UUID
-	OpenedAt          time.Time
-	OpeningFloatCents int32
-	ClosedAt          sql.NullTime
-	DeclaredCents     sql.NullInt32
-	ExpectedCents     sql.NullInt32
-	VarianceCents     sql.NullInt32
-	Cashier           string
-}
-
 type Subscription struct {
 	OrgID     uuid.UUID
 	Plan      string
@@ -291,29 +278,6 @@ type Table struct {
 	Label        string
 	Token        string
 	CreatedAt    time.Time
-}
-
-type Ticket struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
-	ShiftID      uuid.UUID
-	TableID      uuid.UUID
-	Status       string
-	CreatedAt    time.Time
-	Note         string
-	CustomerID   sharedkernel.NullID
-}
-
-type TicketLine struct {
-	ID             uuid.UUID
-	TicketID       uuid.UUID
-	MenuItemID     uuid.UUID
-	Name           string
-	UnitPriceCents int32
-	Qty            int32
-	Options        json.RawMessage
-	FiredAt        sql.NullTime
-	CreatedAt      time.Time
 }
 
 type User struct {
