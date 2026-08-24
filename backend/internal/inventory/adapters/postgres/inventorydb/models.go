@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.31.1
 
-package posdb
+package inventorydb
 
 import (
 	"database/sql"
@@ -114,6 +114,30 @@ type Event struct {
 	PublishedAt   sql.NullTime
 }
 
+type GoodsReceipt struct {
+	ID           uuid.UUID
+	RestaurantID uuid.UUID
+	SupplierID   sharedkernel.NullID
+	Status       string
+	BusinessDate time.Time
+	Note         string
+	PostedAt     sql.NullTime
+	PostedBy     sharedkernel.NullID
+	ReversalOf   sharedkernel.NullID
+	CreatedAt    time.Time
+}
+
+type GoodsReceiptLine struct {
+	ID             uuid.UUID
+	ReceiptID      uuid.UUID
+	ProductID      uuid.UUID
+	QtyBaseMilli   int64
+	InputUnit      string
+	UnitPriceCents int64
+	LineCostCents  int64
+	Seq            int32
+}
+
 type GuestProfile struct {
 	RestaurantID uuid.UUID
 	CustomerID   uuid.UUID
@@ -121,6 +145,19 @@ type GuestProfile struct {
 	Tags         json.RawMessage
 	FirstSeen    time.Time
 	LastSeen     time.Time
+}
+
+type InventoryProduct struct {
+	ID           uuid.UUID
+	RestaurantID uuid.UUID
+	Sku          string
+	Name         string
+	Type         string
+	StockUnit    string
+	MenuItemID   sharedkernel.NullID
+	MinStock     sql.NullInt64
+	Archived     bool
+	CreatedAt    time.Time
 }
 
 type JournalDocument struct {
@@ -251,6 +288,15 @@ type PaymentMethod struct {
 	Active       bool
 }
 
+type RecipeCosting struct {
+	ID         uuid.UUID
+	TechCardID uuid.UUID
+	CostCents  int64
+	Method     string
+	ComputedAt time.Time
+	ComputedBy uuid.UUID
+}
+
 type Restaurant struct {
 	ID        uuid.UUID
 	Slug      string
@@ -301,11 +347,69 @@ type Shift struct {
 	JournalDocumentID sharedkernel.NullID
 }
 
+type StockMove struct {
+	ID            uuid.UUID
+	RestaurantID  uuid.UUID
+	ProductID     uuid.UUID
+	Kind          string
+	Qty           int64
+	CostCents     int64
+	Estimated     bool
+	BusinessDate  time.Time
+	RecordedAt    time.Time
+	DocKind       string
+	DocID         uuid.UUID
+	SourceEventID sharedkernel.NullID
+	CreatedAt     time.Time
+}
+
+type StockOnHand struct {
+	RestaurantID uuid.UUID
+	ProductID    uuid.UUID
+	Qty          int64
+	ValueCents   int64
+	LastAvgCents int64
+	UpdatedAt    time.Time
+}
+
+type Stocktake struct {
+	ID           uuid.UUID
+	RestaurantID uuid.UUID
+	Status       string
+	BusinessDate time.Time
+	Note         string
+	PostedAt     sql.NullTime
+	PostedBy     sharedkernel.NullID
+	ReversalOf   sharedkernel.NullID
+	CreatedAt    time.Time
+}
+
+type StocktakeLine struct {
+	ID                uuid.UUID
+	StocktakeID       uuid.UUID
+	ProductID         uuid.UUID
+	CountedQtyMilli   int64
+	ExpectedQtyMilli  sql.NullInt64
+	VarianceQtyMilli  int64
+	VarianceCostCents int64
+	Seq               int32
+}
+
 type Subscription struct {
 	OrgID     uuid.UUID
 	Plan      string
 	Status    string
 	UpdatedAt time.Time
+}
+
+type Supplier struct {
+	ID           uuid.UUID
+	RestaurantID uuid.UUID
+	Name         string
+	Contacts     json.RawMessage
+	Note         string
+	Archived     bool
+	CreatedAt    time.Time
 }
 
 type Table struct {
@@ -314,6 +418,26 @@ type Table struct {
 	Label        string
 	Token        string
 	CreatedAt    time.Time
+}
+
+type TechCard struct {
+	ID           uuid.UUID
+	RestaurantID uuid.UUID
+	ProductID    uuid.UUID
+	ValidFrom    time.Time
+	ValidTo      sql.NullTime
+	Consumption  string
+	YieldMilli   int64
+	CreatedBy    uuid.UUID
+	CreatedAt    time.Time
+}
+
+type TechCardLine struct {
+	ID                  uuid.UUID
+	TechCardID          uuid.UUID
+	IngredientProductID uuid.UUID
+	Qty                 int64
+	Seq                 int32
 }
 
 type Ticket struct {
@@ -360,4 +484,26 @@ type User struct {
 	Role         string
 	RestaurantID sharedkernel.NullID
 	CreatedAt    time.Time
+}
+
+type WriteOff struct {
+	ID           uuid.UUID
+	RestaurantID uuid.UUID
+	Reason       string
+	Status       string
+	BusinessDate time.Time
+	Note         string
+	PostedAt     sql.NullTime
+	PostedBy     sharedkernel.NullID
+	ReversalOf   sharedkernel.NullID
+	CreatedAt    time.Time
+}
+
+type WriteOffLine struct {
+	ID           uuid.UUID
+	WriteOffID   uuid.UUID
+	ProductID    uuid.UUID
+	QtyBaseMilli int64
+	InputUnit    string
+	Seq          int32
 }

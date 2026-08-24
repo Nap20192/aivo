@@ -4,10 +4,19 @@
 
 - [Menu](./backend/internal/menu/CONTEXT.md) — diner-facing digital menu, ordering, and landing page for a single restaurant
 - POS (`backend/internal/pos`) — cash shifts, per-table tickets, tenders/payments, in-shift cash movements, and shift acceptance (D6). Reads Menu through an in-process bridge.
-- [Ledger](./backend/internal/ledger/CONTEXT.md) — append-only, double-entry GL core (chart of accounts, journal documents, GL-semantics config). Consumed by POS.
+- [Ledger](./backend/internal/ledger/CONTEXT.md) — append-only, double-entry GL core (chart of accounts, journal documents, GL-semantics config). Consumed by POS and Inventory.
+- [Inventory](./backend/internal/inventory/CONTEXT.md) — nomenclature, calendar-versioned tech cards + costing, perpetual weighted-average stock ledger, stock documents (receipt/write-off/stocktake), COGS on sale. Downstream of Menu; posts to Ledger; consumed by POS at ticket close.
 
 ## Relationships
 
+- **POS → Inventory → Ledger** (synchronous, in-process, increment-2): at ticket
+  close POS calls `inventory.ConsumeForSale` (via `pos/adapters/inventorybridge`)
+  in the same transaction; inventory depletes stock by the active tech card and
+  posts a COGS journal to the ledger (via `inventory/adapters/ledgerbridge`).
+  Inventory stock documents (receipt/write-off/stocktake) also post GL through
+  that bridge. The chain is `pos → inventory → ledger` — acyclic; `inventory → pos`
+  and `inventory → menu` in code are forbidden (`menu_item_id` is a bare uuid,
+  pos sales are read through a `SalesReader` port for the food-cost report).
 - **POS → Ledger** (synchronous, in-process): on shift close POS builds a draft
   acceptance journal, and on acceptance posts it, through `pos/ports.Ledger`
   (implemented by `pos/adapters/ledgerbridge` over `ledger/app`). Both writes run

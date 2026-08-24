@@ -1,0 +1,144 @@
+package domain
+
+import (
+	"errors"
+	"time"
+
+	"aivo/internal/sharedkernel"
+)
+
+// Consumption strategies (Domain 3): how a sale of the product depletes
+// stock.
+const (
+	ConsumeAssemble        = "assemble"         // deplete the recipe's ingredients
+	ConsumeDepleteFinished = "deplete_finished" // deplete the finished product itself
+)
+
+// Recipe costing method.
+const CostMethodWeightedAvg = "weighted_avg"
+
+var (
+	ErrInvalidConsumption  = errors.New("inventory: invalid consumption strategy")
+	ErrEmptyRecipe         = errors.New("inventory: recipe needs at least one line")
+	ErrDuplicateIngredient = errors.New("inventory: ingredient appears twice in a recipe")
+	ErrRecipeCycle         = errors.New("inventory: recipe forms a cycle")
+	ErrBadInterval         = errors.New("inventory: valid_to must be after valid_from")
+)
+
+// TechCard is a calendar-versioned recipe for a dish/prepared product (D5).
+// The aggregate boundary is the version + its lines. A version's interval
+// is [ValidFrom, ValidTo); the open (current) version has ValidTo == nil.
+type TechCard struct {
+	ID           sharedkernel.ID
+	RestaurantID sharedkernel.ID
+	ProductID    sharedkernel.ID
+	ValidFrom    time.Time  // date
+	ValidTo      *time.Time // date, nil = open/current
+	Consumption  string     // assemble|deplete_finished
+	YieldMilli   int64      // yield quantity (informational / prepared unit cost)
+	CreatedBy    sharedkernel.ID
+	CreatedAt    time.Time
+	Lines        []TechCardLine
+}
+
+// TechCardLine is one gross ingredient of a recipe version.
+type TechCardLine struct {
+	ID                  sharedkernel.ID
+	TechCardID          sharedkernel.ID
+	IngredientProductID sharedkernel.ID
+	Qty                 int64 // milli-units in the ingredient's base unit
+	Seq                 int
+}
+
+// RecipeCosting is one entry in a tech card's append-only cost series
+// (Domain 3 — cost is never an in-place mutated field). The current cost of
+// a version is the latest entry by ComputedAt.
+type RecipeCosting struct {
+	ID         sharedkernel.ID
+	TechCardID sharedkernel.ID
+	CostCents  int64
+	Method     string // weighted_avg
+	ComputedAt time.Time
+	ComputedBy sharedkernel.ID
+}
+
+// ValidConsumption reports whether c is a known strategy.
+func ValidConsumption(c string) bool {
+	return c == ConsumeAssemble || c == ConsumeDepleteFinished
+}
+
+// ActiveOn reports whether the version is the active one on date d:
+// ValidFrom ≤ d < ValidTo (or ValidTo open).
+func (t TechCard) ActiveOn(d time.Time) bool {
+	if d.Before(t.ValidFrom) {
+		return false
+	}
+	return t.ValidTo == nil || d.Before(*t.ValidTo)
+}
+
+// ValidateLines checks a proposed recipe: non-empty, positive qty, no
+// duplicate ingredient. (Cycle detection is separate — it needs the graph.)
+func ValidateLines(lines []TechCardLine) error {
+	if len(lines) == 0 {
+		return ErrEmptyRecipe
+	}
+	seen := map[sharedkernel.ID]bool{}
+	for _, l := range lines {
+		if l.Qty <= 0 {
+			return ErrInvalidQty
+		}
+		if seen[l.IngredientProductID] {
+			return ErrDuplicateIngredient
+		}
+		seen[l.IngredientProductID] = true
+	}
+	return nil
+}
+
+// ReachesSelf reports whether start is reachable from itself in the recipe
+// graph adj (product → ingredient products of its active card). Used to
+// reject a recipe that would close a cycle (§4). DFS, O(V+E).
+func ReachesSelf(start sharedkernel.ID, adj map[sharedkernel.ID][]sharedkernel.ID) bool {
+	visited := map[sharedkernel.ID]bool{}
+	var dfs func(n sharedkernel.ID) bool
+	dfs = func(n sharedkernel.ID) bool {
+		for _, next := range adj[n] {
+			if next == start {
+				return true
+			}
+			if !visited[next] {
+				visited[next] = true
+				if dfs(next) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return dfs(start)
+}
+
+// LineCost values one recipe line: qty (milli) × unitCostPerBase (cents per
+// base unit), banker-rounded to cents.
+func LineCost(qtyMilli, unitCostPerBase int64) int64 {
+	return bankRound(qtyMilli*unitCostPerBase, MilliPerUnit)
+}
+
+// RecipeCost is Σ of the line costs given each ingredient's cost per base
+// unit (missing ingredient costs count as 0).
+func RecipeCost(lines []TechCardLine, unitCostPerBase map[sharedkernel.ID]int64) int64 {
+	var total int64
+	for _, l := range lines {
+		total += LineCost(l.Qty, unitCostPerBase[l.IngredientProductID])
+	}
+	return total
+}
+
+// UnitCostFromRecipe turns a prepared/dish version's total recipe cost into
+// a cost per base unit of its yield (for use as an ingredient elsewhere).
+func UnitCostFromRecipe(recipeCostCents, yieldMilli int64) int64 {
+	if yieldMilli <= 0 {
+		return 0
+	}
+	return bankRound(recipeCostCents*MilliPerUnit, yieldMilli)
+}

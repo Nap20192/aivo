@@ -121,6 +121,21 @@ type Ledger interface {
 	PostJournal(ctx context.Context, tx *sql.Tx, restaurantID, docID uuid.UUID) error
 }
 
+// SaleLine is one sold ticket line handed to the inventory context for
+// stock depletion / COGS.
+type SaleLine struct {
+	MenuItemID   uuid.UUID
+	Qty          int
+	TicketLineID uuid.UUID
+}
+
+// Inventory is the synchronous pos→inventory bridge (increment-2): at ticket
+// close, deplete stock and post COGS inside the pos transaction (§7). A
+// missing tech card is a silent skip, not an error.
+type Inventory interface {
+	ConsumeForSale(ctx context.Context, tx *sql.Tx, restaurantID, closedBy, ticketID uuid.UUID, businessDate time.Time, lines []SaleLine) (cogsCents int64, err error)
+}
+
 // Menu is the in-process bridge to the Menu context: item lookups for
 // line snapshots, tables for the floor view, and the service-request
 // inbox.

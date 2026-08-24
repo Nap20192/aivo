@@ -248,6 +248,42 @@ cancelled), two dates per document (accounting + recorded), fixed dimensions
 - `POST /api/v1/restaurants/{id}/ledger/journals/{doc_id}/cancel` — reversal (409
   `already_cancelled`/`not_posted`).
 
+### Inventory + tech cards (increment-2; manager+, restaurant-scoped)
+
+New context `inventory`: nomenclature, calendar-versioned tech cards (append-only
+cost series), a perpetual weighted-average stock ledger, and stock documents that
+post to the GL through the ledger. Quantities are a number in a display unit + a
+unit code (`g|kg|ml|l|pcs`); the server converts to the product's base unit.
+COGS is a side effect of ticket close (no new POS endpoint).
+
+- Products: `GET|POST /inventory/products`, `GET|PATCH /inventory/products/{pid}`
+  (422 `sku_taken`/`unit_incompatible`, 409 `menu_item_taken`).
+- Tech cards: `GET /inventory/products/{pid}/tech-cards`,
+  `GET /inventory/products/{pid}/tech-cards/active?on=`,
+  `POST /inventory/products/{pid}/tech-cards`, `GET /inventory/tech-cards/{tcid}`,
+  `POST /inventory/tech-cards/{tcid}/recost` (422 `recipe_cycle`/`empty_recipe`/
+  `duplicate_ingredient`, 409 `version_exists`).
+- Suppliers: `GET|POST /inventory/suppliers`, `PATCH /inventory/suppliers/{sid}`
+  (409 `supplier_name_taken`).
+- Goods receipts: `GET|POST /inventory/receipts`, `GET /inventory/receipts/{rid}`,
+  `POST .../post`, `POST .../cancel` (409 `already_posted`/`already_cancelled`,
+  422 `empty_document`/`backdated_before_last_move`). Post: debit Inventory (1200)
+  / credit Accounts payable (2100).
+- Write-offs: `GET|POST /inventory/write-offs`, `GET /inventory/write-offs/{wid}`,
+  `POST .../post`, `POST .../cancel`. Post: debit Shrinkage (5910) / credit
+  Inventory (1200).
+- Stocktakes: `POST /inventory/stocktakes`, `GET /inventory/stocktakes?status=`,
+  `GET /inventory/stocktakes/{sid}`, `PATCH .../{sid}` (counts),
+  `POST .../{sid}/dry-run` (server-computed variance, no save),
+  `POST .../{sid}/post`, `POST .../{sid}/cancel` (409 `stocktake_open_exists`).
+- Stock + reports: `GET /inventory/on-hand?low_stock=`,
+  `GET /inventory/stock-moves?from=&product=`,
+  `GET /inventory/reports/food-cost?from=&to=` (theoretical per item, actual +
+  estimated-share totals).
+- COGS: closing a ticket (`POST /pos/tickets/{id}/close`) depletes stock by the
+  active tech card and posts debit COGS (5000) / credit Inventory (1200) in the
+  same transaction; a missing tech card is a silent skip.
+
 Money: integer cents everywhere. IDs: uuid strings. Errors:
 `{"error": {"code": "...", "message": "..."}}`, 401/403/404/409/422.
 

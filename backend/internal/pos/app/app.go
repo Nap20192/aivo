@@ -31,13 +31,14 @@ var ErrShiftNotOpen = errors.New("shift is not open")
 var ErrOpenTicketsUnpaid = errors.New("open tickets are unpaid")
 
 type App struct {
-	store  ports.Store
-	menu   ports.Menu
-	ledger ports.Ledger
+	store     ports.Store
+	menu      ports.Menu
+	ledger    ports.Ledger
+	inventory ports.Inventory // nil disables COGS on sale (increment-2)
 }
 
-func New(store ports.Store, menu ports.Menu, ledger ports.Ledger) *App {
-	return &App{store: store, menu: menu, ledger: ledger}
+func New(store ports.Store, menu ports.Menu, ledger ports.Ledger, inventory ports.Inventory) *App {
+	return &App{store: store, menu: menu, ledger: ledger, inventory: inventory}
 }
 
 // State is the POS floor view: the open shift (nil if none), every
@@ -294,7 +295,25 @@ func (a *App) CloseTicket(ctx context.Context, restaurantID, ticketID, closedBy 
 			return domain.Ticket{}, err
 		}
 	}
-	if err := a.store.CloseTicketWithPayments(ctx, restaurantID, t, tenders, closedBy); err != nil {
+	// Close the ticket and deplete stock / post COGS in ONE transaction so a
+	// crash can never leave a paid sale without its cost of goods (debt 1 /
+	// §7). Missing tech cards are skipped inside ConsumeForSale.
+	err = a.store.InTx(ctx, func(tx *sql.Tx, st ports.Store) error {
+		if err := st.CloseTicketWithPayments(ctx, restaurantID, t, tenders, closedBy); err != nil {
+			return err
+		}
+		if a.inventory != nil {
+			lines := make([]ports.SaleLine, len(t.Lines))
+			for i, l := range t.Lines {
+				lines[i] = ports.SaleLine{MenuItemID: l.MenuItemID, Qty: l.Qty, TicketLineID: l.ID}
+			}
+			if _, err := a.inventory.ConsumeForSale(ctx, tx, restaurantID, closedBy, t.ID, businessDate(shift.OpenedAt), lines); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		return domain.Ticket{}, err
 	}
 	return a.store.TicketByID(ctx, restaurantID, ticketID)

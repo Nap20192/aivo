@@ -24,6 +24,9 @@ import (
 	"sync"
 	"time"
 
+	inventoryledgerbridge "aivo/internal/inventory/adapters/ledgerbridge"
+	inventorypg "aivo/internal/inventory/adapters/postgres"
+	inventoryapp "aivo/internal/inventory/app"
 	ledgerpg "aivo/internal/ledger/adapters/postgres"
 	ledgerapp "aivo/internal/ledger/app"
 	menupg "aivo/internal/menu/adapters/postgres"
@@ -36,9 +39,11 @@ import (
 	"aivo/internal/platform/adapters/s3"
 	platformapp "aivo/internal/platform/app"
 	platformports "aivo/internal/platform/ports"
+	"aivo/internal/pos/adapters/inventorybridge"
 	"aivo/internal/pos/adapters/ledgerbridge"
 	"aivo/internal/pos/adapters/menubridge"
 	pospg "aivo/internal/pos/adapters/postgres"
+	"aivo/internal/pos/adapters/salesreader"
 	posapp "aivo/internal/pos/app"
 	"aivo/internal/provisioning"
 	"aivo/migrations"
@@ -80,6 +85,7 @@ func run() error {
 		{Name: "platform", FS: migrations.FS, Dir: "platform"},
 		{Name: "ledger", FS: migrations.FS, Dir: "ledger"},
 		{Name: "pos", FS: migrations.FS, Dir: "pos"},
+		{Name: "inventory", FS: migrations.FS, Dir: "inventory"},
 	})
 	if err != nil {
 		return err
@@ -108,7 +114,14 @@ func run() error {
 
 	platformApplication := platformapp.New(platformStore, billing.NewFake(), themeGen)
 	ledgerApplication := ledgerapp.New(ledgerStore)
-	posApplication := posapp.New(posStore, menubridge.New(menuStore), ledgerbridge.New(ledgerApplication))
+	// Inventory posts to the GL via the ledger bridge and reads pos sales
+	// for the food-cost report (pos → inventory → ledger; no cycles).
+	inventoryApplication := inventoryapp.New(
+		inventorypg.NewStore(db),
+		inventoryledgerbridge.New(ledgerApplication),
+		salesreader.New(db),
+	)
+	posApplication := posapp.New(posStore, menubridge.New(menuStore), ledgerbridge.New(ledgerApplication), inventorybridge.New(inventoryApplication))
 	// Live restaurant provisioning seeds the GL + payment methods in the
 	// same transaction as the restaurant row (M3 / BUG-1).
 	platformStore.OnProvisionRestaurant = provisioning.RestaurantProvisioner(ledgerApplication)
@@ -156,6 +169,7 @@ func run() error {
 		Platform:       platformApplication,
 		Pos:            posApplication,
 		Ledger:         ledgerApplication,
+		Inventory:      inventoryApplication,
 		Menu:           menuStore,
 		MenuAdmin:      menuStore,
 		MenuApp:        menuApplication,
