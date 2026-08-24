@@ -1,5 +1,7 @@
 import {
+  BookOpen,
   BookUser,
+  ClipboardCheck,
   CreditCard,
   LayoutDashboard,
   LogOut,
@@ -20,6 +22,8 @@ const nav = [
   { to: "/menu", label: "Menu", icon: UtensilsCrossed },
   { to: "/assistant", label: "Assistant", icon: Sparkles },
   { to: "/tables", label: "Tables & QR", icon: QrCode },
+  { to: "/shifts", label: "Shift acceptance", icon: ClipboardCheck },
+  { to: "/ledger", label: "Ledger", icon: BookOpen },
   { to: "/guests", label: "Guests", icon: BookUser },
   { to: "/staff", label: "Staff", icon: Users },
   { to: "/settings", label: "Settings", icon: Settings },
