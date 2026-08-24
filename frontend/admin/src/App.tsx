@@ -11,6 +11,7 @@ import Assistant from "./pages/Assistant";
 import Dashboard from "./pages/Dashboard";
 import GuestDetail from "./pages/GuestDetail";
 import Guests from "./pages/Guests";
+import Inventory from "./pages/Inventory";
 import Ledger from "./pages/Ledger";
 import Login from "./pages/Login";
 import MenuScreen from "./pages/MenuScreen";
@@ -73,6 +74,7 @@ const router = createBrowserRouter(
         { path: "shifts", element: <Shifts /> },
         { path: "shifts/:shiftId", element: <ShiftAcceptance /> },
         { path: "ledger", element: <Ledger /> },
+        { path: "inventory", element: <Inventory /> },
         { path: "tables", element: <Tables /> },
         { path: "staff", element: <Staff /> },
         { path: "settings", element: <Settings /> },

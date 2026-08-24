@@ -6,6 +6,7 @@ import {
 } from "../../../design-system/shared/api";
 import { mockApi } from "./mock";
 import { ledgerMock } from "./ledgerMock";
+import { inventoryMock } from "./inventoryMock";
 import type {
   AcceptanceOverride,
   Account,
@@ -14,6 +15,10 @@ import type {
   AssistantMessage,
   Category,
   CostCenter,
+  DocLineInput,
+  FoodCostReport,
+  GoodsReceipt,
+  GoodsReceiptInput,
   GuestDetail,
   GuestSummary,
   JournalDocument,
@@ -22,15 +27,27 @@ import type {
   Me,
   Menu,
   MenuItem,
+  OnHand,
   Plan,
+  Product,
+  ProductInput,
   Restaurant,
   Role,
   ShiftAcceptance,
   ShiftRow,
   StaffMember,
+  StockMove,
+  Stocktake,
+  StocktakePreview,
   Subscription,
+  Supplier,
   Table,
+  TechCard,
+  TechCardInput,
+  TechCardVersion,
   Theme,
+  WriteOff,
+  WriteOffInput,
 } from "./types";
 
 const BASE = "/api/v1";
@@ -493,6 +510,215 @@ export const api = {
     return withFallback(
       () => request("POST", `/restaurants/${id}/ledger/journals/${docId}/cancel`),
       () => ledgerMock.cancelJournal(docId),
+    );
+  },
+
+  // ── Inventory: nomenclature (impl-contract-2 §10) ──
+  listProducts(id: string): Promise<Product[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/products`),
+      () => inventoryMock.listProducts(),
+    );
+  },
+  getProduct(id: string, pid: string): Promise<Product> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/products/${pid}`),
+      () => inventoryMock.getProduct(pid),
+    );
+  },
+  createProduct(id: string, input: ProductInput): Promise<Product> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/products`, input),
+      () => inventoryMock.createProduct(input),
+    );
+  },
+  updateProduct(id: string, pid: string, patch: Partial<ProductInput> & { archived?: boolean }): Promise<Product> {
+    return withFallback(
+      () => request("PATCH", `/restaurants/${id}/inventory/products/${pid}`, patch),
+      () => inventoryMock.updateProduct(pid, patch),
+    );
+  },
+
+  // ── Inventory: tech-cards ──
+  listTechCards(id: string, pid: string): Promise<TechCardVersion[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/products/${pid}/tech-cards`),
+      () => inventoryMock.listTechCards(pid),
+    );
+  },
+  activeTechCard(id: string, pid: string, on: string): Promise<TechCard | null> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/products/${pid}/tech-cards/active?on=${on}`),
+      () => inventoryMock.activeTechCard(pid, on),
+    );
+  },
+  getTechCard(id: string, tcid: string): Promise<TechCard> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/tech-cards/${tcid}`),
+      () => inventoryMock.getTechCard(tcid),
+    );
+  },
+  createTechCard(id: string, pid: string, input: TechCardInput): Promise<TechCard> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/products/${pid}/tech-cards`, input),
+      () => inventoryMock.createTechCard(pid, input),
+    );
+  },
+  recostTechCard(id: string, tcid: string): Promise<TechCard> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/tech-cards/${tcid}/recost`),
+      () => inventoryMock.recost(tcid),
+    );
+  },
+
+  // ── Inventory: suppliers ──
+  listSuppliers(id: string): Promise<Supplier[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/suppliers`),
+      () => inventoryMock.listSuppliers(),
+    );
+  },
+  createSupplier(id: string, input: { name: string; contacts?: Record<string, string>; note?: string }): Promise<Supplier> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/suppliers`, input),
+      () => inventoryMock.createSupplier(input),
+    );
+  },
+  updateSupplier(id: string, sid: string, patch: Partial<Pick<Supplier, "name" | "contacts" | "archived">>): Promise<Supplier> {
+    return withFallback(
+      () => request("PATCH", `/restaurants/${id}/inventory/suppliers/${sid}`, patch),
+      () => inventoryMock.updateSupplier(sid, patch),
+    );
+  },
+
+  // ── Inventory: goods receipts ──
+  listReceipts(id: string, status?: string): Promise<GoodsReceipt[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/receipts${status ? `?status=${status}` : ""}`),
+      () => inventoryMock.listReceipts(status),
+    );
+  },
+  getReceipt(id: string, rid: string): Promise<GoodsReceipt> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/receipts/${rid}`),
+      () => inventoryMock.getReceipt(rid),
+    );
+  },
+  createReceipt(id: string, input: GoodsReceiptInput): Promise<GoodsReceipt> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/receipts`, input),
+      () => inventoryMock.createReceipt(input),
+    );
+  },
+  postReceipt(id: string, rid: string): Promise<GoodsReceipt> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/receipts/${rid}/post`),
+      () => inventoryMock.postReceipt(rid),
+    );
+  },
+  cancelReceipt(id: string, rid: string): Promise<GoodsReceipt> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/receipts/${rid}/cancel`),
+      () => inventoryMock.cancelReceipt(rid),
+    );
+  },
+
+  // ── Inventory: write-offs ──
+  listWriteOffs(id: string, status?: string): Promise<WriteOff[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/write-offs${status ? `?status=${status}` : ""}`),
+      () => inventoryMock.listWriteOffs(status),
+    );
+  },
+  getWriteOff(id: string, wid: string): Promise<WriteOff> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/write-offs/${wid}`),
+      () => inventoryMock.getWriteOff(wid),
+    );
+  },
+  createWriteOff(id: string, input: WriteOffInput): Promise<WriteOff> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/write-offs`, input),
+      () => inventoryMock.createWriteOff(input),
+    );
+  },
+  postWriteOff(id: string, wid: string): Promise<WriteOff> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/write-offs/${wid}/post`),
+      () => inventoryMock.postWriteOff(wid),
+    );
+  },
+  cancelWriteOff(id: string, wid: string): Promise<WriteOff> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/write-offs/${wid}/cancel`),
+      () => inventoryMock.cancelWriteOff(wid),
+    );
+  },
+
+  // ── Inventory: stocktakes ──
+  listStocktakes(id: string, status?: string): Promise<Stocktake[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/stocktakes${status ? `?status=${status}` : ""}`),
+      () => inventoryMock.listStocktakes(status),
+    );
+  },
+  getStocktake(id: string, sid: string): Promise<Stocktake> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/stocktakes/${sid}`),
+      () => inventoryMock.getStocktake(sid),
+    );
+  },
+  createStocktake(id: string, input: { note?: string }): Promise<Stocktake> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/stocktakes`, input),
+      () => inventoryMock.createStocktake(input),
+    );
+  },
+  patchStocktake(id: string, sid: string, lines: DocLineInput[]): Promise<Stocktake> {
+    return withFallback(
+      () => request("PATCH", `/restaurants/${id}/inventory/stocktakes/${sid}`, { lines }),
+      () => inventoryMock.patchStocktake(sid, lines),
+    );
+  },
+  dryRunStocktake(id: string, sid: string): Promise<StocktakePreview> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/stocktakes/${sid}/dry-run`),
+      () => inventoryMock.dryRunStocktake(sid),
+    );
+  },
+  postStocktake(id: string, sid: string): Promise<Stocktake> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/stocktakes/${sid}/post`),
+      () => inventoryMock.postStocktake(sid),
+    );
+  },
+  cancelStocktake(id: string, sid: string): Promise<Stocktake> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/inventory/stocktakes/${sid}/cancel`),
+      () => inventoryMock.cancelStocktake(sid),
+    );
+  },
+
+  // ── Inventory: on-hand, moves, food cost ──
+  onHand(id: string, lowStock = false): Promise<OnHand[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/on-hand${lowStock ? "?low_stock=1" : ""}`),
+      () => inventoryMock.onHandList(lowStock),
+    );
+  },
+  stockMoves(id: string, params: { from?: string; product?: string }): Promise<StockMove[]> {
+    const qs = new URLSearchParams();
+    if (params.from) qs.set("from", params.from);
+    if (params.product) qs.set("product", params.product);
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/stock-moves?${qs}`),
+      () => inventoryMock.stockMoveList(params),
+    );
+  },
+  foodCost(id: string, from: string, to: string): Promise<FoodCostReport> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/inventory/reports/food-cost?from=${from}&to=${to}`),
+      () => inventoryMock.foodCost(from, to),
     );
   },
 };

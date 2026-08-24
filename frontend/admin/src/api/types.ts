@@ -323,3 +323,244 @@ export interface ManualJournalInput {
     memo?: string;
   }[];
 }
+
+// ── Inventory: stock & tech-cards (docs/research/rms/impl-contract-2.md §10) ──
+
+// Base stock unit (g/ml/pcs). Display units (kg/l) convert on the wire — §3.
+export type BaseUnit = "g" | "ml" | "pcs";
+export type Unit = BaseUnit | "kg" | "l";
+export type ProductType = "goods" | "dish" | "prepared" | "modifier";
+
+export interface OnHand {
+  product_id: string;
+  sku: string;
+  name: string;
+  qty: number; // milli base-units, signed
+  unit: BaseUnit;
+  value_cents: number;
+  avg_cents: number; // per base-unit
+  below_min: boolean;
+}
+
+export interface Product {
+  id: string;
+  sku: string;
+  name: string;
+  type: ProductType;
+  stock_unit: BaseUnit;
+  menu_item_id: string | null;
+  min_stock: number | null; // milli base-units
+  archived: boolean;
+  has_moves?: boolean; // set on detail: locks stock_unit
+  on_hand?: { qty: number; unit: BaseUnit; value_cents: number; avg_cents: number };
+}
+
+export interface ProductInput {
+  sku: string;
+  name: string;
+  type: ProductType;
+  stock_unit: BaseUnit;
+  menu_item_id?: string | null;
+  min_stock?: number | null;
+}
+
+export type ConsumptionStrategy = "assemble" | "deplete_finished";
+
+export interface TechCardLine {
+  id: string;
+  ingredient_product_id: string;
+  ingredient_name?: string;
+  qty: number; // milli base-units of ingredient
+  unit: BaseUnit;
+  seq: number;
+}
+
+export interface RecipeCosting {
+  id: string;
+  cost_cents: number;
+  method: "weighted_avg";
+  computed_at: string;
+}
+
+// Version row for the timeline (list endpoint).
+export interface TechCardVersion {
+  id: string;
+  valid_from: string; // YYYY-MM-DD
+  valid_to: string | null;
+  consumption: ConsumptionStrategy;
+  cost_cents: number;
+}
+
+// Full version with lines + cost history (detail / active endpoint).
+export interface TechCard {
+  id: string;
+  product_id: string;
+  valid_from: string;
+  valid_to: string | null;
+  consumption: ConsumptionStrategy;
+  yield_qty: number | null;
+  lines: TechCardLine[];
+  cost_cents: number; // latest costing
+  cost_history: RecipeCosting[];
+}
+
+export interface TechCardInput {
+  valid_from: string;
+  consumption: ConsumptionStrategy;
+  yield_qty?: number | null;
+  lines: { ingredient_product_id: string; qty: number; unit: Unit }[];
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contacts: Record<string, string>;
+  note?: string;
+  archived: boolean;
+}
+
+export type DocStatus = "draft" | "posted" | "cancelled";
+
+export interface DocLineInput {
+  product_id: string;
+  qty: number; // display quantity
+  unit: Unit;
+  unit_price_cents?: number; // receipts only
+}
+
+export interface GoodsReceiptLine {
+  id: string;
+  product_id: string;
+  product_name?: string;
+  qty_input: number;
+  input_unit: Unit;
+  qty_base: number; // milli base-units
+  unit_price_cents: number;
+  line_cost_cents: number;
+  seq: number;
+}
+
+export interface GoodsReceipt {
+  id: string;
+  supplier_id: string | null;
+  supplier_name?: string | null;
+  status: DocStatus;
+  business_date: string;
+  note?: string;
+  posted_at: string | null;
+  reversal_of: string | null;
+  total_cents: number;
+  lines: GoodsReceiptLine[];
+}
+
+export interface GoodsReceiptInput {
+  supplier_id?: string | null;
+  business_date: string;
+  note?: string;
+  lines: DocLineInput[];
+}
+
+export type WriteOffReason =
+  | "spoilage"
+  | "expiry"
+  | "staff_meal"
+  | "loss"
+  | "other";
+
+export interface WriteOffLine {
+  id: string;
+  product_id: string;
+  product_name?: string;
+  qty_input: number;
+  input_unit: Unit;
+  qty_base: number;
+  cost_cents: number;
+  seq: number;
+}
+
+export interface WriteOff {
+  id: string;
+  reason: WriteOffReason;
+  note?: string;
+  status: DocStatus;
+  business_date: string;
+  posted_at: string | null;
+  reversal_of: string | null;
+  total_cents: number;
+  lines: WriteOffLine[];
+}
+
+export interface WriteOffInput {
+  reason: WriteOffReason;
+  note?: string;
+  business_date: string;
+  lines: DocLineInput[];
+}
+
+export interface StocktakeLine {
+  id: string;
+  product_id: string;
+  product_name?: string;
+  unit: BaseUnit;
+  counted_qty: number; // milli base-units
+  expected_qty: number | null;
+  variance_qty: number | null;
+  variance_cost_cents: number | null;
+}
+
+export interface Stocktake {
+  id: string;
+  status: DocStatus;
+  note?: string;
+  business_date: string | null;
+  posted_at: string | null;
+  reversal_of: string | null;
+  lines: StocktakeLine[];
+}
+
+// dry-run response: same line shape, nothing persisted.
+export interface StocktakePreview {
+  lines: StocktakeLine[];
+  total_variance_cost_cents: number;
+}
+
+export interface StockMove {
+  id: string;
+  product_id: string;
+  product_name?: string;
+  kind:
+    | "receipt"
+    | "sale"
+    | "writeoff"
+    | "stocktake_surplus"
+    | "stocktake_shortage"
+    | "reversal";
+  qty: number; // milli base-units, signed
+  unit: BaseUnit;
+  cost_cents: number; // signed magnitude
+  estimated: boolean;
+  business_date: string;
+  recorded_at: string;
+  doc_kind: string;
+  doc_id: string;
+}
+
+export interface FoodCostRow {
+  menu_item_id: string;
+  name: string;
+  revenue_cents: number;
+  actual_cogs_cents: number;
+  theoretical_cogs_cents: number;
+  food_cost_pct: number; // actual_cogs / revenue, 0..1
+}
+
+export interface FoodCostReport {
+  items: FoodCostRow[];
+  totals: {
+    revenue_cents: number;
+    actual_cogs_cents: number;
+    theoretical_cogs_cents: number;
+    food_cost_pct: number;
+  };
+  estimated_share: number; // 0..1 share of sale moves flagged estimated
+}
