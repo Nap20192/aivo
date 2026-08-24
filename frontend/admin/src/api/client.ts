@@ -5,18 +5,28 @@ import {
   request as sharedRequest,
 } from "../../../design-system/shared/api";
 import { mockApi } from "./mock";
+import { ledgerMock } from "./ledgerMock";
 import type {
+  AcceptanceOverride,
+  Account,
+  AccountMapEntry,
   AssistantApplyResult,
   AssistantMessage,
   Category,
+  CostCenter,
   GuestDetail,
   GuestSummary,
+  JournalDocument,
+  JournalSummary,
+  ManualJournalInput,
   Me,
   Menu,
   MenuItem,
   Plan,
   Restaurant,
   Role,
+  ShiftAcceptance,
+  ShiftRow,
   StaffMember,
   Subscription,
   Table,
@@ -392,6 +402,97 @@ export const api = {
     return withFallback(
       () => request("POST", "/org/subscription", { plan }),
       () => mockApi.setSubscription(plan),
+    );
+  },
+
+  // ── Shift acceptance (manager+) ──
+  listShifts(id: string, state: "closed" | "accepted"): Promise<ShiftRow[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/shifts?state=${state}`),
+      () => ledgerMock.listShifts(state),
+    );
+  },
+
+  getAcceptance(id: string, shiftId: string): Promise<ShiftAcceptance> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/shifts/${shiftId}/acceptance`),
+      () => ledgerMock.getAcceptance(shiftId),
+    );
+  },
+
+  patchAcceptance(id: string, shiftId: string, lines: AcceptanceOverride[]): Promise<ShiftAcceptance> {
+    return withFallback(
+      () => request("PATCH", `/restaurants/${id}/shifts/${shiftId}/acceptance`, { lines }),
+      () => ledgerMock.patchAcceptance(shiftId, lines),
+    );
+  },
+
+  acceptShift(id: string, shiftId: string): Promise<{ shift: ShiftRow; document: JournalDocument }> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/shifts/${shiftId}/accept`),
+      () => ledgerMock.acceptShift(shiftId),
+    );
+  },
+
+  // ── Ledger back-office (manager+) ──
+  listAccounts(id: string): Promise<Account[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/ledger/accounts`),
+      () => ledgerMock.listAccounts(),
+    );
+  },
+
+  // §4 has no cost-centers list endpoint; the override dropdown needs one. Flagged.
+  listCostCenters(id: string): Promise<CostCenter[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/ledger/cost-centers`),
+      () => ledgerMock.listCostCenters(),
+    );
+  },
+
+  getAccountMap(id: string): Promise<AccountMapEntry[]> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/ledger/account-map`),
+      () => ledgerMock.getAccountMap(),
+    );
+  },
+
+  putAccountMap(id: string, map: { purpose: string; account_id: string }[]): Promise<AccountMapEntry[]> {
+    return withFallback(
+      () => request("PUT", `/restaurants/${id}/ledger/account-map`, { map }),
+      () => ledgerMock.putAccountMap(map),
+    );
+  },
+
+  listJournals(id: string, params: { from: string; to?: string; account?: string; source?: string }): Promise<JournalSummary[]> {
+    const qs = new URLSearchParams({ from: params.from });
+    if (params.to) qs.set("to", params.to);
+    if (params.account) qs.set("account", params.account);
+    if (params.source) qs.set("source", params.source);
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/ledger/journals?${qs}`),
+      () => ledgerMock.listJournals(),
+    );
+  },
+
+  getJournal(id: string, docId: string): Promise<JournalDocument> {
+    return withFallback(
+      () => request("GET", `/restaurants/${id}/ledger/journals/${docId}`),
+      () => ledgerMock.getJournal(docId),
+    );
+  },
+
+  postManualJournal(id: string, input: ManualJournalInput, post: boolean): Promise<{ document: JournalDocument }> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/ledger/journals${post ? "?post=1" : ""}`, input),
+      () => ledgerMock.postManualJournal(input, post),
+    );
+  },
+
+  cancelJournal(id: string, docId: string): Promise<{ reversal: JournalDocument; original: JournalDocument }> {
+    return withFallback(
+      () => request("POST", `/restaurants/${id}/ledger/journals/${docId}/cancel`),
+      () => ledgerMock.cancelJournal(docId),
     );
   },
 };

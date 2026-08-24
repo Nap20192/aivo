@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, invalidateStateCache } from "./api.ts";
-import type { HandoffPreview, Me, NewLine, PosRequest, PosState, PostedShift, Table } from "./types.ts";
+import type { CashKind, HandoffPreview, Me, NewLine, PaymentGroup, PosRequest, PosState, ShiftClose, Table, Tender, ZReport } from "./types.ts";
 import { formatCents as fmt, parseDollars } from "../../design-system/shared/money";
 import { defaultMod, timeHM, waiting } from "./format.ts";
 import { Badge, Button, EmptyState, Icon, StatusPill } from "./ui.tsx";
@@ -12,14 +12,26 @@ type Route =
   | { name: "pick" }
   | { name: "order"; tableId: string }
   | { name: "handoff" }
+  | { name: "tender"; tableId: string }
   | { name: "close" };
+
+const GROUP_LABEL: Record<PaymentGroup, string> = {
+  cash: "Cash",
+  card: "Card",
+  gift_card: "Gift card",
+  comp: "Comp",
+  void: "Void",
+  house_account: "House account",
+};
+const CASH_LABEL: Record<CashKind, string> = { pay_in: "Pay in", pay_out: "Pay out", drop: "Drop to safe" };
 
 const ticketTotal = (t: Table) => (t.ticket ? t.ticket.lines.reduce((a, l) => a + l.unit_price_cents * l.qty, 0) : 0);
 
 export default function App() {
   const [auth, setAuth] = useState<"loading" | "login" | Me>("loading");
   const [pos, setPos] = useState<PosState | null>(null);
-  const [posted, setPosted] = useState<PostedShift | null>(null);
+  const [closed, setClosed] = useState<{ shift: ShiftClose; z: ZReport } | null>(null);
+  const [cashOpen, setCashOpen] = useState(false);
   const [route, setRoute] = useState<Route>({ name: "floor" });
   const lastBody = useRef("");
 
@@ -94,12 +106,11 @@ export default function App() {
     );
   if (!pos) return <Frame context="aivo · waiter" />;
 
-  if (posted) {
-    const variance = posted.declared_cents - posted.expected_cents;
+  if (closed) {
     return (
-      <Frame context={`${posted.number} · accepted`}>
+      <Frame context={`${closed.shift.number} · closed`}>
         <div className="screen">
-          <div className="screen-body" style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 22px" }}>
+          <div className="screen-body" style={{ padding: "22px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
             <div
               style={{
                 width: 52,
@@ -109,41 +120,27 @@ export default function App() {
                 border: "1px solid var(--green-200)",
                 display: "grid",
                 placeItems: "center",
-                marginBottom: 20,
                 color: "var(--green-700)",
               }}
             >
               <Icon name="check" size={24} />
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <h2 style={{ margin: 0, font: "var(--weight-regular) 27px/1.15 var(--font-display)", letterSpacing: "-0.02em", color: "var(--ink-900)" }}>
-                {posted.number} accepted
+                {closed.shift.number} closed
               </h2>
-              <StatusPill status="accepted" label="accepted" />
+              <StatusPill status="closed" label="closed" />
             </div>
-            <p style={{ margin: "0 0 20px", font: "var(--weight-regular) 15px/1.55 var(--font-sans)", color: "var(--ink-600)" }}>
-              Posted at {posted.posted_at} · {posted.gl_lines} GL lines posted. This shift cannot be cancelled or reopened.
+            <p style={{ margin: 0, font: "var(--weight-regular) 15px/1.55 var(--font-sans)", color: "var(--ink-600)" }}>
+              Draft acceptance handed to the back office. A manager reviews and posts it. Nothing else can be tendered on this till until a new shift is open.
             </p>
-            <div className="card kv-card">
-              <div className="kv-row" style={{ padding: "11px 0" }}>
-                <span className="kv-key">Expected cash</span>
-                <span className="aivo-num" style={{ color: "var(--ink-900)" }}>{fmt(posted.expected_cents)}</span>
-              </div>
-              <div className="kv-row" style={{ padding: "11px 0" }}>
-                <span className="kv-key">Declared cash</span>
-                <span className="aivo-num" style={{ color: "var(--ink-900)" }}>{fmt(posted.declared_cents)}</span>
-              </div>
-              <div className="kv-row" style={{ padding: "11px 0" }}>
-                <span className="kv-key-strong">Variance</span>
-                <VarianceValue variance={variance} />
-              </div>
-            </div>
+            <ZReportView z={{ ...closed.z, declared_cents: closed.shift.declared_cents, variance_cents: closed.shift.variance_cents, state: "closed" }} />
           </div>
           <div className="screen-footer" style={{ padding: "12px 14px 16px" }}>
             <Button
               fullWidth
               onClick={() => {
-                setPosted(null);
+                setClosed(null);
                 setRoute({ name: "floor" });
                 refresh();
               }}
@@ -171,6 +168,7 @@ export default function App() {
     order: route.name === "order" ? `table ${pos.tables.find((t) => t.id === route.tableId)?.number ?? ""} · new order` : "",
     requests: "service requests",
     handoff: "add from code",
+    tender: route.name === "tender" ? `table ${pos.tables.find((t) => t.id === route.tableId)?.number ?? ""} · pay` : "",
     close: shift.number,
   };
 
@@ -195,6 +193,7 @@ export default function App() {
         onRequests={() => setRoute({ name: "requests" })}
         onAddFromCode={() => setRoute({ name: "handoff" })}
         onNewOrder={() => setRoute({ name: "pick" })}
+        onCash={() => setCashOpen(true)}
         onClose={() => setRoute({ name: "close" })}
       />
     );
@@ -205,6 +204,7 @@ export default function App() {
         table={table}
         onBack={goFloor}
         onAdd={() => startOrder(table.id)}
+        onTender={() => setRoute({ name: "tender", tableId: table.id })}
         onFire={() =>
           mutate(
             (p) => {
@@ -312,13 +312,36 @@ export default function App() {
         }}
       />
     );
+  } else if (route.name === "tender") {
+    const table = pos.tables.find((t) => t.id === route.tableId);
+    screen = table && table.ticket ? (
+      <TenderTicket
+        pos={pos}
+        table={table}
+        onBack={() => setRoute({ name: "ticket", tableId: table.id })}
+        onClosed={() => {
+          mutate(
+            (p) => {
+              const tb = p.tables.find((x) => x.id === table.id);
+              if (tb) {
+                tb.ticket = null;
+                tb.covers = null;
+              }
+            },
+            () => Promise.resolve()
+          );
+          goFloor();
+        }}
+      />
+    ) : null;
+    if (!table || !table.ticket) goFloor();
   } else if (route.name === "close") {
     screen = (
       <CloseShift
         pos={pos}
         onBack={goFloor}
-        onPosted={(p) => {
-          setPosted(p);
+        onClosed={(shift, z) => {
+          setClosed({ shift, z });
           refresh();
         }}
       />
@@ -328,6 +351,7 @@ export default function App() {
   return (
     <Frame context={contexts[route.name]}>
       {screen}
+      {cashOpen ? <CashModal shiftId={shift.id} onClose={() => setCashOpen(false)} onDone={refresh} /> : null}
     </Frame>
   );
 }
@@ -492,6 +516,7 @@ function Floor({
   onRequests,
   onAddFromCode,
   onNewOrder,
+  onCash,
   onClose,
 }: {
   pos: PosState;
@@ -499,6 +524,7 @@ function Floor({
   onRequests: () => void;
   onAddFromCode: () => void;
   onNewOrder: () => void;
+  onCash: () => void;
   onClose: () => void;
 }) {
   const reqCount = pos.requests.length;
@@ -511,6 +537,9 @@ function Floor({
         <h2 style={{ margin: 0, font: "var(--weight-regular) 22px/1.1 var(--font-display)", letterSpacing: "-0.02em", color: "var(--ink-900)" }}>Floor</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <StatusPill status="open" label="shift open" dot />
+          <Button variant="ghost" size="sm" onClick={onCash}>
+            Cash
+          </Button>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Close
           </Button>
@@ -575,7 +604,7 @@ function Floor({
   );
 }
 
-function Ticket({ table, onBack, onAdd, onFire }: { table: Table; onBack: () => void; onAdd: () => void; onFire: () => void }) {
+function Ticket({ table, onBack, onAdd, onTender, onFire }: { table: Table; onBack: () => void; onAdd: () => void; onTender: () => void; onFire: () => void }) {
   const tk = table.ticket;
   const lines = tk?.lines ?? [];
   const fired = !!tk?.fired_at;
@@ -668,7 +697,9 @@ function Ticket({ table, onBack, onAdd, onFire }: { table: Table; onBack: () => 
         </div>
       ) : (
         <div className="screen-footer footer-grid" style={{ gridTemplateColumns: "1fr 1.3fr" }}>
-          <Button fullWidth>Tender</Button>
+          <Button fullWidth iconLeft="receipt" onClick={onTender}>
+            Tender
+          </Button>
           <Button variant="primary" fullWidth iconLeft="flame" disabled={fired} onClick={onFire}>
             {fired ? "Fired" : "Fire to kitchen"}
           </Button>
@@ -1133,23 +1164,272 @@ function VarianceValue({ variance }: { variance: number | null }) {
   );
 }
 
-function CloseShift({ pos, onBack, onPosted }: { pos: PosState; onBack: () => void; onPosted: (p: PostedShift) => void }) {
+/** Read-only Z-report card: opening float, tenders by group, cash movements, expected/declared/variance. */
+function ZReportView({ z }: { z: ZReport }) {
+  const tips = z.tenders.reduce((a, t) => a + t.tip_cents, 0);
+  return (
+    <div className="card kv-card">
+      <div className="kv-row">
+        <span className="kv-key">Opening float</span>
+        <span className="aivo-num" style={{ color: "var(--ink-900)" }}>{fmt(z.opening_float_cents)}</span>
+      </div>
+      {z.tenders.map((t) => (
+        <div key={t.payment_group} className="kv-row">
+          <span className="kv-key">
+            {GROUP_LABEL[t.payment_group]}
+            {t.tip_cents ? <span style={{ color: "var(--ink-400)" }}> · tip {fmt(t.tip_cents)}</span> : null}
+          </span>
+          <span className="aivo-num" style={{ color: "var(--ink-900)" }}>{fmt(t.amount_cents)}</span>
+        </div>
+      ))}
+      {z.cash_operations.map((o, i) => (
+        <div key={i} className="kv-row">
+          <span className="kv-key">{CASH_LABEL[o.kind]}</span>
+          <span className="aivo-num" style={{ color: o.kind === "pay_in" ? "var(--green-700)" : "var(--red-700)" }}>
+            {o.kind === "pay_in" ? "+" : "−"}
+            {fmt(o.amount_cents)}
+          </span>
+        </div>
+      ))}
+      {tips ? (
+        <div className="kv-row">
+          <span className="kv-key">Tips (all tenders)</span>
+          <span className="aivo-num" style={{ color: "var(--ink-900)" }}>{fmt(tips)}</span>
+        </div>
+      ) : null}
+      <div className="kv-row">
+        <span className="kv-key-strong">Expected cash</span>
+        <span className="aivo-num" style={{ font: "600 14px/1.3 var(--font-mono)", color: "var(--ink-900)" }}>{fmt(z.expected_cash_cents)}</span>
+      </div>
+      {z.state !== "open" ? (
+        <>
+          <div className="kv-row">
+            <span className="kv-key">Declared cash</span>
+            <span className="aivo-num" style={{ color: "var(--ink-900)" }}>{fmt(z.declared_cents)}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-key-strong">Variance</span>
+            <VarianceValue variance={z.variance_cents} />
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function TenderTicket({ pos, table, onBack, onClosed }: { pos: PosState; table: Table; onBack: () => void; onClosed: () => void }) {
+  const ticket = table.ticket!;
+  const total = ticket.lines.reduce((a, l) => a + l.unit_price_cents * l.qty, 0);
+  // One editable tender line per payment method (cash/card). Blank = not used.
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [tips, setTips] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  // Cash inputs are money *received* (so change can be shown); card/other are the
+  // amount *applied*. The tender sent for cash is the amount due, not what was
+  // handed over — the contract requires Σ tenders == total (§4 tenders_mismatch).
+  const cents = (v: string | undefined) => (v ? parseDollars(v) ?? 0 : 0);
+  const isCash = (mid: string) => pos.payment_methods.find((m) => m.id === mid)?.payment_group === "cash";
+  const nonCashApplied = pos.payment_methods.filter((m) => !isCash(m.id)).reduce((a, m) => a + cents(amounts[m.id]), 0);
+  const cashReceived = pos.payment_methods.filter((m) => isCash(m.id)).reduce((a, m) => a + cents(amounts[m.id]), 0);
+  const cashDue = Math.max(0, total - nonCashApplied);
+  const change = Math.max(0, cashReceived - cashDue);
+  const covered = nonCashApplied + Math.min(cashReceived, cashDue);
+  const remaining = total - covered;
+  const canClose = total > 0 && covered === total;
+
+  const close = () => {
+    if (!canClose || busy) return;
+    setBusy(true);
+    setErr("");
+    // ponytail: assumes a single cash method (the seed has one); multiple cash
+    // methods would each claim cashDue. Split proportionally when that lands.
+    const tenders: Tender[] = pos.payment_methods.flatMap((m) => {
+      const tip = cents(tips[m.id]);
+      if (isCash(m.id)) return cashDue > 0 || tip > 0 ? [{ method_id: m.id, amount_cents: cashDue, tip_cents: tip }] : [];
+      const applied = cents(amounts[m.id]);
+      return applied > 0 || tip > 0 ? [{ method_id: m.id, amount_cents: applied, tip_cents: tip }] : [];
+    });
+    api
+      .closeTicket(ticket.id, tenders)
+      .then(onClosed)
+      .catch((e: { message?: string }) => {
+        setErr(e.message ?? "Could not close the ticket.");
+        setBusy(false);
+      });
+  };
+
+  return (
+    <div className="screen">
+      <div className="back-row">
+        <Button variant="ghost" size="sm" iconLeft="arrow-left" onClick={onBack}>
+          Ticket
+        </Button>
+      </div>
+      <div className="screen-body" style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 style={{ margin: 0, font: "var(--weight-regular) 24px/1.1 var(--font-display)", letterSpacing: "-0.02em", color: "var(--ink-900)" }}>
+            Table {table.number}
+          </h2>
+          <span className="aivo-num" style={{ font: "600 18px/1.3 var(--font-mono)", color: "var(--ink-900)" }}>{fmt(total)}</span>
+        </div>
+        <div className="card kv-card">
+          {pos.payment_methods.map((m) => (
+            <div key={m.id} className="kv-row" style={{ padding: "10px 0", gap: 10, flexWrap: "wrap" }}>
+              <span className="kv-key" style={{ flex: "none", minWidth: 52 }}>{m.name}</span>
+              <input
+                className="money-input"
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                style={{ width: 92 }}
+                value={amounts[m.id] ?? ""}
+                onChange={(e) => setAmounts({ ...amounts, [m.id]: e.target.value.replace(/[^0-9.]/g, "").slice(0, 9) })}
+              />
+              <input
+                className="money-input"
+                type="text"
+                inputMode="decimal"
+                placeholder="tip"
+                style={{ width: 68 }}
+                value={tips[m.id] ?? ""}
+                onChange={(e) => setTips({ ...tips, [m.id]: e.target.value.replace(/[^0-9.]/g, "").slice(0, 9) })}
+              />
+            </div>
+          ))}
+          <div className="kv-row">
+            <span className="kv-key">Exact-fill</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const cash = pos.payment_methods.find((m) => m.payment_group === "cash");
+                if (cash) setAmounts({ [cash.id]: (total / 100).toFixed(2) });
+              }}
+            >
+              Cash the total
+            </Button>
+          </div>
+        </div>
+        <div className="card kv-card">
+          <div className="kv-row">
+            <span className="kv-key">Applied</span>
+            <span className="aivo-num" style={{ color: "var(--ink-900)" }}>{fmt(covered)}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-key-strong">{remaining > 0 ? "Remaining" : "Change due"}</span>
+            <span
+              className="aivo-num"
+              style={{ font: "600 15px/1.3 var(--font-mono)", color: remaining > 0 ? "var(--red-700)" : "var(--green-700)" }}
+            >
+              {remaining > 0 ? fmt(remaining) : fmt(change)}
+            </span>
+          </div>
+        </div>
+        {err ? <div style={{ font: "var(--weight-regular) 13px/1.4 var(--font-sans)", color: "var(--red-700)" }}>{err}</div> : null}
+      </div>
+      <div className="screen-footer" style={{ padding: "12px 14px 16px" }}>
+        <Button variant="primary" fullWidth iconLeft="check" disabled={!canClose || busy} onClick={close}>
+          {canClose ? `Close ticket · ${fmt(total)}` : "Tenders must cover the total"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CashModal({ shiftId, onClose, onDone }: { shiftId: string; onClose: () => void; onDone: () => void }) {
+  const [kind, setKind] = useState<CashKind>("pay_in");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const cents = parseDollars(amount);
+  const submit = () => {
+    if (cents === null || cents <= 0 || busy) return;
+    setBusy(true);
+    setErr("");
+    api
+      .cashOperation(shiftId, kind, cents, reason)
+      .then(() => {
+        onDone();
+        onClose();
+      })
+      .catch((e: { message?: string }) => {
+        setErr(e.message ?? "Could not record the operation.");
+        setBusy(false);
+      });
+  };
+  return (
+    <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-sheet" role="dialog" aria-label="Cash operation">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <h3 style={{ margin: 0, font: "var(--weight-regular) 20px/1.1 var(--font-display)", color: "var(--ink-900)" }}>Cash operation</h3>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 12 }}>
+          {(["pay_in", "pay_out", "drop"] as CashKind[]).map((k) => (
+            <span key={k} className={`cat-chip${kind === k ? " active" : ""}`} style={{ textAlign: "center" }} onClick={() => setKind(k)}>
+              {CASH_LABEL[k]}
+            </span>
+          ))}
+        </div>
+        <div className="card kv-card" style={{ marginBottom: 12 }}>
+          <div className="kv-row" style={{ padding: "10px 0", gap: 12 }}>
+            <span className="kv-key" style={{ flex: "none" }}>Amount</span>
+            <input
+              className="money-input"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, "").slice(0, 9))}
+            />
+          </div>
+        </div>
+        <input
+          className="login-input"
+          type="text"
+          placeholder={kind === "pay_in" ? "Reason (e.g. change fund top-up)" : "Reason (e.g. supplier paid in cash)"}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          style={{ marginBottom: 12 }}
+        />
+        {err ? <div style={{ marginBottom: 12, font: "var(--weight-regular) 13px/1.4 var(--font-sans)", color: "var(--red-700)" }}>{err}</div> : null}
+        <Button variant="primary" fullWidth disabled={cents === null || cents <= 0 || busy} onClick={submit}>
+          Record {CASH_LABEL[kind].toLowerCase()}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CloseShift({ pos, onBack, onClosed }: { pos: PosState; onBack: () => void; onClosed: (shift: ShiftClose, z: ZReport) => void }) {
   const [declared, setDeclared] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [z, setZ] = useState<ZReport | null>(null);
   const shift = pos.shift!;
+
+  useEffect(() => {
+    api.zReport(shift.id).then(setZ).catch(() => setZ(null));
+  }, [shift.id]);
+
+  const expected = z?.expected_cash_cents ?? shift.expected_cents;
   const declaredCents = parseDollars(declared);
-  const variance = declaredCents === null ? null : declaredCents - shift.expected_cents;
+  const variance = declaredCents === null ? null : declaredCents - expected;
   const needsManager = variance !== null && Math.abs(variance) > 1000;
-  const accept = () => {
+  const close = () => {
     if (declaredCents === null || busy) return;
     setBusy(true);
     setErr("");
     api
       .closeShift(shift.id, declaredCents)
-      .then(onPosted)
+      .then((s) => onClosed(s, z ?? { opening_float_cents: shift.opening_float_cents, tenders: [], cash_operations: [], expected_cash_cents: expected, declared_cents: declaredCents, variance_cents: s.variance_cents, state: "closed" }))
       .catch((e: { message?: string }) => {
-        setErr(e.message ?? "Could not post the shift.");
+        setErr(e.message ?? "Could not close the shift.");
         setBusy(false);
       });
   };
@@ -1160,18 +1440,15 @@ function CloseShift({ pos, onBack, onPosted }: { pos: PosState; onBack: () => vo
           Floor
         </Button>
       </div>
-      <div className="screen-body" style={{ padding: "14px 18px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+      <div className="screen-body" style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h2 style={{ margin: 0, font: "var(--weight-regular) 24px/1.1 var(--font-display)", letterSpacing: "-0.02em", color: "var(--ink-900)" }}>
             Close shift
           </h2>
-          <StatusPill status="closed" label="cash frozen" />
+          <StatusPill status="open" label="counting" />
         </div>
-        <div className="card kv-card" style={{ marginBottom: 12 }}>
-          <div className="kv-row">
-            <span className="kv-key">Expected cash</span>
-            <span className="aivo-num" style={{ font: "500 14px/1.3 var(--font-mono)", color: "var(--ink-900)" }}>{fmt(shift.expected_cents)}</span>
-          </div>
+        {z ? <ZReportView z={{ ...z, declared_cents: declaredCents ?? 0, variance_cents: variance ?? 0, state: "open" }} /> : null}
+        <div className="card kv-card">
           <div className="kv-row" style={{ padding: "10px 0", gap: 12 }}>
             <span className="kv-key" style={{ flex: "none" }}>Declared cash</span>
             <input
@@ -1189,29 +1466,31 @@ function CloseShift({ pos, onBack, onPosted }: { pos: PosState; onBack: () => vo
           </div>
         </div>
         {needsManager ? (
-          <div className="warn-card" style={{ marginBottom: 12 }}>
+          <div className="warn-card">
             <div className="hint-card-title" style={{ color: "var(--orange-700)" }}>
               <Icon name="triangle-alert" size={15} />
               <span style={{ color: "var(--orange-700)" }}>Variance over $10.00</span>
             </div>
-            <div className="hint-card-body">A manager accepts this posting. Recount first — most variances are a miscounted float.</div>
+            <div className="hint-card-body">This posts as a cash over/short line. Recount first — most variances are a miscounted float.</div>
           </div>
         ) : null}
         <div className="hint-card">
           <div className="hint-card-title">
             <Icon name="lock" size={15} />
-            <span>Posting is immutable</span>
+            <span>Closing hands off to the back office</span>
           </div>
-          <div className="hint-card-body">An accepted shift cannot be cancelled or reopened. A manager accepts variances over $10.00.</div>
+          <div className="hint-card-body">
+            A draft acceptance journal is built for a manager to review and post. Any variance becomes a cash over/short entry.
+          </div>
         </div>
-        {err ? <div style={{ marginTop: 12, font: "var(--weight-regular) 13px/1.4 var(--font-sans)", color: "var(--red-700)" }}>{err}</div> : null}
+        {err ? <div style={{ font: "var(--weight-regular) 13px/1.4 var(--font-sans)", color: "var(--red-700)" }}>{err}</div> : null}
       </div>
       <div className="screen-footer footer-grid" style={{ gridTemplateColumns: "1fr 1.3fr" }}>
         <Button fullWidth onClick={() => setDeclared("")}>
           Recount
         </Button>
-        <Button variant="primary" fullWidth iconLeft="check" disabled={declaredCents === null || busy} onClick={accept}>
-          Accept and post
+        <Button variant="primary" fullWidth iconLeft="check" disabled={declaredCents === null || busy} onClick={close}>
+          Close shift
         </Button>
       </div>
     </div>

@@ -1,4 +1,19 @@
-import type { Me, MenuCategory, NewLine, PosApi, PosState, PostedShift } from "./types.ts";
+import type {
+  CashKind,
+  CashOperation,
+  ClosedTicket,
+  Me,
+  MenuCategory,
+  NewLine,
+  PaymentGroup,
+  PaymentMethod,
+  PosApi,
+  PosState,
+  ShiftClose,
+  Tender,
+  TicketPayment,
+  ZReport,
+} from "./types.ts";
 import { timeHM } from "./format.ts";
 
 // Fixtures matching docs/prototypes/aivo-pos-prototype.dc.html (Ember & Bone, shift-121).
@@ -54,11 +69,31 @@ let shiftSeq = 121;
 let idSeq = 1;
 const uid = (p: string) => p + "-" + idSeq++;
 
+const paymentMethods: PaymentMethod[] = [
+  { id: "pm-cash", code: "cash", name: "Cash", payment_group: "cash" },
+  { id: "pm-card", code: "card", name: "Card", payment_group: "card" },
+];
+const groupOf = (methodId: string): PaymentGroup => paymentMethods.find((m) => m.id === methodId)?.payment_group ?? "cash";
+
+// Per-shift accumulators (reset on open, cleared on close).
+let tenders: TicketPayment[] = [];
+let cashOps: CashOperation[] = [];
+
+// expected_cash = float + Σ cash tenders + pay_in − pay_out − drop (§3 formula).
+function expectedCash(): number {
+  const s = state.shift;
+  if (!s) return 0;
+  const cash = tenders.filter((t) => t.payment_group === "cash").reduce((a, t) => a + t.amount_cents, 0);
+  const move = cashOps.reduce((a, o) => a + (o.kind === "pay_in" ? o.amount_cents : -o.amount_cents), 0);
+  return s.opening_float_cents + cash + move;
+}
+
 const state: PosState = {
   restaurant: me.restaurant,
   till: 1,
   cashier: me.user.name,
   shift: null,
+  payment_methods: paymentMethods,
   other_till_shift: { till: 2, shift_number: "shift-117", cashier: "Marek", opened_at: "16:04" },
   tables: [
     {
@@ -185,6 +220,7 @@ export const mockApi: PosApi = {
     return me;
   },
   async state() {
+    if (state.shift) state.shift.expected_cents = expectedCash();
     // deep-ish copy so callers can't mutate fixtures
     return JSON.parse(JSON.stringify(state)) as PosState;
   },
@@ -197,9 +233,16 @@ export const mockApi: PosApi = {
       cashier: state.cashier,
       opened_at: timeHM(),
       opening_float_cents: openingFloatCents,
-      // ponytail: fixed takings offset matching the prototype; the real backend computes this
-      expected_cents: openingFloatCents + 113450,
+      expected_cents: openingFloatCents,
+      state: "open",
     };
+    // Seed a plausible evening so the Z-report has content in the demo.
+    tenders = [
+      { method_id: "pm-cash", payment_group: "cash", amount_cents: 68000, tip_cents: 0 },
+      { method_id: "pm-card", payment_group: "card", amount_cents: 45450, tip_cents: 5200 },
+    ];
+    cashOps = [{ id: uid("co"), kind: "pay_out", amount_cents: 5000, reason: "Supplier — bread", recorded_at: timeHM() }];
+    state.shift.expected_cents = expectedCash();
   },
   async addLines(tableId: string, lines: NewLine[]) {
     const table = state.tables.find((t) => t.id === tableId);
@@ -267,17 +310,72 @@ export const mockApi: PosApi = {
   async dismiss(requestId: string) {
     state.requests = state.requests.filter((r) => r.id !== requestId);
   },
-  async closeShift(shiftId: string, declaredCents: number): Promise<PostedShift> {
+  async closeTicket(ticketId: string, tenderLines: Tender[]): Promise<ClosedTicket> {
+    const table = state.tables.find((t) => t.ticket?.id === ticketId);
+    if (!table || !table.ticket) throw notFound();
+    const total = table.ticket.lines.reduce((a, l) => a + l.unit_price_cents * l.qty, 0);
+    const paid = tenderLines.reduce((a, t) => a + t.amount_cents, 0);
+    const allVoid = tenderLines.length > 0 && tenderLines.every((t) => groupOf(t.method_id) === "void");
+    if (!allVoid && total > 0 && paid !== total)
+      throw Object.assign(new Error("tenders do not cover the total"), { code: "tenders_mismatch", status: 422 });
+    const payments: TicketPayment[] = tenderLines.map((t) => ({
+      method_id: t.method_id,
+      payment_group: groupOf(t.method_id),
+      amount_cents: t.amount_cents,
+      tip_cents: t.tip_cents,
+    }));
+    tenders.push(...payments);
+    table.ticket = null;
+    table.covers = null;
+    return { id: ticketId, status: "closed", closed_at: timeHM(), total_cents: total, payments };
+  },
+  async cashOperation(shiftId: string, kind: CashKind, amountCents: number, reason: string): Promise<CashOperation> {
+    const s = state.shift;
+    if (!s || s.id !== shiftId) throw Object.assign(new Error("shift not open"), { code: "shift_not_open", status: 409 });
+    if (amountCents <= 0) throw Object.assign(new Error("amount must be positive"), { code: "invalid_amount", status: 422 });
+    const op: CashOperation = { id: uid("co"), kind, amount_cents: amountCents, reason, recorded_at: timeHM() };
+    cashOps.push(op);
+    return op;
+  },
+  async zReport(shiftId: string): Promise<ZReport> {
     const s = state.shift;
     if (!s || s.id !== shiftId) throw notFound();
-    state.shift = null;
-    shiftSeq++;
+    const byGroup = new Map<PaymentGroup, { amount_cents: number; tip_cents: number }>();
+    for (const t of tenders) {
+      const g = byGroup.get(t.payment_group) ?? { amount_cents: 0, tip_cents: 0 };
+      g.amount_cents += t.amount_cents;
+      g.tip_cents += t.tip_cents;
+      byGroup.set(t.payment_group, g);
+    }
     return {
-      number: s.number,
-      expected_cents: s.expected_cents,
-      declared_cents: declaredCents,
-      posted_at: timeHM(),
-      gl_lines: 3,
+      opening_float_cents: s.opening_float_cents,
+      tenders: [...byGroup.entries()].map(([payment_group, v]) => ({ payment_group, ...v })),
+      cash_operations: cashOps.map((o) => ({ kind: o.kind, amount_cents: o.amount_cents })),
+      expected_cash_cents: expectedCash(),
+      declared_cents: 0,
+      variance_cents: 0,
+      state: s.state,
     };
+  },
+  async closeShift(shiftId: string, declaredCents: number): Promise<ShiftClose> {
+    const s = state.shift;
+    if (!s || s.id !== shiftId) throw notFound();
+    const expected = expectedCash();
+    const out: ShiftClose = {
+      id: s.id,
+      number: s.number,
+      state: "closed",
+      expected_cents: expected,
+      declared_cents: declaredCents,
+      variance_cents: declaredCents - expected,
+      closed_at: timeHM(),
+      journal_document_id: uid("jd"),
+    };
+    // Draft journal is now built server-side; cashier's till is free for the next shift.
+    state.shift = null;
+    tenders = [];
+    cashOps = [];
+    shiftSeq++;
+    return out;
   },
 };

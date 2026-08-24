@@ -205,3 +205,121 @@ export interface GuestDetail {
   tags: string[];
   orders: GuestOrder[];
 }
+
+// ── Ledger / shift acceptance (docs/research/rms/impl-contract.md §4) ──
+
+export type AccountType =
+  | "asset"
+  | "liability"
+  | "revenue"
+  | "expense"
+  | "equity"
+  | "statistical";
+export type Side = "debit" | "credit";
+
+export interface Account {
+  id: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  normal_side: Side;
+  postable: boolean;
+}
+
+export interface CostCenter {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface AccountMapEntry {
+  purpose: string;
+  account_id: string;
+  account_code: string;
+}
+
+export type JournalKind = "shift_acceptance" | "manual" | "reversal";
+export type JournalState = "draft" | "posted" | "cancelled";
+export type ShiftState = "closed" | "accepted";
+
+export interface JournalLine {
+  line_id?: string; // present on draft acceptance lines (override target)
+  account_id: string;
+  account_code: string;
+  account_name?: string;
+  side: Side;
+  amount_cents: number;
+  cost_center_id: string;
+  memo?: string;
+  editable?: boolean; // draft lines only
+}
+
+export interface JournalSummary {
+  id: string;
+  kind: JournalKind;
+  state: JournalState;
+  accounting_date: string; // YYYY-MM-DD
+  recorded_at: string; // ISO
+  source_kind: "shift" | "manual" | null;
+  source_id: string | null;
+  reversal_of: string | null;
+  total_cents: number;
+}
+
+export interface JournalDocument {
+  id: string;
+  kind: JournalKind;
+  state: JournalState;
+  accounting_date: string;
+  recorded_at: string;
+  posted_at: string | null;
+  cancelled_at: string | null;
+  reversal_of: string | null;
+  lines: JournalLine[];
+}
+
+export interface ShiftRow {
+  id: string;
+  number: string;
+  cashier: string;
+  opened_at: string;
+  closed_at: string;
+  accepted_at: string | null;
+  state: ShiftState;
+  expected_cents: number;
+  declared_cents: number;
+  variance_cents: number;
+}
+
+export interface ShiftAcceptance {
+  shift: ShiftRow;
+  document: {
+    id: string;
+    state: JournalState; // "draft"
+    accounting_date: string;
+    recorded_at: string;
+    lines: JournalLine[];
+  };
+  variance_cents: number;
+  balanced: boolean;
+}
+
+// PATCH acceptance body — per-line override of account / cost-center.
+export interface AcceptanceOverride {
+  line_id: string;
+  account_id?: string;
+  cost_center_id?: string;
+}
+
+// POST manual journal body.
+export interface ManualJournalInput {
+  accounting_date: string;
+  memo: string;
+  lines: {
+    account_id: string;
+    side: Side;
+    amount_cents: number;
+    cost_center_id?: string;
+    memo?: string;
+  }[];
+}

@@ -11,10 +11,13 @@ import Assistant from "./pages/Assistant";
 import Dashboard from "./pages/Dashboard";
 import GuestDetail from "./pages/GuestDetail";
 import Guests from "./pages/Guests";
+import Ledger from "./pages/Ledger";
 import Login from "./pages/Login";
 import MenuScreen from "./pages/MenuScreen";
 import Register from "./pages/Register";
 import Settings from "./pages/Settings";
+import ShiftAcceptance from "./pages/ShiftAcceptance";
+import Shifts from "./pages/Shifts";
 import Staff from "./pages/Staff";
 import Subscription from "./pages/Subscription";
 import Tables from "./pages/Tables";
@@ -67,6 +70,9 @@ const router = createBrowserRouter(
         { path: "assistant", element: <Assistant /> },
         { path: "guests", element: <Guests /> },
         { path: "guests/:customerId", element: <GuestDetail /> },
+        { path: "shifts", element: <Shifts /> },
+        { path: "shifts/:shiftId", element: <ShiftAcceptance /> },
+        { path: "ledger", element: <Ledger /> },
         { path: "tables", element: <Tables /> },
         { path: "staff", element: <Staff /> },
         { path: "settings", element: <Settings /> },

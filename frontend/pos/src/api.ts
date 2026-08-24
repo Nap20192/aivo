@@ -1,5 +1,5 @@
 import { ApiError, request } from "../../design-system/shared/api";
-import type { HandoffPreview, Me, NewLine, PosApi, PosState, PostedShift } from "./types.ts";
+import type { CashOperation, ClosedTicket, HandoffPreview, Me, NewLine, PosApi, PosState, ShiftClose, Tender, ZReport } from "./types.ts";
 import { mockApi } from "./mock.ts";
 
 export { ApiError };
@@ -57,7 +57,11 @@ const realApi: PosApi = {
   acceptHandoff: (code, table_id) => req("POST", `/pos/handoff/${encodeURIComponent(code)}/accept`, { table_id }),
   ack: (requestId) => req("POST", `/pos/requests/${requestId}/ack`),
   dismiss: (requestId) => req("POST", `/pos/requests/${requestId}/dismiss`),
-  closeShift: (shiftId, declared_cents) => req<PostedShift>("POST", `/pos/shifts/${shiftId}/close`, { declared_cents }),
+  closeTicket: (ticketId, tenders: Tender[]) => req<ClosedTicket>("POST", `/pos/tickets/${ticketId}/close`, { payments: tenders }),
+  cashOperation: (shiftId, kind, amount_cents, reason) =>
+    req<CashOperation>("POST", `/pos/shifts/${shiftId}/cash-operations`, { kind, amount_cents, reason }),
+  closeShift: (shiftId, declared_cents) => req<ShiftClose>("POST", `/pos/shifts/${shiftId}/close`, { declared_cents }),
+  zReport: (shiftId) => req<ZReport>("GET", `/pos/shifts/${shiftId}/z-report`),
 };
 
 let mockActive = import.meta.env.VITE_MOCK === "1";

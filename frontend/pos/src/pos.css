@@ -23,6 +23,7 @@ body {
   font-family: var(--font-sans);
 }
 .app-frame {
+  position: relative;
   width: 100%;
   max-width: 430px;
   height: 100dvh;
@@ -32,6 +33,24 @@ body {
   border-left: 1px solid var(--border-default);
   border-right: 1px solid var(--border-default);
   overflow: hidden;
+}
+
+/* Bottom-sheet modal, overlaid inside the phone frame. */
+.modal-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.4);
+}
+.modal-sheet {
+  width: 100%;
+  background: var(--paper-0);
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  padding: 18px 16px 18px;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18);
 }
 
 .statusbar {
