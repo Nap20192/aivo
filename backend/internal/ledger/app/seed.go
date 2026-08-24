@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"database/sql"
 
 	ledger "aivo/internal/domain/ledger"
 	"aivo/internal/ledger/ports"
@@ -43,25 +44,37 @@ var defaultMap = []struct{ purpose, code string }{
 // transaction. Not idempotent (unique code) — call once at provisioning.
 func (a *App) SeedRestaurant(ctx context.Context, restaurantID uuid.UUID) error {
 	return a.store.InTx(ctx, func(st ports.Store) error {
-		codeToID := map[string]uuid.UUID{}
-		for _, acc := range defaultAccounts {
-			acc.ID = a.newID()
-			acc.RestaurantID = restaurantID
-			if err := st.InsertAccount(ctx, acc); err != nil {
-				return err
-			}
-			codeToID[acc.Code] = acc.ID
-		}
-		if err := st.InsertCostCenter(ctx, ledger.CostCenter{
-			ID: a.newID(), RestaurantID: restaurantID, Code: CostCenterMain, Name: "Main",
-		}); err != nil {
+		return a.seedOn(ctx, st, restaurantID)
+	})
+}
+
+// SeedRestaurantTx seeds the chart of accounts + cost center + account map
+// on an externally-provided transaction, so live restaurant provisioning
+// (platform) can seed the GL in the SAME transaction as the restaurant
+// row (M3/BUG-1). The tx is the platform's; both tables share one Postgres.
+func (a *App) SeedRestaurantTx(ctx context.Context, tx *sql.Tx, restaurantID uuid.UUID) error {
+	return a.seedOn(ctx, a.store.WithTx(tx), restaurantID)
+}
+
+func (a *App) seedOn(ctx context.Context, st ports.Store, restaurantID uuid.UUID) error {
+	codeToID := map[string]uuid.UUID{}
+	for _, acc := range defaultAccounts {
+		acc.ID = a.newID()
+		acc.RestaurantID = restaurantID
+		if err := st.InsertAccount(ctx, acc); err != nil {
 			return err
 		}
-		for _, m := range defaultMap {
-			if err := st.PutAccountMap(ctx, restaurantID, m.purpose, codeToID[m.code]); err != nil {
-				return err
-			}
+		codeToID[acc.Code] = acc.ID
+	}
+	if err := st.InsertCostCenter(ctx, ledger.CostCenter{
+		ID: a.newID(), RestaurantID: restaurantID, Code: CostCenterMain, Name: "Main",
+	}); err != nil {
+		return err
+	}
+	for _, m := range defaultMap {
+		if err := st.PutAccountMap(ctx, restaurantID, m.purpose, codeToID[m.code]); err != nil {
+			return err
 		}
-		return nil
-	})
+	}
+	return nil
 }

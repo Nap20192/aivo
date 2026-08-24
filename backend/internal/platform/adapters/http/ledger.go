@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -47,20 +48,29 @@ func (h *handler) listShifts(w http.ResponseWriter, r *http.Request, _ domain.Us
 	}
 	out := make([]map[string]any, len(shifts))
 	for i, s := range shifts {
-		number, _ := h.Pos.ShiftNumber(r.Context(), rest.ID, s.ID)
-		out[i] = map[string]any{
-			"id": s.ID, "number": number, "cashier": s.Cashier,
-			"opened_at": s.OpenedAt, "closed_at": s.ClosedAt, "accepted_at": s.AcceptedAt,
-			"state":          s.State(),
-			"expected_cents": derefInt(s.ExpectedCents),
-			"declared_cents": derefInt(s.DeclaredCents),
-			"variance_cents": derefInt(s.VarianceCents),
-		}
+		out[i] = h.shiftRowView(r.Context(), rest.ID, s)
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
+// shiftRowView is the full ShiftRow the admin UI expects (contract §4 list
+// shape): number as the display string "shift-N", cashier, timestamps, and
+// the cash figures — so the acceptance header/summary never render NaN.
+func (h *handler) shiftRowView(ctx context.Context, restaurantID uuid.UUID, s posdomain.Shift) map[string]any {
+	number, _ := h.Pos.ShiftNumber(ctx, restaurantID, s.ID)
+	return map[string]any{
+		"id": s.ID, "number": fmt.Sprintf("shift-%d", number), "cashier": s.Cashier,
+		"opened_at": s.OpenedAt, "closed_at": s.ClosedAt, "accepted_at": s.AcceptedAt,
+		"state":          s.State(),
+		"expected_cents": derefInt(s.ExpectedCents),
+		"declared_cents": derefInt(s.DeclaredCents),
+		"variance_cents": derefInt(s.VarianceCents),
+	}
+}
+
 // acceptanceView is the draft-journal review payload (GET/PATCH share it).
+// The shift is the full ShiftRow (M1) so the UI can show cashier + the
+// declared/expected/variance the manager posts against.
 func (h *handler) acceptanceView(ctx context.Context, restaurantID uuid.UUID, sh posdomain.Shift, doc ledgerdomain.JournalDocument) (map[string]any, error) {
 	idx, err := h.accountIndex(ctx, restaurantID)
 	if err != nil {
@@ -77,7 +87,7 @@ func (h *handler) acceptanceView(ctx context.Context, restaurantID uuid.UUID, sh
 		}
 	}
 	return map[string]any{
-		"shift": map[string]any{"id": sh.ID, "state": sh.State()},
+		"shift": h.shiftRowView(ctx, restaurantID, sh),
 		"document": map[string]any{
 			"id": doc.ID, "state": doc.State,
 			"accounting_date": doc.AccountingDate.Format("2006-01-02"),
@@ -205,6 +215,18 @@ func (h *handler) ledgerAccounts(w http.ResponseWriter, r *http.Request, _ domai
 			"id": a.ID, "code": a.Code, "name": a.Name,
 			"type": a.Type, "normal_side": a.NormalSide, "postable": a.Postable,
 		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *handler) ledgerCostCenters(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+	centers, err := h.Ledger.CostCenters(r.Context(), rest.ID)
+	if writeAppErr(w, err) {
+		return
+	}
+	out := make([]map[string]any, len(centers))
+	for i, c := range centers {
+		out[i] = map[string]any{"id": c.ID, "code": c.Code, "name": c.Name}
 	}
 	writeJSON(w, http.StatusOK, out)
 }

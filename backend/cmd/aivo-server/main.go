@@ -40,6 +40,7 @@ import (
 	"aivo/internal/pos/adapters/menubridge"
 	pospg "aivo/internal/pos/adapters/postgres"
 	posapp "aivo/internal/pos/app"
+	"aivo/internal/provisioning"
 	"aivo/migrations"
 	"aivo/pkg/migrate"
 
@@ -108,6 +109,9 @@ func run() error {
 	platformApplication := platformapp.New(platformStore, billing.NewFake(), themeGen)
 	ledgerApplication := ledgerapp.New(ledgerStore)
 	posApplication := posapp.New(posStore, menubridge.New(menuStore), ledgerbridge.New(ledgerApplication))
+	// Live restaurant provisioning seeds the GL + payment methods in the
+	// same transaction as the restaurant row (M3 / BUG-1).
+	platformStore.OnProvisionRestaurant = provisioning.RestaurantProvisioner(ledgerApplication)
 
 	var images platformports.ImageStore
 	imagePrefix := ""

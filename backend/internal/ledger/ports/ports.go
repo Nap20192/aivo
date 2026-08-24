@@ -57,6 +57,7 @@ type Store interface {
 	// Cost centers.
 	InsertCostCenter(ctx context.Context, c ledger.CostCenter) error
 	CostCenterByCode(ctx context.Context, restaurantID uuid.UUID, code string) (ledger.CostCenter, error)
+	CostCenters(ctx context.Context, restaurantID uuid.UUID) ([]ledger.CostCenter, error)
 
 	// Account map.
 	PutAccountMap(ctx context.Context, restaurantID uuid.UUID, purpose string, accountID uuid.UUID) error
@@ -69,6 +70,11 @@ type Store interface {
 	// LiveDocumentBySource returns the single non-cancelled document for a
 	// source (e.g. a shift), ErrNotFound if none.
 	LiveDocumentBySource(ctx context.Context, restaurantID uuid.UUID, sourceKind string, sourceID uuid.UUID) (ledger.JournalDocument, error)
+	// LockDocumentState locks the document row FOR UPDATE and returns its
+	// state — so the override and post paths serialize on the same row
+	// (append-only guard against a PATCH racing an accept). Must run inside
+	// a transaction. ErrNotFound if the document is missing.
+	LockDocumentState(ctx context.Context, restaurantID, id uuid.UUID) (string, error)
 	// ReplaceDraftLines rewrites the lines of a draft document (override
 	// path). No-op guard belongs to the caller (must be draft).
 	ReplaceDraftLines(ctx context.Context, documentID uuid.UUID, lines []ledger.JournalLine) error

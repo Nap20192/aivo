@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
-	ledgerapp "aivo/internal/ledger/app"
 	ledger "aivo/internal/domain/ledger"
+	ledgerapp "aivo/internal/ledger/app"
 	"aivo/internal/ledger/ports"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -499,5 +500,144 @@ func TestOneLiveDocumentPerShift(t *testing.T) {
 	tx3.Rollback()
 	if !errors.Is(err, ports.ErrConflict) {
 		t.Errorf("rebuild after reversal: got %v, want ErrConflict (reversal holds the live slot)", err)
+	}
+}
+
+// B1 — override (PATCH acceptance) racing accept (post) must never rewrite
+// the lines of an already-posted document (append-only, D1/§15.2/§15.3).
+// The FOR UPDATE lock + state re-read in both paths serializes them on the
+// journal_documents row: either the override applies to a still-draft doc
+// and the post then posts those lines, or the post wins and the override is
+// rejected with ErrNotDraft — never a post followed by a silent line
+// rewrite. Pre-fix (override in a separate tx with no row lock) this races
+// into a mutation of the posted fact.
+func TestOverrideRacesAcceptStaysAppendOnly(t *testing.T) {
+	ctx, db, app := setupLedger(t)
+	restID, userID := seedRestaurant(t, ctx, db, app)
+
+	// A distinct postable account (1020 undeposited funds) the override
+	// swaps the cash-drawer line onto, so the applied set is detectable.
+	var swap uuid.UUID
+	accs, err := app.Accounts(ctx, restID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range accs {
+		if a.Code == "1020" {
+			swap = a.ID
+		}
+	}
+
+	for i := 0; i < 25; i++ {
+		docID := buildShiftJournal(t, ctx, db, app, ledgerapp.ShiftJournalInput{
+			RestaurantID: restID, ShiftID: uuid.New(), CreatedBy: userID,
+			AccountingDate: time.Now().UTC(),
+			Tenders:        []ledgerapp.TenderTotal{{Group: "cash", AmountCents: 10000}},
+		})
+		draft, err := app.GetJournal(ctx, restID, docID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Override set B: the same balanced lines with the first line's
+		// account swapped to 1020 (fresh line ids).
+		override := make([]ledger.JournalLine, len(draft.Lines))
+		for j, l := range draft.Lines {
+			l.ID = uuid.New()
+			if j == 0 {
+				l.AccountID = swap
+			}
+			override[j] = l
+		}
+
+		var wg sync.WaitGroup
+		var overrideErr, postErr error
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			overrideErr = app.OverrideDraftLines(ctx, restID, docID, override)
+		}()
+		go func() {
+			defer wg.Done()
+			tx, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				postErr = err
+				return
+			}
+			if err := app.PostShiftJournal(ctx, tx, restID, docID); err != nil {
+				tx.Rollback()
+				postErr = err
+				return
+			}
+			postErr = tx.Commit()
+		}()
+		wg.Wait()
+
+		if postErr != nil {
+			t.Fatalf("iter %d: post failed: %v", i, postErr)
+		}
+		if overrideErr != nil && !errors.Is(overrideErr, ledger.ErrNotDraft) {
+			t.Fatalf("iter %d: unexpected override error: %v", i, overrideErr)
+		}
+
+		final, err := app.GetJournal(ctx, restID, docID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if final.State != ledger.StatePosted {
+			t.Fatalf("iter %d: final state %s, want posted", i, final.State)
+		}
+		assertBalanced(t, final)
+		if len(final.Lines) != len(draft.Lines) {
+			t.Fatalf("iter %d: torn line set: %d lines, want %d", i, len(final.Lines), len(draft.Lines))
+		}
+		_, hasSwap := lineOn(final, swap)
+		// Coherent outcome: override succeeded ⟺ its lines are the posted
+		// ones; override rejected ⟺ the original lines survived. Never a
+		// post followed by a rewrite.
+		if overrideErr == nil && !hasSwap {
+			t.Fatalf("iter %d: override reported success but its lines were not posted", i)
+		}
+		if errors.Is(overrideErr, ledger.ErrNotDraft) && hasSwap {
+			t.Fatalf("iter %d: override rejected yet its lines mutated the posted document", i)
+		}
+	}
+}
+
+// M2 — OverrideDraftLines must reject a cost center that does not belong to
+// the restaurant, returning a 422 (ErrInvalid) rather than letting a foreign
+// UUID reach the FK and surface as a 500.
+func TestOverrideRejectsForeignCostCenter(t *testing.T) {
+	ctx, db, app := setupLedger(t)
+	restID, userID := seedRestaurant(t, ctx, db, app)
+
+	docID := buildShiftJournal(t, ctx, db, app, ledgerapp.ShiftJournalInput{
+		RestaurantID: restID, ShiftID: uuid.New(), CreatedBy: userID,
+		AccountingDate: time.Now().UTC(),
+		Tenders:        []ledgerapp.TenderTotal{{Group: "cash", AmountCents: 10000}},
+	})
+	draft, err := app.GetJournal(ctx, restID, docID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := make([]ledger.JournalLine, len(draft.Lines))
+	for i, l := range draft.Lines {
+		l.ID = uuid.New()
+		if i == 0 {
+			l.CostCenterID = uuid.New() // foreign / non-existent cost center
+		}
+		lines[i] = l
+	}
+	err = app.OverrideDraftLines(ctx, restID, docID, lines)
+	if !errors.Is(err, ledgerapp.ErrInvalid) {
+		t.Errorf("override with a foreign cost center: got %v, want ErrInvalid", err)
+	}
+	// The draft must be untouched (still balanced, original cost centers).
+	after, err := app.GetJournal(ctx, restID, docID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertBalanced(t, after)
+	if after.State != ledger.StateDraft {
+		t.Errorf("draft state changed to %s", after.State)
 	}
 }

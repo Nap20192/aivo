@@ -30,6 +30,7 @@ import (
 	"aivo/internal/platform/adapters/billing"
 	platformpg "aivo/internal/platform/adapters/postgres"
 	platformapp "aivo/internal/platform/app"
+	"aivo/internal/provisioning"
 	"aivo/migrations"
 	"aivo/pkg/migrate"
 
@@ -71,7 +72,11 @@ func run() error {
 	}
 
 	menuStore := menupg.NewPostgresStoreFromDB(db)
-	platform := platformapp.New(platformpg.NewStore(db), billing.NewFake(), nil)
+	platformStore := platformpg.NewStore(db)
+	// Seed the GL + payment methods on restaurant creation, atomically,
+	// the same as the live server (so the demo tenant is fully provisioned).
+	platformStore.OnProvisionRestaurant = provisioning.RestaurantProvisioner(ledgerapp.New(ledgerpg.NewStore(db)))
+	platform := platformapp.New(platformStore, billing.NewFake(), nil)
 
 	owner, _, err := platform.Register(ctx, "Ember & Bone", "Ember & Bone", "owner@ember.test", "embertest1")
 	if err != nil {
@@ -113,9 +118,6 @@ func run() error {
 	}
 
 	if err := seedMenu(ctx, menuStore, rest.ID); err != nil {
-		return err
-	}
-	if err := seedLedger(ctx, db, rest.ID); err != nil {
 		return err
 	}
 	if err := seedCustomer(ctx, db, menuStore, platform, rest.ID); err != nil {
@@ -316,28 +318,6 @@ func seedCustomer(ctx context.Context, db *sql.DB, store *menupg.PostgresStore, 
 		return fmt.Errorf("seed: guest profile: %w", err)
 	}
 	fmt.Println("Demo customer: guest@ember.test / embertest1 (2 historical orders)")
-	return nil
-}
-
-// seedLedger provisions the restaurant's chart of accounts + account map
-// + "main" cost center (via ledger app), and the pos payment_methods
-// (cash, card). Mirrors what restaurant provisioning will do.
-func seedLedger(ctx context.Context, db *sql.DB, restaurantID uuid.UUID) error {
-	ledger := ledgerapp.New(ledgerpg.NewStore(db))
-	if err := ledger.SeedRestaurant(ctx, restaurantID); err != nil {
-		return fmt.Errorf("seed: ledger: %w", err)
-	}
-	for _, m := range []struct{ code, name, group string }{
-		{"cash", "Cash", "cash"},
-		{"card", "Card", "card"},
-	} {
-		if _, err := db.ExecContext(ctx,
-			`INSERT INTO payment_methods (id, restaurant_id, code, name, payment_group) VALUES ($1, $2, $3, $4, $5)`,
-			uuid.New(), restaurantID, m.code, m.name, m.group); err != nil {
-			return fmt.Errorf("seed: payment method %s: %w", m.code, err)
-		}
-	}
-	fmt.Println("Seeded ledger: chart of accounts + account-map + cost-center main + payment methods (cash, card)")
 	return nil
 }
 

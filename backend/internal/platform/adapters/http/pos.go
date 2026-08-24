@@ -288,6 +288,22 @@ func (h *handler) posState(w http.ResponseWriter, r *http.Request, u domain.User
 	}
 	menu := posMenu(menus, cats, items)
 
+	// Tender methods for the ticket-close screen (§4 has no list-methods
+	// endpoint; POS reads them off /pos/state).
+	methods, err := h.Pos.PaymentMethods(r.Context(), restaurantID)
+	if writeAppErr(w, err) {
+		return
+	}
+	paymentMethods := make([]map[string]any, 0, len(methods))
+	for _, m := range methods {
+		if !m.Active {
+			continue
+		}
+		paymentMethods = append(paymentMethods, map[string]any{
+			"id": m.ID, "code": m.Code, "name": m.Name, "payment_group": m.PaymentGroup,
+		})
+	}
+
 	// ETag on the 5s poll: hash the body, If-None-Match hit → 304 and no
 	// bytes. No caching layers — just a hash compare per request.
 	body, err := json.Marshal(map[string]any{
@@ -299,6 +315,7 @@ func (h *handler) posState(w http.ResponseWriter, r *http.Request, u domain.User
 		"tables":           tables,
 		"requests":         requests,
 		"menu":             menu,
+		"payment_methods":  paymentMethods,
 	})
 	if writeAppErr(w, err) {
 		return
