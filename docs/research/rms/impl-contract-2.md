@@ -699,10 +699,14 @@ admin-отчётах). При отсутствии тех-карты — тих�
 (products, tech-cards, suppliers, receipts, write-offs, stocktakes, on-hand,
 stock-moves, food-cost) с гейтами storekeeper+/manager+.
 
-**Роль `storekeeper`** — добавить в platform-роли (`domain.md` §3a: `users.role`
-text, дешёвое расширение; статическая матрица прав в коде). Если раскатка ролей
-отдельным слайсом ещё не сделана — временно гейтить склад ролью `manager+`, отметить
-в DoD.
+**Роль `storekeeper`** — **добавляется в этом инкременте** (`domain.md` §3a:
+`users.role` text, дешёвое расширение; статическая матрица прав в коде
+`platform/app`). Скоуп ролей — минимальный под склад: завести `storekeeper`
+(restaurant-scoped staff, фабрика `NewStaff`) и права `inventory:documents`
+(storekeeper+), `inventory:stocktake_post` / `inventory:techcards` /
+`inventory:reports` (manager+). `cook`/`cashier` из общей матрицы `domain.md` §3a
+— **не** в этом инкременте (придут со своими слайсами KDS/касса). Матрица —
+статическая (permission→роли), не таблица (кастомных ролей никто не просил, YAGNI).
 
 **Транзакции — где:**
 - `PostReceipt` / `PostWriteOff` / `PostStocktake` — **1 tx**: moves + on_hand
@@ -817,6 +821,8 @@ GL инвентарных документов балансируется, не�
   batch-expiry / мультивалюты / мульти-складов / received-not-billed-цепочки /
   рекурсивного списания. Backdate-запрет и single-currency помечены комментариями
   с upgrade-path.
+- Роль `storekeeper` заведена (platform), матрица прав склада (`inventory:*`)
+  гейтит эндпоинты §10; owner/manager сохраняют доступ.
 - Обновлены: `PLATFORM.md` (эндпоинты §10), `CONTEXT.md` (новый контекст inventory +
   решения: weighted-average, calendar-versioning, синхронный COGS-порт,
   AP-вместо-RNB), `docs/adr/` — при желании ADR на «weighted average вместо FIFO» и
