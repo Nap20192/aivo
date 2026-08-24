@@ -143,6 +143,7 @@ func NewMux(d Deps) http.Handler {
 
 	// Ledger back office (manager+, restaurant-scoped).
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/ledger/accounts", h.restaurant(true, h.ledgerAccounts))
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/ledger/cost-centers", h.restaurant(true, h.ledgerCostCenters))
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/ledger/account-map", h.restaurant(true, h.getAccountMap))
 	mux.HandleFunc("PUT /api/v1/restaurants/{id}/ledger/account-map", h.restaurant(true, h.putAccountMap))
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/ledger/journals", h.restaurant(true, h.listJournals))

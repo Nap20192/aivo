@@ -330,11 +330,24 @@ func (a *App) BuildDraftShiftJournal(ctx context.Context, tx *sql.Tx, in ShiftJo
 	return doc.ID, nil
 }
 
+// CostCenters returns the restaurant's cost centers (override dropdown).
+func (a *App) CostCenters(ctx context.Context, restaurantID uuid.UUID) ([]ledger.CostCenter, error) {
+	return a.store.CostCenters(ctx, restaurantID)
+}
+
 // PostShiftJournal posts a draft acceptance document in tx (called at
-// Accept). It validates balance + period gate through the domain and
-// flips draft→posted.
+// Accept). It locks the document row FOR UPDATE and re-reads its state in
+// the same transaction, so a concurrent override cannot rewrite the lines
+// of a document that has just been posted (append-only, B1/§15.2/§15.3).
 func (a *App) PostShiftJournal(ctx context.Context, tx *sql.Tx, restaurantID, docID uuid.UUID) error {
 	st := a.store.WithTx(tx)
+	state, err := st.LockDocumentState(ctx, restaurantID, docID)
+	if err != nil {
+		return err
+	}
+	if state != ledger.StateDraft {
+		return ledger.ErrNotDraft
+	}
 	doc, err := st.DocumentByID(ctx, restaurantID, docID)
 	if err != nil {
 		return err
@@ -347,15 +360,12 @@ func (a *App) PostShiftJournal(ctx context.Context, tx *sql.Tx, restaurantID, do
 }
 
 // OverrideDraftLines rewrites a draft document's lines (acceptance review
-// override, §15.2). Rejects non-draft and non-postable accounts.
+// override, §15.2). The write runs in one transaction that locks the
+// document row FOR UPDATE and re-reads its state, so a concurrent accept
+// cannot flip the document to posted between the check and the rewrite
+// (append-only guard, B1). Rejects non-postable/foreign accounts and cost
+// centers that do not belong to the restaurant.
 func (a *App) OverrideDraftLines(ctx context.Context, restaurantID, docID uuid.UUID, lines []ledger.JournalLine) error {
-	doc, err := a.store.DocumentByID(ctx, restaurantID, docID)
-	if err != nil {
-		return err
-	}
-	if doc.State != ledger.StateDraft {
-		return ledger.ErrNotDraft
-	}
 	for _, l := range lines {
 		acc, err := a.store.AccountByID(ctx, restaurantID, l.AccountID)
 		if err != nil {
@@ -365,5 +375,36 @@ func (a *App) OverrideDraftLines(ctx context.Context, restaurantID, docID uuid.U
 			return fmt.Errorf("%w: %s", ErrAccountNotPostable, acc.Code)
 		}
 	}
-	return a.store.ReplaceDraftLines(ctx, docID, lines)
+	if err := a.validateCostCenters(ctx, restaurantID, lines); err != nil {
+		return err
+	}
+	return a.store.InTx(ctx, func(st ports.Store) error {
+		state, err := st.LockDocumentState(ctx, restaurantID, docID)
+		if err != nil {
+			return err
+		}
+		if state != ledger.StateDraft {
+			return ledger.ErrNotDraft
+		}
+		return st.ReplaceDraftLines(ctx, docID, lines)
+	})
+}
+
+// validateCostCenters rejects a line whose cost center does not belong to
+// the restaurant (an FK would otherwise surface as a 500 instead of 422).
+func (a *App) validateCostCenters(ctx context.Context, restaurantID uuid.UUID, lines []ledger.JournalLine) error {
+	centers, err := a.store.CostCenters(ctx, restaurantID)
+	if err != nil {
+		return err
+	}
+	own := map[uuid.UUID]bool{}
+	for _, c := range centers {
+		own[c.ID] = true
+	}
+	for _, l := range lines {
+		if !own[l.CostCenterID] {
+			return fmt.Errorf("%w: cost center %s does not belong to the restaurant", ErrInvalid, l.CostCenterID)
+		}
+	}
+	return nil
 }

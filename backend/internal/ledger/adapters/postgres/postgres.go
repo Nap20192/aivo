@@ -35,8 +35,11 @@ var _ ports.Store = (*Store)(nil)
 
 func NewStore(db *sql.DB) *Store { return &Store{pool: db, q: db} }
 
-// WithTx returns a Store whose queries run on tx.
-func (s *Store) WithTx(tx *sql.Tx) ports.Store { return &Store{pool: s.pool, q: tx} }
+// WithTx returns a Store whose queries run on tx. pool is left nil: a
+// tx-bound store must never begin its own (second) transaction — that is
+// what makes ReplaceDraftLines run its DELETE+INSERT inline on the caller's
+// tx instead of self-deadlocking on a second connection.
+func (s *Store) WithTx(tx *sql.Tx) ports.Store { return &Store{q: tx} }
 
 // InTx runs fn in one transaction against a tx-bound Store.
 func (s *Store) InTx(ctx context.Context, fn func(ports.Store) error) error {
@@ -137,6 +140,24 @@ func (s *Store) CostCenterByCode(ctx context.Context, restaurantID uuid.UUID, co
 		return ledger.CostCenter{}, fmt.Errorf("ledger store: cost center: %w", err)
 	}
 	return c, nil
+}
+
+func (s *Store) CostCenters(ctx context.Context, restaurantID uuid.UUID) ([]ledger.CostCenter, error) {
+	rows, err := s.q.QueryContext(ctx,
+		`SELECT id, restaurant_id, code, name FROM cost_centers WHERE restaurant_id = $1 ORDER BY code`, restaurantID)
+	if err != nil {
+		return nil, fmt.Errorf("ledger store: cost centers: %w", err)
+	}
+	defer rows.Close()
+	out := []ledger.CostCenter{}
+	for rows.Next() {
+		var c ledger.CostCenter
+		if err := rows.Scan(&c.ID, &c.RestaurantID, &c.Code, &c.Name); err != nil {
+			return nil, fmt.Errorf("ledger store: cost centers: scan: %w", err)
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }
 
 // --- Account map -------------------------------------------------------
@@ -263,6 +284,22 @@ func (s *Store) LiveDocumentBySource(ctx context.Context, restaurantID uuid.UUID
 		return ledger.JournalDocument{}, fmt.Errorf("ledger store: live document by source: %w", err)
 	}
 	return s.DocumentByID(ctx, restaurantID, id)
+}
+
+// LockDocumentState locks the document row FOR UPDATE and returns its
+// state, serializing the override and post paths on one row.
+func (s *Store) LockDocumentState(ctx context.Context, restaurantID, id uuid.UUID) (string, error) {
+	var state string
+	err := s.q.QueryRowContext(ctx,
+		`SELECT state FROM journal_documents WHERE restaurant_id = $1 AND id = $2 FOR UPDATE`,
+		restaurantID, id).Scan(&state)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ports.ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("ledger store: lock document: %w", err)
+	}
+	return state, nil
 }
 
 func (s *Store) ReplaceDraftLines(ctx context.Context, documentID uuid.UUID, lines []ledger.JournalLine) error {

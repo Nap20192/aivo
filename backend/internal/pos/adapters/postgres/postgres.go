@@ -209,9 +209,9 @@ func (s *Store) AppendTicketNote(ctx context.Context, restaurantID, id uuid.UUID
 func (s *Store) TicketByID(ctx context.Context, restaurantID, id uuid.UUID) (domain.Ticket, error) {
 	var t domain.Ticket
 	err := s.q.QueryRowContext(ctx,
-		`SELECT id, restaurant_id, shift_id, table_id, customer_id, status, note, created_at
+		`SELECT id, restaurant_id, shift_id, table_id, customer_id, status, note, created_at, closed_at
 		 FROM tickets WHERE restaurant_id = $1 AND id = $2`, restaurantID, id,
-	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.CustomerID, &t.Status, &t.Note, &t.CreatedAt)
+	).Scan(&t.ID, &t.RestaurantID, &t.ShiftID, &t.TableID, &t.CustomerID, &t.Status, &t.Note, &t.CreatedAt, &t.ClosedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Ticket{}, ports.ErrNotFound
 	}
@@ -492,9 +492,9 @@ func (s *Store) CloseTicketWithPayments(ctx context.Context, restaurantID uuid.U
 
 func (s *Store) RecordCashOperation(ctx context.Context, op domain.CashOperation) error {
 	_, err := s.q.ExecContext(ctx,
-		`INSERT INTO cash_operations (id, shift_id, restaurant_id, kind, amount_cents, reason, recorded_by)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-		op.ID, op.ShiftID, op.RestaurantID, op.Kind, op.AmountCents, op.Reason, op.RecordedBy)
+		`INSERT INTO cash_operations (id, shift_id, restaurant_id, kind, amount_cents, reason, recorded_by, recorded_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+		op.ID, op.ShiftID, op.RestaurantID, op.Kind, op.AmountCents, op.Reason, op.RecordedBy, op.RecordedAt)
 	if err != nil {
 		return fmt.Errorf("pos store: record cash op: %w", err)
 	}
@@ -584,4 +584,21 @@ func (s *Store) ShiftsByState(ctx context.Context, restaurantID uuid.UUID, state
 		out = append(out, sh)
 	}
 	return out, rows.Err()
+}
+
+// SeedDefaultPaymentMethods inserts the default tender methods (cash, card)
+// for a restaurant on the given transaction — used by live restaurant
+// provisioning so a self-registered restaurant can take tenders.
+func SeedDefaultPaymentMethods(ctx context.Context, tx *sql.Tx, restaurantID uuid.UUID) error {
+	for _, m := range []struct{ code, name, group string }{
+		{"cash", "Cash", "cash"},
+		{"card", "Card", "card"},
+	} {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO payment_methods (id, restaurant_id, code, name, payment_group) VALUES ($1, $2, $3, $4, $5)`,
+			uuid.New(), restaurantID, m.code, m.name, m.group); err != nil {
+			return fmt.Errorf("pos store: seed payment method %s: %w", m.code, err)
+		}
+	}
+	return nil
 }

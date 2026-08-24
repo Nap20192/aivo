@@ -20,6 +20,11 @@ import (
 
 type Store struct {
 	db *sql.DB
+	// OnProvisionRestaurant, if set, runs inside the restaurant-creation
+	// transaction (register + create) after the restaurant row is inserted,
+	// so cross-context seeding (ledger chart of accounts, payment methods)
+	// is atomic with it. nil = skip (tests / the seed command wire it too).
+	OnProvisionRestaurant func(ctx context.Context, tx *sql.Tx, restaurantID uuid.UUID) error
 }
 
 var _ ports.Store = (*Store)(nil)
@@ -56,6 +61,11 @@ func (s *Store) CreateOrgWithOwner(ctx context.Context, org domain.Organization,
 	}
 	if err := insertDefaultMenu(ctx, tx, rest.ID); err != nil {
 		return err
+	}
+	if s.OnProvisionRestaurant != nil {
+		if err := s.OnProvisionRestaurant(ctx, tx, rest.ID); err != nil {
+			return fmt.Errorf("store: register: provision: %w", err)
+		}
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO users (id, org_id, email, password_hash, role, restaurant_id) VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -273,6 +283,11 @@ func (s *Store) CreateRestaurant(ctx context.Context, r domain.Restaurant) error
 	}
 	if err := insertDefaultMenu(ctx, tx, r.ID); err != nil {
 		return err
+	}
+	if s.OnProvisionRestaurant != nil {
+		if err := s.OnProvisionRestaurant(ctx, tx, r.ID); err != nil {
+			return fmt.Errorf("store: create restaurant: provision: %w", err)
+		}
 	}
 	return tx.Commit()
 }

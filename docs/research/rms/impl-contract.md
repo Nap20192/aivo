@@ -581,11 +581,15 @@ credit 4000 Sales revenue      15000
    Добавлен `ledger` метод `LiveDocumentBySource`/`LiveDocumentForShift`, чтобы хендлеры
    приёмки находили черновик журнала смены.
 
-7. **Хук провижининга.** `ledger/app.SeedRestaurant` вызывается из `cmd/aivo-seed`
-   (по DoD). В живой само-регистрации ресторана (`platform createRestaurant`) он **пока
-   не подключён** — кросс-контекстный хук отложен: у ресторанов, созданных через API,
-   не будет плана счётов, пока хук не добавят. Явно отмечено, чтобы это не было тихой
-   дырой.
+7. **Хук провижининга.** ~~Не подключён в живой само-регистрации.~~ **Исправлено в
+   QA-волне (M3/BUG-1):** `platform` store получил nil-safe хук `OnProvisionRestaurant`,
+   вызываемый внутри той же транзакции, что и вставка ресторана (в `CreateOrgWithOwner`
+   и `CreateRestaurant`, рядом с `insertDefaultMenu`). Хук
+   (`internal/provisioning.RestaurantProvisioner`) сеет план счётов + cost-center + map
+   (`ledger.SeedRestaurantTx` на общий `*sql.Tx`) и payment_methods cash/card
+   (`pospg.SeedDefaultPaymentMethods`). Подключён в `cmd/aivo-server` и `cmd/aivo-seed`
+   (дубль-seed из aivo-seed убран). Само-регистрированный ресторан теперь полностью
+   провижинится атомарно.
 
 8. **Код ошибки «нет открытой смены».** §4 для закрытия тикета указывает
    409 `no_open_shift`; введён отдельный `ErrShiftNotOpen` → 409 `shift_not_open` и для
@@ -608,3 +612,35 @@ seed + пример §6 «нал 10000/карта 5000/вариант −200» �
 cancel→reversal сегодняшней датой + оригинал cancelled; manual balanced/unbalanced;
 ремап `tender:cash` §15.6; полный pos-флоу open→ticket→tender→cash-op→close→accept,
 двойной accept → конфликт). Smoke удалён после проверки — интеграционные тесты за тестером.
+
+### QA-волна фиксов (после ревью QA + тестера)
+
+Закрыты все находки QA (B1,B2,M1,M2,M3,m1,m2,m3) и e2e (BUG-1..3):
+
+- **B1** — append-only при гонке override×accept. `ReplaceDraftLines` и
+  `PostShiftJournal` теперь берут `journal_documents … FOR UPDATE` и перечитывают state
+  в одной tx → сериализуются на одной строке. Побочно найден и починен латентный
+  self-deadlock: `Store.WithTx` оставлял `pool` ненулевым, из-за чего `ReplaceDraftLines`
+  на tx-связанном сторе открывал **вторую** транзакцию (INSERT journal_lines → FK-lock на
+  строке, которую первая tx держит FOR UPDATE). `WithTx` теперь возвращает `{q: tx}` (pool
+  nil) → DELETE+INSERT идут инлайн по tx вызывающего. Конкурентный тест:
+  `TestOverrideRacesAcceptStaysAppendOnly` (25 итераций override vs post, исход всегда
+  когерентный, posted-строки не переписываются).
+- **B2** — `/pos/state` отдаёт `payment_methods` (активные, из `store.PaymentMethods`).
+- **M1** — `acceptanceView.shift` = полный ShiftRow (number/cashier/opened/closed/expected/
+  declared/variance) через общий `shiftRowView`.
+- **M2** — `GET /restaurants/{id}/ledger/cost-centers`; `OverrideDraftLines` валидирует
+  принадлежность cost_center ресторану (422 вместо FK-500). Тест
+  `TestOverrideRejectsForeignCostCenter`.
+- **M3/BUG-1** — провижининг (см. отклонение №7).
+- **m1** — `number` в списке смен = строка `"shift-N"`.
+- **m2** — `CloseTicket` сверяет `ticket.ShiftID` с текущей открытой сменой →
+  `ErrShiftNotOpen`. Тест `TestCloseTicketRejectsForeignShift`.
+- **m3** — `PostedJournals.total_cents` = сумма дебетов = магнитуда сбалансированного
+  документа (все posted-документы сбалансированы); соответствует контракту, оставлено.
+- **BUG-2** — `TicketByID` выбирает `closed_at`.
+- **BUG-3** — `RecordCashOperation` заполняет `RecordedAt` (пишется явно в INSERT).
+
+Проверка волны: `go build/vet/test -C backend ./...` зелёные, включая интеграционные с
+`DATABASE_URL` (ledger + pos адаптеры). `npm run build` зелёный в `frontend/admin` и
+`frontend/pos`.

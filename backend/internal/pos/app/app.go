@@ -243,11 +243,19 @@ func businessDate(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
+// PaymentMethods returns the restaurant's tender methods (pos state /
+// tender buttons).
+func (a *App) PaymentMethods(ctx context.Context, restaurantID uuid.UUID) ([]domain.PaymentMethod, error) {
+	return a.store.PaymentMethods(ctx, restaurantID)
+}
+
 // CloseTicket records the tenders for a ticket and closes it. Σ tenders
 // must equal the ticket total (unless a void closure). Requires an open
-// shift.
+// shift, and the ticket must belong to that open shift (guards a stray
+// close across a shift changeover).
 func (a *App) CloseTicket(ctx context.Context, restaurantID, ticketID, closedBy uuid.UUID, tenders []domain.Tender) (domain.Ticket, error) {
-	if _, err := a.store.OpenShiftFor(ctx, restaurantID); err != nil {
+	shift, err := a.store.OpenShiftFor(ctx, restaurantID)
+	if err != nil {
 		if errors.Is(err, ports.ErrNotFound) {
 			return domain.Ticket{}, ErrShiftNotOpen
 		}
@@ -256,6 +264,9 @@ func (a *App) CloseTicket(ctx context.Context, restaurantID, ticketID, closedBy 
 	t, err := a.store.TicketByID(ctx, restaurantID, ticketID)
 	if err != nil {
 		return domain.Ticket{}, err
+	}
+	if t.ShiftID != shift.ID {
+		return domain.Ticket{}, ErrShiftNotOpen
 	}
 	// Resolve each tender's payment group from its method (snapshot).
 	methods, err := a.store.PaymentMethods(ctx, restaurantID)
@@ -307,6 +318,7 @@ func (a *App) RecordCashOperation(ctx context.Context, restaurantID, shiftID, re
 	op := domain.CashOperation{
 		ID: uuid.New(), ShiftID: shiftID, RestaurantID: restaurantID,
 		Kind: kind, AmountCents: amountCents, Reason: reason, RecordedBy: recordedBy,
+		RecordedAt: time.Now().UTC(),
 	}
 	if err := a.store.RecordCashOperation(ctx, op); err != nil {
 		return domain.CashOperation{}, err

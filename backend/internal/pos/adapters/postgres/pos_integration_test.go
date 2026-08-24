@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
+	ledger "aivo/internal/domain/ledger"
 	menudomain "aivo/internal/domain/menu"
 	domain "aivo/internal/domain/pos"
-	ledger "aivo/internal/domain/ledger"
-	ledgerapp "aivo/internal/ledger/app"
 	ledgerpg "aivo/internal/ledger/adapters/postgres"
+	ledgerapp "aivo/internal/ledger/app"
 	"aivo/internal/pos/adapters/ledgerbridge"
 	posapp "aivo/internal/pos/app"
 	posports "aivo/internal/pos/ports"
@@ -54,18 +54,18 @@ func posDSN() string {
 }
 
 type posFixture struct {
-	ctx      context.Context
-	db       *sql.DB
-	store    *Store
-	app      *posapp.App
-	ledger   *ledgerapp.App
-	restID   uuid.UUID
-	userID   uuid.UUID
-	tableID  uuid.UUID
-	itemID   uuid.UUID
-	price    int
-	cashID   uuid.UUID // cash payment method
-	cardID   uuid.UUID // card payment method
+	ctx     context.Context
+	db      *sql.DB
+	store   *Store
+	app     *posapp.App
+	ledger  *ledgerapp.App
+	restID  uuid.UUID
+	userID  uuid.UUID
+	tableID uuid.UUID
+	itemID  uuid.UUID
+	price   int
+	cashID  uuid.UUID // cash payment method
+	cardID  uuid.UUID // card payment method
 }
 
 func setupPos(t *testing.T) posFixture {
@@ -467,5 +467,27 @@ func assertBalanced(t *testing.T, doc ledger.JournalDocument) {
 	}
 	if d != c {
 		t.Errorf("document not balanced: debit %d != credit %d", d, c)
+	}
+}
+
+// m2 — CloseTicket must reject a ticket that belongs to a shift other than
+// the current open one (a stray close across a shift changeover). The
+// ticket's own immutability is separate; this guards the shift binding.
+func TestCloseTicketRejectsForeignShift(t *testing.T) {
+	f := setupPos(t)
+	sh1 := f.openShift(t, 0)
+	tk := f.newTicket(t, sh1.ID, 1) // open ticket on sh1
+
+	// Close sh1 at the DB level (leaving tk open), then open sh2 so the
+	// current open shift differs from the ticket's shift.
+	if _, err := f.db.ExecContext(f.ctx, `UPDATE shifts SET closed_at = now() WHERE id = $1`, sh1.ID); err != nil {
+		t.Fatal(err)
+	}
+	f.openShift(t, 0) // sh2
+
+	_, err := f.app.CloseTicket(f.ctx, f.restID, tk.ID, f.userID,
+		[]domain.Tender{{MethodID: f.cashID, AmountCents: f.price}})
+	if !errors.Is(err, posapp.ErrShiftNotOpen) {
+		t.Errorf("close ticket from a foreign shift: got %v, want ErrShiftNotOpen", err)
 	}
 }
