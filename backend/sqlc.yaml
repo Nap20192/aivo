@@ -59,3 +59,17 @@ sql:
           - db_type: uuid
             nullable: true
             go_type: { import: "aivo/internal/sharedkernel", type: "NullID" }
+  - name: inventory
+    engine: postgresql
+    schema: ["migrations/menu", "migrations/platform", "migrations/ledger", "migrations/pos", "migrations/inventory"]
+    queries: ["queries/inventory"]
+    gen:
+      go:
+        package: inventorydb
+        out: internal/inventory/adapters/postgres/inventorydb
+        overrides:
+          - db_type: uuid
+            go_type: { import: "uuid", type: "UUID" }
+          - db_type: uuid
+            nullable: true
+            go_type: { import: "aivo/internal/sharedkernel", type: "NullID" }

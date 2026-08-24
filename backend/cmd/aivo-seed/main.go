@@ -66,6 +66,7 @@ func run() error {
 		{Name: "platform", FS: migrations.FS, Dir: "platform"},
 		{Name: "ledger", FS: migrations.FS, Dir: "ledger"},
 		{Name: "pos", FS: migrations.FS, Dir: "pos"},
+		{Name: "inventory", FS: migrations.FS, Dir: "inventory"},
 	})
 	if err != nil {
 		return err

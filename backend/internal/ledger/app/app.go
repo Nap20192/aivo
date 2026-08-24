@@ -31,6 +31,8 @@ var (
 var Purposes = []string{
 	"sales_revenue", "cash_drawer", "cash_over_short", "cash_movement", "rounding_unassigned",
 	"tender:cash", "tender:card", "tender:gift_card", "tender:comp", "tender:house_account",
+	// Inventory / COGS (increment-2, §9).
+	"inventory", "accounts_payable", "received_not_billed", "cogs", "inventory_shrinkage", "inventory_surplus",
 }
 
 func knownPurpose(p string) bool {
@@ -198,27 +200,45 @@ func (a *App) ManualJournal(ctx context.Context, in ManualJournalInput, post boo
 func (a *App) CancelJournal(ctx context.Context, restaurantID, docID uuid.UUID) (uuid.UUID, error) {
 	var reversalID uuid.UUID
 	err := a.store.InTx(ctx, func(st ports.Store) error {
-		orig, err := st.DocumentByID(ctx, restaurantID, docID)
-		if err != nil {
-			return err
-		}
-		rev, err := orig.Reverse(a.newID(), a.now(), a.newID)
-		if err != nil {
-			return err
-		}
-		// Mark the original cancelled BEFORE inserting the reversal, so the
-		// "one live document per shift" partial-unique never sees two live
-		// shift documents at once (the reversal keeps the source linkage).
-		if err := st.MarkCancelled(ctx, restaurantID, docID, *orig.CancelledAt); err != nil {
-			return err
-		}
-		if err := st.InsertDocument(ctx, rev); err != nil {
-			return err
-		}
-		reversalID = rev.ID
-		return nil
+		id, err := a.cancelOn(ctx, st, restaurantID, docID)
+		reversalID = id
+		return err
 	})
 	return reversalID, err
+}
+
+// cancelOn reverses a posted document on the given (tx-bound) store.
+func (a *App) cancelOn(ctx context.Context, st ports.Store, restaurantID, docID uuid.UUID) (uuid.UUID, error) {
+	orig, err := st.DocumentByID(ctx, restaurantID, docID)
+	if err != nil {
+		return uuid.Nil(), err
+	}
+	rev, err := orig.Reverse(a.newID(), a.now(), a.newID)
+	if err != nil {
+		return uuid.Nil(), err
+	}
+	// Mark the original cancelled BEFORE inserting the reversal, so the "one
+	// live document per shift" partial-unique never sees two live documents
+	// at once (the reversal keeps the source linkage).
+	if err := st.MarkCancelled(ctx, restaurantID, docID, *orig.CancelledAt); err != nil {
+		return uuid.Nil(), err
+	}
+	if err := st.InsertDocument(ctx, rev); err != nil {
+		return uuid.Nil(), err
+	}
+	return rev.ID, nil
+}
+
+// CancelJournalForSource reverses the live posted journal for a source
+// (e.g. an inventory document) on the caller's transaction, so the reversal
+// GL and the reversal stock moves commit atomically (§6 cancel).
+func (a *App) CancelJournalForSource(ctx context.Context, tx *sql.Tx, restaurantID uuid.UUID, sourceKind string, sourceID uuid.UUID) (uuid.UUID, error) {
+	st := a.store.WithTx(tx)
+	doc, err := st.LiveDocumentBySource(ctx, restaurantID, sourceKind, sourceID)
+	if err != nil {
+		return uuid.Nil(), err
+	}
+	return a.cancelOn(ctx, st, restaurantID, doc.ID)
 }
 
 // --- Shift acceptance journal (pos ledger bridge) ----------------------
@@ -357,6 +377,76 @@ func (a *App) PostShiftJournal(ctx context.Context, tx *sql.Tx, restaurantID, do
 		return err
 	}
 	return st.MarkPosted(ctx, restaurantID, docID, at)
+}
+
+// InventoryJournalLine is one line of an inventory GL document, addressed
+// by purpose (resolved through ledger_account_map — the same §15.6 config).
+type InventoryJournalLine struct {
+	Purpose     string // inventory|accounts_payable|cogs|inventory_shrinkage|inventory_surplus
+	Side        string // debit|credit
+	AmountCents int64
+	Memo        string
+}
+
+// InventoryJournalInput is the request to post an inventory GL document.
+type InventoryJournalInput struct {
+	RestaurantID   uuid.UUID
+	CreatedBy      uuid.UUID
+	SourceKind     string // inventory_receipt|inventory_writeoff|inventory_stocktake|cogs
+	SourceID       uuid.UUID
+	AccountingDate time.Time
+	Lines          []InventoryJournalLine
+}
+
+// PostInventoryJournal builds and posts an inventory GL document on the
+// caller's transaction, immediately (inventory postings are mechanical, no
+// human review — §2). Lines address accounts by purpose; the document is
+// auto-balanced onto rounding_unassigned and posted through the domain
+// gate. Correction is only via CancelJournal (reversal); append-only holds.
+func (a *App) PostInventoryJournal(ctx context.Context, tx *sql.Tx, in InventoryJournalInput) (uuid.UUID, error) {
+	st := a.store.WithTx(tx)
+	mainCC, err := st.CostCenterByCode(ctx, in.RestaurantID, CostCenterMain)
+	if err != nil {
+		return uuid.Nil(), err
+	}
+	cc := mainCC.ID
+
+	doc := ledger.NewDocument(a.newID(), in.RestaurantID, in.CreatedBy, in.SourceKind, in.AccountingDate, a.now())
+	doc.SourceKind = in.SourceKind
+	sid := in.SourceID
+	doc.SourceID = &sid
+
+	for _, l := range in.Lines {
+		if l.AmountCents == 0 {
+			continue
+		}
+		acctID, err := st.AccountForPurpose(ctx, in.RestaurantID, l.Purpose)
+		if err != nil {
+			return uuid.Nil(), err
+		}
+		memo := l.Memo
+		if memo == "" {
+			memo = l.Purpose
+		}
+		if err := doc.AddLine(a.newID(), acctID, cc, l.Side, l.AmountCents, memo); err != nil {
+			return uuid.Nil(), err
+		}
+	}
+	if roundAcct, err := st.AccountForPurpose(ctx, in.RestaurantID, "rounding_unassigned"); err == nil {
+		if err := doc.AutoBalance(a.newID(), roundAcct, cc); err != nil {
+			return uuid.Nil(), err
+		}
+	} else if !errors.Is(err, ports.ErrNotFound) {
+		return uuid.Nil(), err
+	}
+	at := a.now()
+	if err := doc.Post(at, func(d time.Time) bool { return a.periodOpen(in.RestaurantID, d) }); err != nil {
+		return uuid.Nil(), err
+	}
+	if err := st.InsertDocument(ctx, doc); err != nil {
+		return uuid.Nil(), err
+	}
+	return doc.ID, nil
 }
 
 // OverrideDraftLines rewrites a draft document's lines (acceptance review

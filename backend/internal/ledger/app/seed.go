@@ -22,6 +22,13 @@ var defaultAccounts = []ledger.Account{
 	{Code: "5900", Name: "Cash over/short", Type: ledger.TypeExpense, NormalSide: ledger.SideDebit, Postable: true},
 	{Code: "6000", Name: "Cash movements (pay in/out)", Type: ledger.TypeExpense, NormalSide: ledger.SideDebit, Postable: true},
 	{Code: "9999", Name: "Unassigned / rounding", Type: ledger.TypeExpense, NormalSide: ledger.SideDebit, Postable: true},
+	// Inventory / COGS (increment-2, §9).
+	{Code: "1200", Name: "Inventory", Type: ledger.TypeAsset, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "2100", Name: "Accounts payable", Type: ledger.TypeLiability, NormalSide: ledger.SideCredit, Postable: true},
+	{Code: "2110", Name: "Received not billed", Type: ledger.TypeLiability, NormalSide: ledger.SideCredit, Postable: true}, // seeded placeholder, unused
+	{Code: "5000", Name: "Cost of goods sold", Type: ledger.TypeExpense, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "5910", Name: "Inventory shrinkage / write-off", Type: ledger.TypeExpense, NormalSide: ledger.SideDebit, Postable: true},
+	{Code: "4910", Name: "Inventory surplus", Type: ledger.TypeRevenue, NormalSide: ledger.SideCredit, Postable: true},
 }
 
 // defaultMap is the per-restaurant purpose→account-code seed (contract §6).
@@ -37,6 +44,13 @@ var defaultMap = []struct{ purpose, code string }{
 	{"tender:gift_card", "2000"},
 	{"tender:comp", "4900"},
 	{"tender:house_account", "1100"},
+	// Inventory / COGS purposes (increment-2, §9).
+	{"inventory", "1200"},
+	{"accounts_payable", "2100"},
+	{"received_not_billed", "2110"},
+	{"cogs", "5000"},
+	{"inventory_shrinkage", "5910"},
+	{"inventory_surplus", "4910"},
 }
 
 // SeedRestaurant provisions the default chart of accounts, the "main"

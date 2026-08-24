@@ -86,7 +86,7 @@ func setupPos(t *testing.T) posFixture {
 
 	ledgerApp := ledgerapp.New(ledgerpg.NewStore(db))
 	store := NewStore(db)
-	app := posapp.New(store, menuStub{}, ledgerbridge.New(ledgerApp))
+	app := posapp.New(store, menuStub{}, ledgerbridge.New(ledgerApp), nil)
 
 	orgID := uuid.New()
 	f := posFixture{
