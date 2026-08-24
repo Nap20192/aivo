@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 func testKey() []byte {

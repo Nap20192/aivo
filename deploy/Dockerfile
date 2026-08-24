@@ -1,7 +1,7 @@
 # Builds cmd/aivo-server plus the three SPAs (admin, menu, pos) so the
 # compose happy path serves the real apps. cmd/aivo-seed stays a
 # `go run` dev tool (see README).
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 # go.mod pins a patch version newer than this base image ships; let Go
 # fetch the exact toolchain it declares instead of pinning a base image
 # tag we'd have to bump in lockstep with go.mod.

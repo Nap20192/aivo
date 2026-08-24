@@ -11,7 +11,7 @@ import (
 	menuports "aivo/internal/menu/ports"
 	"aivo/internal/pos/ports"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 type Bridge struct {

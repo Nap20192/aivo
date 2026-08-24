@@ -10,7 +10,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
+	"uuid"
 )
 
 const insertEvent = `-- name: InsertEvent :exec
@@ -23,7 +24,7 @@ type InsertEventParams struct {
 	Name          string
 	AggregateType string
 	AggregateID   uuid.UUID
-	RestaurantID  uuid.NullUUID
+	RestaurantID  sharedkernel.NullID
 	Payload       json.RawMessage
 }
 
@@ -58,7 +59,7 @@ type PendingEventsRow struct {
 	Name          string
 	AggregateType string
 	AggregateID   uuid.UUID
-	RestaurantID  uuid.NullUUID
+	RestaurantID  sharedkernel.NullID
 	Payload       json.RawMessage
 	OccurredAt    time.Time
 }

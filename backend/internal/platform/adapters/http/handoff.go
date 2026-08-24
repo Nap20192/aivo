@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"crypto/sha1"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,7 +18,7 @@ import (
 	"aivo/pkg/qrcode"
 	"aivo/pkg/session"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Cart handoff: the diner stores their cart under a short pickup code
@@ -176,7 +177,7 @@ func (h *handler) handoffPreview(r *http.Request, restaurantID uuid.UUID, handof
 			unit += o.PriceDeltaCents
 			labels = append(labels, o.Label)
 		}
-		lines[i] = posLineView{ID: uuid.NewSHA1(handoff.ID, []byte(fmt.Sprint(i))), MenuItemID: l.MenuItemID, Name: l.Name, Qty: l.Qty, Options: labels, UnitPriceCents: unit}
+		lines[i] = posLineView{ID: lineViewID(handoff.ID, i), MenuItemID: l.MenuItemID, Name: l.Name, Qty: l.Qty, Options: labels, UnitPriceCents: unit}
 	}
 	var customerName *string
 	if handoff.CustomerID != nil {
@@ -266,4 +267,17 @@ func (h *handler) posHandoffAccept(w http.ResponseWriter, r *http.Request, u dom
 	slog.Info("handoff accepted", "restaurant_id", restaurantID, "code", handoff.Code,
 		"table_id", tableID, "by_user", u.ID, "lines", len(handoff.Lines))
 	writeJSON(w, http.StatusOK, toPosTicketView(ticket))
+}
+
+// lineViewID derives a stable per-line view ID (UUIDv5-style SHA-1 in the
+// handoff's namespace) so the POS preview keys don't change between polls.
+func lineViewID(ns uuid.UUID, i int) uuid.UUID {
+	h := sha1.New()
+	h.Write(ns[:])
+	fmt.Fprint(h, i)
+	var u uuid.UUID
+	copy(u[:], h.Sum(nil))
+	u[6] = (u[6] & 0x0f) | 0x50
+	u[8] = (u[8] & 0x3f) | 0x80
+	return u
 }

@@ -13,8 +13,8 @@ import (
 	"aivo/internal/domain/menu"
 	"aivo/internal/menu/ports"
 
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
+	"uuid"
 )
 
 // PostgresStore implements ports.Store against a Postgres database via

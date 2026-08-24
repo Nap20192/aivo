@@ -14,7 +14,7 @@ import (
 	posdomain "aivo/internal/domain/pos"
 	posapp "aivo/internal/pos/app"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Shapes here match the POS client (frontend/pos/src/types.ts): display

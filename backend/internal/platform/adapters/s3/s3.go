@@ -11,9 +11,9 @@ import (
 
 	"aivo/internal/platform/ports"
 
-	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"uuid"
 )
 
 type ImageStore struct {

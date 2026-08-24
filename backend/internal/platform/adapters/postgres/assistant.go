@@ -10,7 +10,7 @@ import (
 	"aivo/internal/domain/platform"
 	"aivo/internal/platform/ports"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 func (s *Store) AssistantThread(ctx context.Context, restaurantID uuid.UUID) (uuid.UUID, error) {
@@ -22,7 +22,7 @@ func (s *Store) AssistantThread(ctx context.Context, restaurantID uuid.UUID) (uu
 		 ON CONFLICT (restaurant_id) DO UPDATE SET restaurant_id = EXCLUDED.restaurant_id
 		 RETURNING id`, id, restaurantID).Scan(&id)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("store: assistant thread: %w", err)
+		return uuid.Nil(), fmt.Errorf("store: assistant thread: %w", err)
 	}
 	return id, nil
 }

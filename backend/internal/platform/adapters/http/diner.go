@@ -10,7 +10,7 @@ import (
 	menuapp "aivo/internal/menu/app"
 	"aivo/pkg/session"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Diner entry points, table-token scoped and anonymous: the token IS the

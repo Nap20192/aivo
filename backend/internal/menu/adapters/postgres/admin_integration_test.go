@@ -9,7 +9,7 @@ import (
 	"aivo/internal/domain/menu"
 	"aivo/internal/menu/ports"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Integration test for the item↔category tenant-scoping guard. Runs only
@@ -30,7 +30,7 @@ func TestItemCategoryTenantScoping(t *testing.T) {
 		rid := uuid.New()
 		if _, err := store.db.ExecContext(ctx,
 			`INSERT INTO restaurants (id, slug, name) VALUES ($1, $2, $3)`,
-			rid, "t-"+uuid.NewString()[:8], name); err != nil {
+			rid, "t-"+uuid.New().String()[:8], name); err != nil {
 			t.Fatal(err)
 		}
 		mid := uuid.New()

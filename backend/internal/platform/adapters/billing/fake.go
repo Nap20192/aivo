@@ -11,7 +11,7 @@ import (
 	"aivo/internal/domain/platform"
 	"aivo/internal/platform/ports"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Fake is an in-memory BillingProvider that approves everything

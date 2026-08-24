@@ -14,7 +14,7 @@ import (
 	"aivo/internal/domain/platform"
 	"aivo/internal/platform/app"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Admin AI assistant: chat per restaurant, model PROPOSES actions,

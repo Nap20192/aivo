@@ -20,8 +20,8 @@ import (
 	"aivo/internal/platform/ports"
 	"aivo/pkg/crypto"
 
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"uuid"
 )
 
 // SessionTTL is how long an aivo_session login lives.

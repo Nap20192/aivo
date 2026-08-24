@@ -10,8 +10,8 @@ import (
 	"aivo/internal/domain/platform"
 	"aivo/internal/platform/ports"
 
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"uuid"
 )
 
 // CustomerSessionTTL — diner accounts stay signed in long-term.

@@ -6,7 +6,7 @@ import (
 
 	"aivo/internal/domain/menu"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ponytail: in-memory, swap for shared store (Redis) if scaled beyond one

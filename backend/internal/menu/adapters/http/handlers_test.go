@@ -13,7 +13,7 @@ import (
 	"aivo/internal/menu/adapters/telegram"
 	"aivo/internal/menu/app"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 func testKey() []byte { return make([]byte, 32) }

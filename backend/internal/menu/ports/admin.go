@@ -12,7 +12,7 @@ import (
 
 	"aivo/internal/domain/menu"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ErrItemReferenced is returned by DeleteMenuItem when historical order

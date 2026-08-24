@@ -12,7 +12,7 @@ import (
 	"aivo/pkg/crypto"
 	"aivo/pkg/qrcode"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Shapes here match the admin client (frontend/admin/src/api/types.ts): bare
@@ -179,7 +179,7 @@ func (h *handler) listCategories(w http.ResponseWriter, r *http.Request, _ domai
 	}
 	views := []categoryView{}
 	for _, c := range cats {
-		if menuID == uuid.Nil || c.MenuID == menuID {
+		if menuID == uuid.Nil() || c.MenuID == menuID {
 			views = append(views, toCategoryView(c))
 		}
 	}
@@ -370,7 +370,7 @@ type itemPatch struct {
 // apply merges the patch into it, validating as it goes.
 func (p itemPatch) apply(it *menudomain.MenuItem) error {
 	if p.CategoryID != nil {
-		if *p.CategoryID == uuid.Nil {
+		if *p.CategoryID == uuid.Nil() {
 			return fmt.Errorf("category_id is required")
 		}
 		it.CategoryID = *p.CategoryID
@@ -451,7 +451,7 @@ func (h *handler) createItem(w http.ResponseWriter, r *http.Request, u domain.Us
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
 		return
 	}
-	if it.Name == "" || it.CategoryID == uuid.Nil {
+	if it.Name == "" || it.CategoryID == uuid.Nil() {
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", "name and category_id are required")
 		return
 	}

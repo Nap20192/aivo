@@ -8,7 +8,7 @@ package menudb
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 const categoriesByMenu = `-- name: CategoriesByMenu :many

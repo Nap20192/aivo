@@ -7,7 +7,7 @@ import (
 	"aivo/internal/domain/menu"
 	"aivo/internal/menu/ports"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 func TestMemoryStore(t *testing.T) {
@@ -68,7 +68,7 @@ func TestMemoryStore(t *testing.T) {
 			{MenuItemID: item.ID, Name: item.Name, UnitPriceCents: item.PriceCents, Qty: 2},
 		},
 	})
-	if err != nil || order.ID == uuid.Nil || order.CreatedAt.IsZero() {
+	if err != nil || order.ID == uuid.Nil() || order.CreatedAt.IsZero() {
 		t.Fatalf("CreateOrder: got %+v, err %v", order, err)
 	}
 	if _, err := m.CreateOrder(ctx, domain.Order{RestaurantID: restaurant.ID, TableID: table.ID}); err == nil {

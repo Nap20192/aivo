@@ -10,7 +10,7 @@ import (
 	menudomain "aivo/internal/domain/menu"
 	"aivo/internal/domain/pos"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ErrNotFound mirrors the other contexts' not-found sentinel.

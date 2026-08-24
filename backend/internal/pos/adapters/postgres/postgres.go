@@ -11,9 +11,9 @@ import (
 	"aivo/internal/domain/pos"
 	"aivo/internal/pos/ports"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
+	"uuid"
 )
 
 type Store struct {

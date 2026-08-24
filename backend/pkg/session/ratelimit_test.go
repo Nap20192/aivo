@@ -5,11 +5,11 @@ import (
 
 	"aivo/internal/domain/menu"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 func TestAllowOrder_DebouncesWithin30s(t *testing.T) {
-	sess := "sess-" + uuid.NewString()
+	sess := "sess-" + uuid.New().String()
 
 	if !AllowOrder(sess) {
 		t.Fatal("first order should be allowed")
@@ -40,7 +40,7 @@ func TestAllowServiceRequest_DedupesUntilAcknowledged(t *testing.T) {
 }
 
 func TestAllowIP_BlocksAfter20PerMinute(t *testing.T) {
-	ip := "203.0.113." + uuid.NewString()[:2]
+	ip := "203.0.113." + uuid.New().String()[:2]
 
 	for i := 1; i <= ipLimit; i++ {
 		if !AllowIP(ip) {

@@ -9,7 +9,7 @@ import (
 	"aivo/internal/menu/ports"
 	"aivo/pkg/crypto"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // notifyOrder best-effort alerts the restaurant's Telegram bot. A missing

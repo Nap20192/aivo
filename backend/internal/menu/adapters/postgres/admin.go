@@ -9,8 +9,8 @@ import (
 	"aivo/internal/domain/menu"
 	"aivo/internal/menu/ports"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"uuid"
 )
 
 var _ ports.AdminStore = (*PostgresStore)(nil)
@@ -224,7 +224,7 @@ func insertItemCollections(ctx context.Context, tx *sql.Tx, it domain.MenuItem) 
 		}
 	}
 	for gi, g := range it.OptionGroups {
-		if g.ID == uuid.Nil {
+		if g.ID == uuid.Nil() {
 			g.ID = uuid.New()
 		}
 		if _, err := tx.ExecContext(ctx,
@@ -233,7 +233,7 @@ func insertItemCollections(ctx context.Context, tx *sql.Tx, it domain.MenuItem) 
 			return fmt.Errorf("store: option group: %w", err)
 		}
 		for oi, o := range g.Options {
-			if o.ID == uuid.Nil {
+			if o.ID == uuid.Nil() {
 				o.ID = uuid.New()
 			}
 			if _, err := tx.ExecContext(ctx,

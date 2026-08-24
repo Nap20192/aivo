@@ -13,7 +13,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Token returns nBytes of crypto/rand entropy, base64url-encoded — the

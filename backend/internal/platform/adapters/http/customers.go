@@ -11,7 +11,7 @@ import (
 	"aivo/internal/domain/platform"
 	"aivo/internal/platform/app"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // CustomerCookie is the diner-account login cookie — deliberately a

@@ -5,9 +5,9 @@
 package sharedkernel
 
 import (
+	"database/sql"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ID is the identity type for all entities. An alias (not a defined
@@ -19,6 +19,10 @@ func NewID() ID { return uuid.New() }
 
 // ParseID parses an ID from its string form.
 func ParseID(s string) (ID, error) { return uuid.Parse(s) }
+
+// NullID is a nullable ID for scanning NULLable uuid columns (sqlc uses
+// it for nullable uuid overrides).
+type NullID = sql.Null[ID]
 
 // Entity is the base for domain entities that carry identity and a
 // creation timestamp. Embed it in new entities; existing structs with

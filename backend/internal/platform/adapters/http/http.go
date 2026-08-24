@@ -26,7 +26,7 @@ import (
 	posports "aivo/internal/pos/ports"
 	"aivo/pkg/session"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // SessionCookie is the platform login cookie (HttpOnly, server-side

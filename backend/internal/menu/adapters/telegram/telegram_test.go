@@ -5,7 +5,7 @@ import (
 
 	"aivo/internal/domain/menu"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 func TestRenderOrder(t *testing.T) {

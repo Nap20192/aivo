@@ -10,7 +10,7 @@ import (
 
 	"aivo/internal/domain/menu"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ErrNotFound is returned by lookup methods when the requested row does

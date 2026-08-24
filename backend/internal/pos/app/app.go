@@ -12,7 +12,7 @@ import (
 	"aivo/internal/domain/pos"
 	"aivo/internal/pos/ports"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ErrNoOpenShift is returned when an action needs an open shift.
@@ -253,7 +253,7 @@ func optionIDByLabel(item menudomain.MenuItem, label string) (uuid.UUID, bool) {
 			}
 		}
 	}
-	return uuid.Nil, false
+	return uuid.Nil(), false
 }
 
 // Fire stamps fired_at on every unfired line of the ticket. Idempotent.

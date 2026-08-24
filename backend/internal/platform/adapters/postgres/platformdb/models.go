@@ -9,7 +9,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
+	"uuid"
 )
 
 type AssistantMessage struct {
@@ -33,7 +34,7 @@ type CartHandoff struct {
 	ID           uuid.UUID
 	RestaurantID uuid.UUID
 	TableID      uuid.UUID
-	CustomerID   uuid.NullUUID
+	CustomerID   sharedkernel.NullID
 	Code         string
 	Lines        json.RawMessage
 	Note         string
@@ -78,7 +79,7 @@ type Event struct {
 	Name          string
 	AggregateType string
 	AggregateID   uuid.UUID
-	RestaurantID  uuid.NullUUID
+	RestaurantID  sharedkernel.NullID
 	Payload       json.RawMessage
 	OccurredAt    time.Time
 	PublishedAt   sql.NullTime
@@ -155,7 +156,7 @@ type Order struct {
 	TableID      uuid.UUID
 	Comment      string
 	CreatedAt    time.Time
-	CustomerID   uuid.NullUUID
+	CustomerID   sharedkernel.NullID
 }
 
 type OrderLine struct {
@@ -185,7 +186,7 @@ type Restaurant struct {
 	Slug      string
 	Name      string
 	CreatedAt time.Time
-	OrgID     uuid.NullUUID
+	OrgID     sharedkernel.NullID
 	Address   string
 	Hours     json.RawMessage
 	Contacts  json.RawMessage
@@ -235,6 +236,6 @@ type User struct {
 	Email        string
 	PasswordHash []byte
 	Role         string
-	RestaurantID uuid.NullUUID
+	RestaurantID sharedkernel.NullID
 	CreatedAt    time.Time
 }

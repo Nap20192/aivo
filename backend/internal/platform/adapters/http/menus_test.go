@@ -5,7 +5,7 @@ import (
 
 	menudomain "aivo/internal/domain/menu"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 func fixtures() ([]menudomain.Menu, []menudomain.Category, []menudomain.MenuItem) {

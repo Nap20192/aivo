@@ -8,7 +8,7 @@ import (
 	"aivo/internal/domain/platform"
 	"aivo/internal/platform/app"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 type orgView struct {

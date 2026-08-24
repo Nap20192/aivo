@@ -13,10 +13,10 @@ sql:
         out: internal/menu/adapters/postgres/menudb
         overrides:
           - db_type: uuid
-            go_type: github.com/google/uuid.UUID
+            go_type: { import: "uuid", type: "UUID" }
           - db_type: uuid
             nullable: true
-            go_type: github.com/google/uuid.NullUUID
+            go_type: { import: "aivo/internal/sharedkernel", type: "NullID" }
   - name: platform
     engine: postgresql
     schema: ["migrations/menu", "migrations/platform"]
@@ -27,10 +27,10 @@ sql:
         out: internal/platform/adapters/postgres/platformdb
         overrides:
           - db_type: uuid
-            go_type: github.com/google/uuid.UUID
+            go_type: { import: "uuid", type: "UUID" }
           - db_type: uuid
             nullable: true
-            go_type: github.com/google/uuid.NullUUID
+            go_type: { import: "aivo/internal/sharedkernel", type: "NullID" }
   - name: pos
     engine: postgresql
     schema: ["migrations/menu", "migrations/platform", "migrations/pos"]
@@ -41,7 +41,7 @@ sql:
         out: internal/pos/adapters/postgres/posdb
         overrides:
           - db_type: uuid
-            go_type: github.com/google/uuid.UUID
+            go_type: { import: "uuid", type: "UUID" }
           - db_type: uuid
             nullable: true
-            go_type: github.com/google/uuid.NullUUID
+            go_type: { import: "aivo/internal/sharedkernel", type: "NullID" }

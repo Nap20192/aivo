@@ -31,8 +31,8 @@ import (
 	"aivo/migrations"
 	"aivo/pkg/migrate"
 
-	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
+	"uuid"
 )
 
 func main() {

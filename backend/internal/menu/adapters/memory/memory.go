@@ -13,7 +13,7 @@ import (
 	"aivo/internal/domain/menu"
 	"aivo/internal/menu/ports"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // MemoryStore is an in-memory ports.Store implementation used as a test
@@ -60,7 +60,7 @@ func NewMemoryStore() *MemoryStore {
 // caller left it zero, and returns the stored value.
 
 func (m *MemoryStore) SeedRestaurant(r domain.Restaurant) domain.Restaurant {
-	if r.ID == uuid.Nil {
+	if r.ID == uuid.Nil() {
 		r.ID = uuid.New()
 	}
 	m.mu.Lock()
@@ -70,7 +70,7 @@ func (m *MemoryStore) SeedRestaurant(r domain.Restaurant) domain.Restaurant {
 }
 
 func (m *MemoryStore) SeedTable(t domain.Table) domain.Table {
-	if t.ID == uuid.Nil {
+	if t.ID == uuid.Nil() {
 		t.ID = uuid.New()
 	}
 	m.mu.Lock()
@@ -80,7 +80,7 @@ func (m *MemoryStore) SeedTable(t domain.Table) domain.Table {
 }
 
 func (m *MemoryStore) SeedCategory(c domain.Category) domain.Category {
-	if c.ID == uuid.Nil {
+	if c.ID == uuid.Nil() {
 		c.ID = uuid.New()
 	}
 	m.mu.Lock()
@@ -90,7 +90,7 @@ func (m *MemoryStore) SeedCategory(c domain.Category) domain.Category {
 }
 
 func (m *MemoryStore) SeedMenuItem(item domain.MenuItem) domain.MenuItem {
-	if item.ID == uuid.Nil {
+	if item.ID == uuid.Nil() {
 		item.ID = uuid.New()
 	}
 	m.mu.Lock()
@@ -100,7 +100,7 @@ func (m *MemoryStore) SeedMenuItem(item domain.MenuItem) domain.MenuItem {
 }
 
 func (m *MemoryStore) SeedLandingBlock(b domain.LandingBlock) domain.LandingBlock {
-	if b.ID == uuid.Nil {
+	if b.ID == uuid.Nil() {
 		b.ID = uuid.New()
 	}
 	m.mu.Lock()

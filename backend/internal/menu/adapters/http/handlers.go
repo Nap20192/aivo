@@ -20,7 +20,7 @@ import (
 	"aivo/internal/menu/ports"
 	"aivo/pkg/session"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 type handler struct {

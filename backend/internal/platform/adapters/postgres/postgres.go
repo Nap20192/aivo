@@ -13,9 +13,9 @@ import (
 	"aivo/internal/domain/platform"
 	"aivo/internal/platform/ports"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
+	"uuid"
 )
 
 type Store struct {
@@ -448,10 +448,10 @@ func (s *Store) RestaurantIDByDomain(ctx context.Context, host string) (uuid.UUI
 		`SELECT restaurant_id FROM custom_domains WHERE domain = $1 AND verified_at IS NOT NULL`, host,
 	).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return uuid.Nil, ports.ErrNotFound
+		return uuid.Nil(), ports.ErrNotFound
 	}
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("store: domain: %w", err)
+		return uuid.Nil(), fmt.Errorf("store: domain: %w", err)
 	}
 	return id, nil
 }

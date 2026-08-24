@@ -9,8 +9,8 @@ import (
 	"aivo/internal/domain/menu"
 	"aivo/internal/menu/ports"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"uuid"
 )
 
 func isUniqueViolation(err error) bool {

@@ -9,7 +9,7 @@ import (
 	"aivo/internal/platform/adapters/billing"
 	"aivo/internal/platform/ports"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // fakeStore is a minimal in-memory ports.Store for app-level tests.
@@ -211,7 +211,7 @@ func (f *fakeStore) CustomDomainForRestaurant(context.Context, uuid.UUID) (strin
 	return "", nil
 }
 func (f *fakeStore) AssistantThread(context.Context, uuid.UUID) (uuid.UUID, error) {
-	return uuid.Nil, nil
+	return uuid.Nil(), nil
 }
 func (f *fakeStore) CreateAssistantMessage(context.Context, uuid.UUID, domain.AssistantMessage) error {
 	return nil
@@ -227,7 +227,7 @@ func (f *fakeStore) SetAssistantMessageStatus(context.Context, uuid.UUID, uuid.U
 }
 func (f *fakeStore) SetCustomDomain(context.Context, uuid.UUID, string) error { return nil }
 func (f *fakeStore) RestaurantIDByDomain(context.Context, string) (uuid.UUID, error) {
-	return uuid.Nil, ports.ErrNotFound
+	return uuid.Nil(), ports.ErrNotFound
 }
 
 var _ ports.Store = (*fakeStore)(nil)

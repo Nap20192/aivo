@@ -9,14 +9,15 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
+	"aivo/internal/sharedkernel"
+	"uuid"
 )
 
 type CartHandoff struct {
 	ID           uuid.UUID
 	RestaurantID uuid.UUID
 	TableID      uuid.UUID
-	CustomerID   uuid.NullUUID
+	CustomerID   sharedkernel.NullID
 	Code         string
 	Lines        json.RawMessage
 	Note         string
@@ -95,7 +96,7 @@ type Order struct {
 	TableID      uuid.UUID
 	Comment      string
 	CreatedAt    time.Time
-	CustomerID   uuid.NullUUID
+	CustomerID   sharedkernel.NullID
 }
 
 type OrderLine struct {
