@@ -2,6 +2,7 @@ site_name: AIVO RMS
 site_description: AI-powered restaurant management system
 repo_url: https://github.com/Nap20192/aivo
 docs_dir: docs
+site_dir: mkdocs
 
 theme:
   name: material

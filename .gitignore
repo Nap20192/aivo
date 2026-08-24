@@ -145,4 +145,4 @@ dist
 
 ### Worktrees ###
 .worktrees/
-site/
+mkdocs/
