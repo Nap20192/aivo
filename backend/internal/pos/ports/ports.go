@@ -5,7 +5,9 @@ package ports
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"time"
 
 	menudomain "aivo/internal/domain/menu"
 	"aivo/internal/domain/pos"
@@ -45,8 +47,6 @@ type Store interface {
 	// OpenTickets returns every open ticket (with lines) of the
 	// restaurant in two queries — the pos state hot path.
 	OpenTickets(ctx context.Context, restaurantID uuid.UUID) ([]domain.Ticket, error)
-	// ShiftClosedSalesCents aggregates the shift's closed-ticket sales.
-	ShiftClosedSalesCents(ctx context.Context, restaurantID, shiftID uuid.UUID) (int, error)
 	// LinkTicketCustomer sets the ticket's customer when none is linked.
 	LinkTicketCustomer(ctx context.Context, restaurantID, id, customerID uuid.UUID) error
 	// CreateTicket creates an open ticket. Returns ErrConflict if the
@@ -64,6 +64,61 @@ type Store interface {
 	TicketsForShift(ctx context.Context, restaurantID, shiftID uuid.UUID) ([]domain.Ticket, error)
 	// CloseTickets closes every open ticket of the shift (shift close).
 	CloseTickets(ctx context.Context, restaurantID, shiftID uuid.UUID) error
+
+	// --- payments / cash movements / acceptance (increment-1) ---
+
+	// InTx runs fn in a single transaction, passing the raw *sql.Tx (for
+	// the ledger port) and a Store bound to that transaction.
+	InTx(ctx context.Context, fn func(tx *sql.Tx, s Store) error) error
+	// LockShift loads the shift FOR UPDATE (CloseShift serialization).
+	LockShift(ctx context.Context, restaurantID, shiftID uuid.UUID) (domain.Shift, error)
+	// PaymentMethods returns the restaurant's tender methods.
+	PaymentMethods(ctx context.Context, restaurantID uuid.UUID) ([]domain.PaymentMethod, error)
+	// RecordTicketPayments inserts the tenders taken at ticket close and
+	// stamps closed_at — only while status='open' (immutability guard,
+	// debt 3); ErrConflict if already closed.
+	CloseTicketWithPayments(ctx context.Context, restaurantID uuid.UUID, t domain.Ticket, tenders []domain.Tender, recordedBy uuid.UUID) error
+	// RecordCashOperation inserts a pay-in/out/drop; requires an open shift.
+	RecordCashOperation(ctx context.Context, op domain.CashOperation) error
+	// TendersForShift aggregates tenders by payment group.
+	TendersForShift(ctx context.Context, restaurantID, shiftID uuid.UUID) ([]TenderGroupTotal, error)
+	// CashOperationsForShift returns the shift's cash movements.
+	CashOperationsForShift(ctx context.Context, restaurantID, shiftID uuid.UUID) ([]domain.CashOperation, error)
+	// AcceptShift stamps accepted_at/by + journal_document_id, only while
+	// closed and not yet accepted; ErrConflict otherwise (double accept).
+	AcceptShift(ctx context.Context, s domain.Shift) error
+	// ShiftsByState lists shifts in the "closed" (closed, not accepted) or
+	// "accepted" state, newest first (acceptance queue).
+	ShiftsByState(ctx context.Context, restaurantID uuid.UUID, state string) ([]domain.Shift, error)
+}
+
+// TenderGroupTotal is a shift's tender total for one payment group.
+type TenderGroupTotal struct {
+	Group       string
+	AmountCents int64
+	TipCents    int64
+}
+
+// ShiftJournalDraft is what pos hands the ledger to build the acceptance
+// draft (contract §3). Tips are recorded on ticket_payments but not posted
+// in increment-1; the journal uses tender amounts only.
+type ShiftJournalDraft struct {
+	ShiftID        uuid.UUID
+	CreatedBy      uuid.UUID
+	AccountingDate time.Time
+	Tenders        []TenderGroupTotal
+	VarianceCents  int64
+}
+
+// Ledger is the synchronous pos→ledger bridge. Build/Post run inside the
+// pos transaction (shared *sql.Tx). Account-map reads and reversals are
+// ledger back-office operations handled directly by the ledger app, not
+// through this bridge.
+type Ledger interface {
+	// BuildDraftShiftJournal creates the acceptance draft in tx.
+	BuildDraftShiftJournal(ctx context.Context, tx *sql.Tx, restaurantID uuid.UUID, draft ShiftJournalDraft) (uuid.UUID, error)
+	// PostJournal posts a draft document (draft→posted) in tx.
+	PostJournal(ctx context.Context, tx *sql.Tx, restaurantID, docID uuid.UUID) error
 }
 
 // Menu is the in-process bridge to the Menu context: item lookups for

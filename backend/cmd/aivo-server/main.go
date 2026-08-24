@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	ledgerpg "aivo/internal/ledger/adapters/postgres"
+	ledgerapp "aivo/internal/ledger/app"
 	menupg "aivo/internal/menu/adapters/postgres"
 	"aivo/internal/menu/adapters/telegram"
 	menuapp "aivo/internal/menu/app"
@@ -34,6 +36,7 @@ import (
 	"aivo/internal/platform/adapters/s3"
 	platformapp "aivo/internal/platform/app"
 	platformports "aivo/internal/platform/ports"
+	"aivo/internal/pos/adapters/ledgerbridge"
 	"aivo/internal/pos/adapters/menubridge"
 	pospg "aivo/internal/pos/adapters/postgres"
 	posapp "aivo/internal/pos/app"
@@ -74,6 +77,7 @@ func run() error {
 	err = migrate.Apply(context.Background(), db, []migrate.Source{
 		{Name: "menu", FS: migrations.FS, Dir: "menu"},
 		{Name: "platform", FS: migrations.FS, Dir: "platform"},
+		{Name: "ledger", FS: migrations.FS, Dir: "ledger"},
 		{Name: "pos", FS: migrations.FS, Dir: "pos"},
 	})
 	if err != nil {
@@ -84,6 +88,7 @@ func run() error {
 	menuStore := menupg.NewPostgresStoreFromDB(db)
 	platformStore := platformpg.NewStore(db)
 	posStore := pospg.NewStore(db)
+	ledgerStore := ledgerpg.NewStore(db)
 
 	menuApplication := menuapp.NewApplication(menuStore, telegram.New(), key, baseURL)
 
@@ -101,7 +106,8 @@ func run() error {
 	}
 
 	platformApplication := platformapp.New(platformStore, billing.NewFake(), themeGen)
-	posApplication := posapp.New(posStore, menubridge.New(menuStore))
+	ledgerApplication := ledgerapp.New(ledgerStore)
+	posApplication := posapp.New(posStore, menubridge.New(menuStore), ledgerbridge.New(ledgerApplication))
 
 	var images platformports.ImageStore
 	imagePrefix := ""
@@ -145,6 +151,7 @@ func run() error {
 	apiV1 := platformhttp.NewMux(platformhttp.Deps{
 		Platform:       platformApplication,
 		Pos:            posApplication,
+		Ledger:         ledgerApplication,
 		Menu:           menuStore,
 		MenuAdmin:      menuStore,
 		MenuApp:        menuApplication,

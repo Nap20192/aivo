@@ -31,9 +31,23 @@ sql:
           - db_type: uuid
             nullable: true
             go_type: { import: "aivo/internal/sharedkernel", type: "NullID" }
+  - name: ledger
+    engine: postgresql
+    schema: ["migrations/menu", "migrations/platform", "migrations/ledger"]
+    queries: ["queries/ledger"]
+    gen:
+      go:
+        package: ledgerdb
+        out: internal/ledger/adapters/postgres/ledgerdb
+        overrides:
+          - db_type: uuid
+            go_type: { import: "uuid", type: "UUID" }
+          - db_type: uuid
+            nullable: true
+            go_type: { import: "aivo/internal/sharedkernel", type: "NullID" }
   - name: pos
     engine: postgresql
-    schema: ["migrations/menu", "migrations/platform", "migrations/pos"]
+    schema: ["migrations/menu", "migrations/platform", "migrations/ledger", "migrations/pos"]
     queries: ["queries/pos"]
     gen:
       go:

@@ -3,10 +3,21 @@
 ## Contexts
 
 - [Menu](./backend/internal/menu/CONTEXT.md) — diner-facing digital menu, ordering, and landing page for a single restaurant
+- POS (`backend/internal/pos`) — cash shifts, per-table tickets, tenders/payments, in-shift cash movements, and shift acceptance (D6). Reads Menu through an in-process bridge.
+- [Ledger](./backend/internal/ledger/CONTEXT.md) — append-only, double-entry GL core (chart of accounts, journal documents, GL-semantics config). Consumed by POS.
 
 ## Relationships
 
-_None yet — Menu is the first context. Future satellite services (backoffice, POS, waiter app) will be added here as their contexts are charted, along with how they relate to Menu (e.g. Backoffice configures Menu's landing/content; POS/till integration with Menu orders is explicitly deferred — see `backend/internal/menu/docs/adr/0002-menu-order-decoupled-from-pos.md`)._
+- **POS → Ledger** (synchronous, in-process): on shift close POS builds a draft
+  acceptance journal, and on acceptance posts it, through `pos/ports.Ledger`
+  (implemented by `pos/adapters/ledgerbridge` over `ledger/app`). Both writes run
+  in one Postgres transaction (documented cross-context `*sql.Tx`; the whole
+  backend is one module/database). The variance between declared and expected
+  cash is a mandatory GL posting (`cash_over_short`), not a soft field; the GL
+  account each tender lands on is per-restaurant config (`ledger_account_map`).
+- **POS → Menu** (in-process bridge): item lookups for line snapshots, tables for
+  the floor view, the service-request inbox. POS never mutates Menu orders — the
+  POS/Menu-order decoupling stands (`backend/internal/menu/docs/adr/0002-menu-order-decoupled-from-pos.md`).
 
 ## Code layout
 

@@ -15,9 +15,12 @@ import (
 	"strconv"
 	"time"
 
+	ledgerdomain "aivo/internal/domain/ledger"
 	menudomain "aivo/internal/domain/menu"
 	"aivo/internal/domain/platform"
 	posdomain "aivo/internal/domain/pos"
+	ledgerapp "aivo/internal/ledger/app"
+	ledgerports "aivo/internal/ledger/ports"
 	menuapp "aivo/internal/menu/app"
 	menuports "aivo/internal/menu/ports"
 	"aivo/internal/platform/app"
@@ -48,6 +51,7 @@ type AssistantStore interface {
 type Deps struct {
 	Platform       *app.App
 	Pos            *posapp.App
+	Ledger         *ledgerapp.App
 	Menu           menuports.Store
 	MenuAdmin      menuports.AdminStore
 	MenuApp        menuapp.Application
@@ -131,10 +135,28 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("POST /api/v1/restaurants/{id}/assistant/messages/{msgID}/apply", h.restaurant(true, h.assistantApply))
 	mux.HandleFunc("POST /api/v1/restaurants/{id}/assistant/messages/{msgID}/discard", h.restaurant(true, h.assistantDiscard))
 
+	// Shift acceptance (manager+, restaurant-scoped).
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/shifts", h.restaurant(true, h.listShifts))
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/shifts/{shift_id}/acceptance", h.restaurant(true, h.getAcceptance))
+	mux.HandleFunc("PATCH /api/v1/restaurants/{id}/shifts/{shift_id}/acceptance", h.restaurant(true, h.patchAcceptance))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/shifts/{shift_id}/accept", h.restaurant(true, h.postAccept))
+
+	// Ledger back office (manager+, restaurant-scoped).
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/ledger/accounts", h.restaurant(true, h.ledgerAccounts))
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/ledger/account-map", h.restaurant(true, h.getAccountMap))
+	mux.HandleFunc("PUT /api/v1/restaurants/{id}/ledger/account-map", h.restaurant(true, h.putAccountMap))
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/ledger/journals", h.restaurant(true, h.listJournals))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/ledger/journals", h.restaurant(true, h.postJournal))
+	mux.HandleFunc("GET /api/v1/restaurants/{id}/ledger/journals/{docID}", h.restaurant(true, h.getJournal))
+	mux.HandleFunc("POST /api/v1/restaurants/{id}/ledger/journals/{docID}/cancel", h.restaurant(true, h.cancelJournal))
+
 	// POS (any authenticated role, scoped to the user's restaurant).
 	mux.HandleFunc("GET /api/v1/pos/state", h.pos(h.posState))
 	mux.HandleFunc("POST /api/v1/pos/shifts", h.pos(h.posOpenShift))
 	mux.HandleFunc("POST /api/v1/pos/shifts/{id}/close", h.pos(h.posCloseShift))
+	mux.HandleFunc("POST /api/v1/pos/shifts/{id}/cash-operations", h.pos(h.posCashOperation))
+	mux.HandleFunc("GET /api/v1/pos/shifts/{id}/z-report", h.pos(h.posZReport))
+	mux.HandleFunc("POST /api/v1/pos/tickets/{id}/close", h.pos(h.posCloseTicket))
 	mux.HandleFunc("POST /api/v1/pos/tables/{tableID}/lines", h.pos(h.posAddLines))
 	mux.HandleFunc("POST /api/v1/pos/tickets/{id}/fire", h.pos(h.posFire))
 	mux.HandleFunc("POST /api/v1/pos/requests/{id}/ack", h.pos(h.posAckRequest))
@@ -267,6 +289,39 @@ func writeAppErr(w http.ResponseWriter, err error) bool {
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
 	case errors.Is(err, posapp.ErrNoOpenShift):
 		writeErr(w, http.StatusUnprocessableEntity, "no_open_shift", err.Error())
+	// --- ledger / shift acceptance (increment-1) ---
+	case errors.Is(err, ledgerports.ErrNotFound):
+		writeErr(w, http.StatusNotFound, "not_found", "not found")
+	case errors.Is(err, posapp.ErrShiftNotOpen):
+		writeErr(w, http.StatusConflict, "shift_not_open", err.Error())
+	case errors.Is(err, posapp.ErrOpenTicketsUnpaid):
+		writeErr(w, http.StatusConflict, "open_tickets_unpaid", err.Error())
+	case errors.Is(err, posdomain.ErrTicketClosed):
+		writeErr(w, http.StatusConflict, "ticket_closed", err.Error())
+	case errors.Is(err, posdomain.ErrTendersMismatch):
+		writeErr(w, http.StatusUnprocessableEntity, "tenders_mismatch", err.Error())
+	case errors.Is(err, posdomain.ErrShiftNotClosed):
+		writeErr(w, http.StatusConflict, "shift_not_closed", err.Error())
+	case errors.Is(err, posdomain.ErrAlreadyAccepted):
+		writeErr(w, http.StatusConflict, "already_accepted", err.Error())
+	case errors.Is(err, ledgerdomain.ErrNotDraft):
+		writeErr(w, http.StatusConflict, "document_posted", err.Error())
+	case errors.Is(err, ledgerdomain.ErrAlreadyCancelled):
+		writeErr(w, http.StatusConflict, "already_cancelled", err.Error())
+	case errors.Is(err, ledgerdomain.ErrNotPosted):
+		writeErr(w, http.StatusConflict, "not_posted", err.Error())
+	case errors.Is(err, ledgerapp.ErrUnknownPurpose):
+		writeErr(w, http.StatusUnprocessableEntity, "unknown_purpose", err.Error())
+	case errors.Is(err, ledgerapp.ErrAccountNotPostable):
+		writeErr(w, http.StatusUnprocessableEntity, "account_not_postable", err.Error())
+	case errors.Is(err, ledgerdomain.ErrUnbalanced):
+		writeErr(w, http.StatusUnprocessableEntity, "unbalanced", err.Error())
+	case errors.Is(err, ledgerdomain.ErrInvalidSide):
+		writeErr(w, http.StatusUnprocessableEntity, "line_side", err.Error())
+	case errors.Is(err, ledgerdomain.ErrInvalidAmount), errors.Is(err, ledgerapp.ErrInvalid):
+		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
+	case errors.Is(err, ledgerports.ErrConflict):
+		writeErr(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, menuapp.ErrServiceRequestAlreadyOpen):
 		// Duplicate open request for the table: 409 per the menu client
 		// contract (it renders the existing open-request state).
