@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "aivo/internal/auth/v1;authv1";
+
+// AuthService mints tokens for users platform has already authenticated
+// via its own session-cookie login. It owns no credential storage and
+// accepts no password/credential field — see
+// openspec/changes/split-inventory-microservice/specs/service-auth/spec.md.
+service AuthService {
+  rpc Mint(MintRequest) returns (MintResponse);
+}
+
+message MintRequest {
+  string user_id = 1;
+  string tenant_id = 2;
+  repeated string roles = 3;
+  string app_id = 4;
+}
+
+message MintResponse {
+  string token = 1;
+}

@@ -157,3 +157,11 @@ type ImageStore interface {
 	// validation is the caller's job.
 	Put(ctx context.Context, restaurantID uuid.UUID, filename, contentType string, r io.Reader, size int64) (url string, err error)
 }
+
+// TokenMinter calls aivo-auth's Mint RPC for a user platform has already
+// authenticated via its own session-cookie login — see
+// openspec/changes/split-inventory-microservice/specs/service-auth/spec.md.
+// No password/credential ever crosses this boundary.
+type TokenMinter interface {
+	Mint(ctx context.Context, userID, tenantID uuid.UUID, roles []string, appID string) (token string, err error)
+}

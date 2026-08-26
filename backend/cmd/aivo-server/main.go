@@ -32,6 +32,7 @@ import (
 	menupg "aivo/internal/menu/adapters/postgres"
 	"aivo/internal/menu/adapters/telegram"
 	menuapp "aivo/internal/menu/app"
+	"aivo/internal/platform/adapters/authclient"
 	"aivo/internal/platform/adapters/billing"
 	"aivo/internal/platform/adapters/claudecli"
 	platformhttp "aivo/internal/platform/adapters/http"
@@ -165,6 +166,22 @@ func run() error {
 		}
 	}
 
+	// Cross-service token minting: opt-in via AUTH_GRPC_ADDR (aivo-auth's
+	// host:port). Additive — login/register's cookie session behaves the
+	// same with or without it; unset just means no "token" field in the
+	// response.
+	var tokenMinter platformports.TokenMinter
+	if addr := os.Getenv("AUTH_GRPC_ADDR"); addr != "" {
+		client, err := authclient.Dial(addr)
+		if err != nil {
+			return fmt.Errorf("server: auth client: %w", err)
+		}
+		tokenMinter = client
+		log.Printf("server: cross-service token minting via aivo-auth at %s", addr)
+	} else {
+		log.Print("server: AUTH_GRPC_ADDR not set, cross-service token minting disabled")
+	}
+
 	apiV1 := platformhttp.NewMux(platformhttp.Deps{
 		Platform:       platformApplication,
 		Pos:            posApplication,
@@ -176,6 +193,7 @@ func run() error {
 		Images:         images,
 		Assistant:      assistant,
 		AssistantStore: platformStore,
+		TokenMinter:    tokenMinter,
 		ImagePrefix:    imagePrefix,
 		BaseURL:        baseURL,
 		POSLocation:    posLocation,

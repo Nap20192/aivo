@@ -62,6 +62,10 @@ type Deps struct {
 	Images         platformports.ImageStore // nil disables image upload (503)
 	Assistant      platformports.Assistant  // nil disables the admin assistant (503)
 	AssistantStore AssistantStore           // chat thread/message persistence
+	// TokenMinter calls aivo-auth's Mint RPC after a successful
+	// login/register, additive to the existing cookie session — nil
+	// disables it (the response just has no "token" field).
+	TokenMinter platformports.TokenMinter
 	// ImagePrefix is the public URL prefix of our image bucket
 	// (e.g. "http://localhost:9000/aivo-menu-images/") — the only host
 	// assistant-proposed image_url values may point at.
