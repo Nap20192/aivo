@@ -92,7 +92,7 @@ func (h *handler) toPosShiftView(ctx context.Context, s posdomain.Shift, number,
 	return posShiftView{
 		ID: s.ID, Number: fmt.Sprintf("shift-%d", number), Till: 1, Cashier: cashier,
 		OpenedAt: hhmm(s.OpenedAt), OpeningFloatCents: s.OpeningFloatCents, ExpectedCents: expectedCents,
-		State: s.State(),
+		State: string(s.State()),
 	}
 }
 
@@ -147,7 +147,7 @@ func toPosTicketView(t posdomain.Ticket) posTicketView {
 	return posTicketView{
 		ID: t.ID, Lines: lines, Note: note,
 		Source: "at the till · " + placed, PlacedAt: &placed, FiredAt: fired,
-		TableID: t.TableID, ShiftID: t.ShiftID, Status: t.Status, TotalCents: t.TotalCents(),
+		TableID: t.TableID, ShiftID: t.ShiftID, Status: string(t.Status), TotalCents: t.TotalCents(),
 	}
 }
 

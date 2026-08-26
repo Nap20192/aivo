@@ -130,12 +130,47 @@ func (a *App) LiveDocumentForShift(ctx context.Context, restaurantID, shiftID uu
 	return a.store.LiveDocumentBySource(ctx, restaurantID, ledger.SourceShift, shiftID)
 }
 
+// LiveDocumentBySource returns the single non-cancelled document for a
+// source (e.g. an inventory document id), ErrNotFound if none. Used by
+// the ledger gRPC server to detect a redelivered Post*/Reverse* request
+// before doing any work (D3 idempotency).
+func (a *App) LiveDocumentBySource(ctx context.Context, restaurantID uuid.UUID, sourceKind string, sourceID uuid.UUID) (ledger.JournalDocument, error) {
+	return a.store.LiveDocumentBySource(ctx, restaurantID, sourceKind, sourceID)
+}
+
+// PostInventoryJournalAtomic posts an inventory GL document in its own
+// transaction — for a caller with no pre-existing transaction (the
+// ledger gRPC server); PostInventoryJournal itself expects to run inside
+// the producing context's (pos/inventory) own transaction.
+func (a *App) PostInventoryJournalAtomic(ctx context.Context, in InventoryJournalInput) (uuid.UUID, error) {
+	var docID uuid.UUID
+	err := a.store.InTxWithConn(ctx, func(tx *sql.Tx, _ ports.Store) error {
+		id, err := a.PostInventoryJournal(ctx, tx, in)
+		docID = id
+		return err
+	})
+	return docID, err
+}
+
+// CancelJournalForSourceAtomic reverses the live posted journal for a
+// source in its own transaction — the gRPC-server counterpart to
+// PostInventoryJournalAtomic.
+func (a *App) CancelJournalForSourceAtomic(ctx context.Context, restaurantID uuid.UUID, sourceKind string, sourceID uuid.UUID) (uuid.UUID, error) {
+	var revID uuid.UUID
+	err := a.store.InTxWithConn(ctx, func(tx *sql.Tx, _ ports.Store) error {
+		id, err := a.CancelJournalForSource(ctx, tx, restaurantID, sourceKind, sourceID)
+		revID = id
+		return err
+	})
+	return revID, err
+}
+
 // --- Manual journal ----------------------------------------------------
 
 // ManualLine is one line of a manual journal.
 type ManualLine struct {
 	AccountID    uuid.UUID
-	Side         string
+	Side         ledger.Side
 	AmountCents  int64
 	CostCenterID *uuid.UUID // nil → main
 	Memo         string
@@ -162,7 +197,7 @@ func (a *App) ManualJournal(ctx context.Context, in ManualJournalInput, post boo
 		return ledger.JournalDocument{}, err
 	}
 	doc := ledger.NewDocument(a.newID(), in.RestaurantID, in.CreatedBy, ledger.KindManual, in.AccountingDate, a.now())
-	doc.SourceKind = ledger.KindManual
+	doc.SourceKind = string(ledger.KindManual)
 	for _, l := range in.Lines {
 		acc, err := a.store.AccountByID(ctx, in.RestaurantID, l.AccountID)
 		if err != nil {
@@ -383,7 +418,7 @@ func (a *App) PostShiftJournal(ctx context.Context, tx *sql.Tx, restaurantID, do
 // by purpose (resolved through ledger_account_map — the same §15.6 config).
 type InventoryJournalLine struct {
 	Purpose     string // inventory|accounts_payable|cogs|inventory_shrinkage|inventory_surplus
-	Side        string // debit|credit
+	Side        ledger.Side
 	AmountCents int64
 	Memo        string
 }
@@ -411,7 +446,7 @@ func (a *App) PostInventoryJournal(ctx context.Context, tx *sql.Tx, in Inventory
 	}
 	cc := mainCC.ID
 
-	doc := ledger.NewDocument(a.newID(), in.RestaurantID, in.CreatedBy, in.SourceKind, in.AccountingDate, a.now())
+	doc := ledger.NewDocument(a.newID(), in.RestaurantID, in.CreatedBy, ledger.DocumentKind(in.SourceKind), in.AccountingDate, a.now())
 	doc.SourceKind = in.SourceKind
 	sid := in.SourceID
 	doc.SourceID = &sid

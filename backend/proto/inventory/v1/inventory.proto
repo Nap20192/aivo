@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package inventory.v1;
+
+option go_package = "aivo/internal/inventory/v1;inventoryv1";
+
+// InventoryService is cmd/aivo-inventory's inbound gRPC surface for pos's
+// outbox (see openspec/changes/split-inventory-microservice). Authored
+// by svc-ms-server (the client side needs it to compile against); the
+// team lead reconciles field-for-field with svc-inventory's server
+// implementation on merge.
+service InventoryService {
+  rpc HandleTicketClosed(TicketClosedRequest) returns (HandleTicketClosedResponse);
+}
+
+// SoldLine mirrors internal/pos/ports.SaleLine: one sold ticket line
+// handed to inventory for stock depletion / COGS.
+message SoldLine {
+  string menu_item_id = 1;    // uuid
+  int32 qty = 2;
+  string ticket_line_id = 3;  // uuid; used for per-line COGS idempotency
+}
+
+// TicketClosedRequest is the wire shape of the TicketClosed event
+// (service-events spec). ticket_id is the idempotency key: a redelivery
+// MUST NOT double-deplete stock or double-post COGS.
+message TicketClosedRequest {
+  string restaurant_id = 1;   // uuid
+  string ticket_id = 2;       // uuid; idempotency key
+  string closed_by = 3;       // uuid
+  string business_date = 4;   // YYYY-MM-DD
+  repeated SoldLine lines = 5;
+}
+
+message HandleTicketClosedResponse {
+  int64 cogs_cents = 1;
+}

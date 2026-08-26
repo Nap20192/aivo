@@ -40,7 +40,7 @@ func balanced(d ledgerdomain.JournalDocument) bool { return d.Balanced() }
 func (h *handler) listShifts(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
 	state := r.URL.Query().Get("state")
 	if state == "" {
-		state = posdomain.ShiftClosed
+		state = string(posdomain.ShiftClosed)
 	}
 	shifts, err := h.Pos.ShiftsByState(r.Context(), rest.ID, state)
 	if writeAppErr(w, err) {
@@ -357,7 +357,7 @@ func (h *handler) postJournal(w http.ResponseWriter, r *http.Request, u domain.U
 	lines := make([]ledgerapp.ManualLine, len(req.Lines))
 	for i, l := range req.Lines {
 		lines[i] = ledgerapp.ManualLine{
-			AccountID: l.AccountID, Side: l.Side, AmountCents: l.AmountCents,
+			AccountID: l.AccountID, Side: ledgerdomain.Side(l.Side), AmountCents: l.AmountCents,
 			CostCenterID: l.CostCenterID, Memo: l.Memo,
 		}
 	}

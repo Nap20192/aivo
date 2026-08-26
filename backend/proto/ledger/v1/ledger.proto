@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package ledger.v1;
+
+option go_package = "aivo/internal/ledger/v1;ledgerv1";
+
+// LedgerService is cmd/aivo-server's inbound gRPC surface for inventory's
+// outbox: every inventory-originated GL posting (sale COGS, receipt,
+// write-off, stocktake, and their reversals) crosses this boundary since
+// ledger stays in-process for pos but not for inventory (see
+// openspec/changes/split-inventory-microservice). Every RPC MUST be
+// idempotent on its request's source id (the existing domain document
+// id), since delivery is at-least-once.
+service LedgerService {
+  rpc PostCOGSJournal(PostCOGSJournalRequest) returns (PostJournalResponse);
+  rpc ReverseCOGSJournal(ReverseJournalRequest) returns (ReverseJournalResponse);
+
+  rpc PostReceiptJournal(PostReceiptJournalRequest) returns (PostJournalResponse);
+  rpc ReverseReceiptJournal(ReverseJournalRequest) returns (ReverseJournalResponse);
+
+  rpc PostWriteOffJournal(PostWriteOffJournalRequest) returns (PostJournalResponse);
+  rpc ReverseWriteOffJournal(ReverseJournalRequest) returns (ReverseJournalResponse);
+
+  rpc PostStocktakeJournal(PostStocktakeJournalRequest) returns (PostJournalResponse);
+  rpc ReverseStocktakeJournal(ReverseJournalRequest) returns (ReverseJournalResponse);
+}
+
+// JournalLine mirrors internal/ledger/app.InventoryJournalLine: one line
+// of an inventory-originated GL document, addressed by purpose (resolved
+// through the restaurant's ledger_account_map).
+message JournalLine {
+  string purpose = 1;       // e.g. "cogs", "inventory", "accounts_payable", "inventory_shrinkage", "inventory_surplus"
+  string side = 2;          // "debit" | "credit"
+  int64 amount_cents = 3;
+}
+
+message PostCOGSJournalRequest {
+  string restaurant_id = 1;    // uuid
+  string created_by = 2;       // uuid
+  string ticket_id = 3;        // uuid; idempotency key (source document id)
+  string accounting_date = 4;  // YYYY-MM-DD
+  repeated JournalLine lines = 5;
+}
+
+message PostReceiptJournalRequest {
+  string restaurant_id = 1;
+  string created_by = 2;
+  string receipt_id = 3;       // idempotency key
+  string accounting_date = 4;
+  repeated JournalLine lines = 5;
+}
+
+message PostWriteOffJournalRequest {
+  string restaurant_id = 1;
+  string created_by = 2;
+  string write_off_id = 3;     // idempotency key
+  string accounting_date = 4;
+  repeated JournalLine lines = 5;
+}
+
+message PostStocktakeJournalRequest {
+  string restaurant_id = 1;
+  string created_by = 2;
+  string stocktake_id = 3;     // idempotency key
+  string accounting_date = 4;
+  repeated JournalLine lines = 5;
+}
+
+// PostJournalResponse is shared by every Post* RPC: the posted (or,
+// on a redelivery, the already-posted) document's id.
+message PostJournalResponse {
+  string document_id = 1;
+}
+
+// ReverseJournalRequest is shared by every Reverse* RPC: restaurant_id
+// plus the original document's source id (same id used to post it).
+message ReverseJournalRequest {
+  string restaurant_id = 1;
+  string source_id = 2;
+}
+
+// ReverseJournalResponse is shared by every Reverse* RPC: the reversal
+// (or, on a redelivery, the already-created reversal) document's id.
+message ReverseJournalResponse {
+  string reversal_document_id = 1;
+}

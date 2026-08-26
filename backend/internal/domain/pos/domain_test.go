@@ -113,3 +113,74 @@ func TestTicketTotal(t *testing.T) {
 		t.Errorf("total = %d, want 7900", got)
 	}
 }
+
+func TestShiftStateValid(t *testing.T) {
+	cases := []struct {
+		s    ShiftState
+		want bool
+	}{
+		{ShiftOpen, true}, {ShiftClosed, true}, {ShiftAccepted, true},
+		{"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.s.Valid(); got != c.want {
+			t.Errorf("ShiftState(%q).Valid() = %v, want %v", c.s, got, c.want)
+		}
+	}
+	if ShiftState("").Default() != ShiftOpen {
+		t.Errorf("ShiftState default = %q, want %q", ShiftState("").Default(), ShiftOpen)
+	}
+}
+
+func TestTicketStatusValid(t *testing.T) {
+	cases := []struct {
+		s    TicketStatus
+		want bool
+	}{
+		{TicketOpen, true}, {TicketClosed, true}, {"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.s.Valid(); got != c.want {
+			t.Errorf("TicketStatus(%q).Valid() = %v, want %v", c.s, got, c.want)
+		}
+	}
+	if TicketStatus("").Default() != TicketOpen {
+		t.Errorf("TicketStatus default = %q, want %q", TicketStatus("").Default(), TicketOpen)
+	}
+}
+
+func TestPaymentGroupValid(t *testing.T) {
+	cases := []struct {
+		g    PaymentGroup
+		want bool
+	}{
+		{PaymentGroupCash, true}, {PaymentGroupCard, true}, {PaymentGroupGiftCard, true},
+		{PaymentGroupComp, true}, {PaymentGroupVoid, true}, {PaymentGroupHouseAccount, true},
+		{"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.g.Valid(); got != c.want {
+			t.Errorf("PaymentGroup(%q).Valid() = %v, want %v", c.g, got, c.want)
+		}
+	}
+	if PaymentGroup("").Default() != PaymentGroupCash {
+		t.Errorf("PaymentGroup default = %q, want %q", PaymentGroup("").Default(), PaymentGroupCash)
+	}
+}
+
+func TestCashOpKindValid(t *testing.T) {
+	cases := []struct {
+		k    CashOpKind
+		want bool
+	}{
+		{CashPayIn, true}, {CashPayOut, true}, {CashDrop, true}, {"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.k.Valid(); got != c.want {
+			t.Errorf("CashOpKind(%q).Valid() = %v, want %v", c.k, got, c.want)
+		}
+	}
+	if CashOpKind("").Default() != CashPayIn {
+		t.Errorf("CashOpKind default = %q, want %q", CashOpKind("").Default(), CashPayIn)
+	}
+}

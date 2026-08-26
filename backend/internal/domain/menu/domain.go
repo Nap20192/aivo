@@ -229,13 +229,24 @@ const (
 	RequestBill ServiceRequestKind = "request_bill"
 )
 
-// Service request lifecycle states. Dismissed is the POS "not doing
-// this" exit, distinct from acknowledged ("handled").
+// ServiceRequestStatus is a service request's lifecycle state. Dismissed
+// is the POS "not doing this" exit, distinct from acknowledged
+// ("handled").
+type ServiceRequestStatus string
+
 const (
-	ServiceRequestPending      = "pending"
-	ServiceRequestAcknowledged = "acknowledged"
-	ServiceRequestDismissed    = "dismissed"
+	ServiceRequestPending      ServiceRequestStatus = "pending"
+	ServiceRequestAcknowledged ServiceRequestStatus = "acknowledged"
+	ServiceRequestDismissed    ServiceRequestStatus = "dismissed"
 )
+
+// Default is the status of a freshly created service request.
+func (ServiceRequestStatus) Default() ServiceRequestStatus { return ServiceRequestPending }
+
+// Valid reports whether s is one of the three known statuses.
+func (s ServiceRequestStatus) Valid() bool {
+	return s == ServiceRequestPending || s == ServiceRequestAcknowledged || s == ServiceRequestDismissed
+}
 
 // ServiceRequest is a diner-initiated action with no items, e.g. "call
 // waiter" or "request bill". Deduped per Table (not per diner session):
@@ -245,7 +256,7 @@ type ServiceRequest struct {
 	RestaurantID sharedkernel.ID
 	TableID      sharedkernel.ID
 	Kind         ServiceRequestKind
-	Status       string // "pending" or "acknowledged", see ServiceRequestPending/Acknowledged
+	Status       ServiceRequestStatus
 	CreatedAt    time.Time
 }
 

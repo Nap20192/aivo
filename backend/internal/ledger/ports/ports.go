@@ -48,6 +48,13 @@ type Store interface {
 	WithTx(tx *sql.Tx) Store
 	// InTx runs fn inside a single transaction against a tx-bound Store.
 	InTx(ctx context.Context, fn func(Store) error) error
+	// InTxWithConn runs fn inside a single transaction, passing both the
+	// raw *sql.Tx and a Store bound to it — for a caller with no
+	// pre-existing transaction of its own (the ledger gRPC server) that
+	// still needs to invoke PostInventoryJournal/CancelJournalForSource,
+	// which take a *sql.Tx because they're normally called inside the
+	// producing context's (pos/inventory) own transaction.
+	InTxWithConn(ctx context.Context, fn func(tx *sql.Tx, s Store) error) error
 
 	// Accounts.
 	InsertAccount(ctx context.Context, a ledger.Account) error
@@ -74,7 +81,7 @@ type Store interface {
 	// state — so the override and post paths serialize on the same row
 	// (append-only guard against a PATCH racing an accept). Must run inside
 	// a transaction. ErrNotFound if the document is missing.
-	LockDocumentState(ctx context.Context, restaurantID, id uuid.UUID) (string, error)
+	LockDocumentState(ctx context.Context, restaurantID, id uuid.UUID) (ledger.DocumentState, error)
 	// ReplaceDraftLines rewrites the lines of a draft document (override
 	// path). No-op guard belongs to the caller (must be draft).
 	ReplaceDraftLines(ctx context.Context, documentID uuid.UUID, lines []ledger.JournalLine) error

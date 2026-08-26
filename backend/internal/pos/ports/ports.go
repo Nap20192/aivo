@@ -89,12 +89,12 @@ type Store interface {
 	AcceptShift(ctx context.Context, s domain.Shift) error
 	// ShiftsByState lists shifts in the "closed" (closed, not accepted) or
 	// "accepted" state, newest first (acceptance queue).
-	ShiftsByState(ctx context.Context, restaurantID uuid.UUID, state string) ([]domain.Shift, error)
+	ShiftsByState(ctx context.Context, restaurantID uuid.UUID, state domain.ShiftState) ([]domain.Shift, error)
 }
 
 // TenderGroupTotal is a shift's tender total for one payment group.
 type TenderGroupTotal struct {
-	Group       string
+	Group       domain.PaymentGroup
 	AmountCents int64
 	TipCents    int64
 }

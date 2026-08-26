@@ -144,3 +144,75 @@ func TestReverseRejectsDraft(t *testing.T) {
 		t.Errorf("reverse draft: got %v, want ErrNotPosted", err)
 	}
 }
+
+func TestAccountTypeValid(t *testing.T) {
+	cases := []struct {
+		typ  AccountType
+		want bool
+	}{
+		{TypeAsset, true}, {TypeLiability, true}, {TypeRevenue, true},
+		{TypeExpense, true}, {TypeEquity, true}, {TypeStatistical, true},
+		{"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.typ.Valid(); got != c.want {
+			t.Errorf("AccountType(%q).Valid() = %v, want %v", c.typ, got, c.want)
+		}
+	}
+	if AccountType("").Default() != TypeAsset {
+		t.Errorf("AccountType default = %q, want %q", AccountType("").Default(), TypeAsset)
+	}
+}
+
+func TestSideValid(t *testing.T) {
+	cases := []struct {
+		s    Side
+		want bool
+	}{
+		{SideDebit, true}, {SideCredit, true}, {"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.s.Valid(); got != c.want {
+			t.Errorf("Side(%q).Valid() = %v, want %v", c.s, got, c.want)
+		}
+	}
+	if Side("").Default() != SideDebit {
+		t.Errorf("Side default = %q, want %q", Side("").Default(), SideDebit)
+	}
+}
+
+func TestDocumentKindValid(t *testing.T) {
+	cases := []struct {
+		k    DocumentKind
+		want bool
+	}{
+		{KindShiftAcceptance, true}, {KindManual, true}, {KindReversal, true},
+		{"", false}, {"cogs", false}, // inventory source kinds pass through this field unchecked
+	}
+	for _, c := range cases {
+		if got := c.k.Valid(); got != c.want {
+			t.Errorf("DocumentKind(%q).Valid() = %v, want %v", c.k, got, c.want)
+		}
+	}
+	if DocumentKind("").Default() != KindManual {
+		t.Errorf("DocumentKind default = %q, want %q", DocumentKind("").Default(), KindManual)
+	}
+}
+
+func TestDocumentStateValid(t *testing.T) {
+	cases := []struct {
+		s    DocumentState
+		want bool
+	}{
+		{StateDraft, true}, {StatePosted, true}, {StateCancelled, true},
+		{"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.s.Valid(); got != c.want {
+			t.Errorf("DocumentState(%q).Valid() = %v, want %v", c.s, got, c.want)
+		}
+	}
+	if DocumentState("").Default() != StateDraft {
+		t.Errorf("DocumentState default = %q, want %q", DocumentState("").Default(), StateDraft)
+	}
+}

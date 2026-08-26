@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"time"
 
+	ledgerdomain "aivo/internal/domain/ledger"
 	"aivo/internal/inventory/ports"
 	ledgerapp "aivo/internal/ledger/app"
 
@@ -26,7 +27,7 @@ func New(ledger *ledgerapp.App) *Bridge { return &Bridge{ledger: ledger} }
 func (b *Bridge) PostInventoryJournal(ctx context.Context, tx *sql.Tx, restaurantID, createdBy uuid.UUID, sourceKind string, sourceID uuid.UUID, accountingDate time.Time, lines []ports.JournalLine) (uuid.UUID, error) {
 	glLines := make([]ledgerapp.InventoryJournalLine, len(lines))
 	for i, l := range lines {
-		glLines[i] = ledgerapp.InventoryJournalLine{Purpose: l.Purpose, Side: l.Side, AmountCents: l.AmountCents}
+		glLines[i] = ledgerapp.InventoryJournalLine{Purpose: l.Purpose, Side: ledgerdomain.Side(l.Side), AmountCents: l.AmountCents}
 	}
 	return b.ledger.PostInventoryJournal(ctx, tx, ledgerapp.InventoryJournalInput{
 		RestaurantID:   restaurantID,

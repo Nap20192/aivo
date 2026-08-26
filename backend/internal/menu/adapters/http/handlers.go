@@ -353,7 +353,7 @@ func (h *handler) createServiceRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, serviceRequestView{
-		ID: sr.ID, TableID: sr.TableID, Kind: sr.Kind, Status: sr.Status, CreatedAt: sr.CreatedAt,
+		ID: sr.ID, TableID: sr.TableID, Kind: sr.Kind, Status: string(sr.Status), CreatedAt: sr.CreatedAt,
 	})
 }
 

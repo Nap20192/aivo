@@ -91,5 +91,5 @@ type AdminStore interface {
 	PendingServiceRequestsForTable(ctx context.Context, restaurantID, tableID uuid.UUID) ([]domain.ServiceRequest, error)
 	// SetServiceRequestStatus transitions a request (acknowledged or
 	// dismissed), scoped to restaurantID; ErrNotFound on wrong tenant.
-	SetServiceRequestStatus(ctx context.Context, restaurantID, id uuid.UUID, status string) error
+	SetServiceRequestStatus(ctx context.Context, restaurantID, id uuid.UUID, status domain.ServiceRequestStatus) error
 }

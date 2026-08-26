@@ -25,7 +25,7 @@ func New(ledger *ledgerapp.App) *Bridge { return &Bridge{ledger: ledger} }
 func (b *Bridge) BuildDraftShiftJournal(ctx context.Context, tx *sql.Tx, restaurantID uuid.UUID, draft ports.ShiftJournalDraft) (uuid.UUID, error) {
 	tenders := make([]ledgerapp.TenderTotal, len(draft.Tenders))
 	for i, t := range draft.Tenders {
-		tenders[i] = ledgerapp.TenderTotal{Group: t.Group, AmountCents: t.AmountCents}
+		tenders[i] = ledgerapp.TenderTotal{Group: string(t.Group), AmountCents: t.AmountCents}
 	}
 	return b.ledger.BuildDraftShiftJournal(ctx, tx, ledgerapp.ShiftJournalInput{
 		RestaurantID:   restaurantID,
