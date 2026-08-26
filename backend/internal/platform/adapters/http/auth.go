@@ -1,6 +1,8 @@
 package http
 
 import (
+	"context"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -10,6 +12,15 @@ import (
 
 	"uuid"
 )
+
+// defaultAppID is used when a login/register request omits app_id — the
+// admin backoffice is the primary caller of these endpoints today.
+const defaultAppID = "admin"
+
+// mintTokenTimeout bounds how long login/register waits on aivo-auth
+// before giving up on minting a cross-service token — the cookie
+// session must never be held hostage by a slow/unreachable aivo-auth.
+const mintTokenTimeout = 2 * time.Second
 
 // authedFunc is a handler that runs with a resolved session user.
 type authedFunc func(w http.ResponseWriter, r *http.Request, u domain.User)
@@ -64,6 +75,42 @@ func (h *handler) restaurant(needManage bool, next restaurantFunc) http.HandlerF
 		}
 		next(w, r, u, rest)
 	})
+}
+
+// mintToken calls h.TokenMinter for u, additive to the existing
+// cookie-session login. A nil TokenMinter (not configured in this
+// deployment) or a mint failure (e.g. aivo-auth unreachable) never
+// breaks login — the caller just doesn't get a "token" field this
+// time. tenantID is the restaurant the token is scoped to: u's own
+// restaurant for staff, or its first accessible restaurant for an
+// org-wide owner (same "the" restaurant precedent as meResponse below);
+// an owner with zero restaurants yet gets no token, nothing to scope it to.
+func (h *handler) mintToken(r *http.Request, u domain.User, appID string) (token string, ok bool) {
+	if h.TokenMinter == nil {
+		return "", false
+	}
+	tenantID := uuid.UUID{}
+	if u.RestaurantID != nil {
+		tenantID = *u.RestaurantID
+	} else {
+		rests, err := h.restaurantViews(r, u)
+		if err != nil || len(rests) == 0 {
+			return "", false
+		}
+		tenantID = rests[0].ID
+	}
+	if appID == "" {
+		appID = defaultAppID
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), mintTokenTimeout)
+	defer cancel()
+	token, err := h.TokenMinter.Mint(ctx, u.ID, tenantID, []string{string(u.Role)}, appID)
+	if err != nil {
+		log.Printf("api: mint token: %v", err)
+		return "", false
+	}
+	return token, true
 }
 
 func (h *handler) sessionUser(r *http.Request) (domain.User, error) {
@@ -147,6 +194,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) {
 		RestaurantName string `json:"restaurant_name"`
 		Email          string `json:"email"`
 		Password       string `json:"password"`
+		AppID          string `json:"app_id"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -160,6 +208,9 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) {
 	if writeAppErr(w, err) {
 		return
 	}
+	if minted, ok := h.mintToken(r, u, req.AppID); ok {
+		resp["token"] = minted
+	}
 	writeJSON(w, http.StatusCreated, resp)
 }
 
@@ -167,6 +218,7 @@ func (h *handler) login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
+		AppID    string `json:"app_id"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
@@ -179,6 +231,9 @@ func (h *handler) login(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.meResponse(r, u)
 	if writeAppErr(w, err) {
 		return
+	}
+	if minted, ok := h.mintToken(r, u, req.AppID); ok {
+		resp["token"] = minted
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
