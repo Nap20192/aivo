@@ -421,15 +421,20 @@ type Table struct {
 }
 
 type TechCard struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
-	ProductID    uuid.UUID
-	ValidFrom    time.Time
-	ValidTo      sql.NullTime
-	Consumption  string
-	YieldMilli   int64
-	CreatedBy    uuid.UUID
-	CreatedAt    time.Time
+	ID               uuid.UUID
+	RestaurantID     uuid.UUID
+	ProductID        uuid.UUID
+	ValidFrom        time.Time
+	ValidTo          sql.NullTime
+	Consumption      string
+	YieldMilli       int64
+	CreatedBy        uuid.UUID
+	CreatedAt        time.Time
+	Format           string
+	ScopeNote        sql.NullString
+	PresentationNote sql.NullString
+	StorageNote      sql.NullString
+	OrganolepticNote sql.NullString
 }
 
 type TechCardLine struct {
@@ -438,6 +443,7 @@ type TechCardLine struct {
 	IngredientProductID uuid.UUID
 	Qty                 int64
 	Seq                 int32
+	YieldPermille       int32
 }
 
 type Ticket struct {

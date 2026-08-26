@@ -17,13 +17,34 @@ const (
 // Recipe costing method.
 const CostMethodWeightedAvg = "weighted_avg"
 
+// Tech card document formats. Simple (default) is the lean costing-only
+// card; TTK adds the ГОСТ 31987-2012 технико-технологическая карта text
+// sections (§ scope/presentation/storage/organoleptic — required for a new,
+// non-typical dish presented to a regulator) on top of the same recipe
+// data. The format never changes costing math — it only gates which text
+// fields a restaurant is expected to fill in and which print template
+// renders.
+const (
+	FormatSimple = "simple"
+	FormatTTK    = "ttk"
+)
+
+// YieldPermilleDefault is 100.0% (no cooking loss modeled) — a tech card
+// line that doesn't specify a yield defaults to gross == net.
+const YieldPermilleDefault = 1000
+
 var (
 	ErrInvalidConsumption  = errors.New("inventory: invalid consumption strategy")
 	ErrEmptyRecipe         = errors.New("inventory: recipe needs at least one line")
 	ErrDuplicateIngredient = errors.New("inventory: ingredient appears twice in a recipe")
 	ErrRecipeCycle         = errors.New("inventory: recipe forms a cycle")
 	ErrBadInterval         = errors.New("inventory: valid_to must be after valid_from")
+	ErrInvalidFormat       = errors.New("inventory: invalid tech card format")
+	ErrInvalidYieldPct     = errors.New("inventory: yield_permille must be in (0, 1000]")
 )
+
+// ValidFormat reports whether f is a known tech card format.
+func ValidFormat(f string) bool { return f == FormatSimple || f == FormatTTK }
 
 // TechCard is a calendar-versioned recipe for a dish/prepared product (D5).
 // The aggregate boundary is the version + its lines. A version's interval
@@ -39,15 +60,41 @@ type TechCard struct {
 	CreatedBy    sharedkernel.ID
 	CreatedAt    time.Time
 	Lines        []TechCardLine
+
+	// GOST 31987-2012 ТТК fields — nullable, meaningful only when
+	// Format == FormatTTK (a "новая, нетиповая" dish presented to a
+	// regulator needs them); stored regardless of format so switching a
+	// card to ttk later doesn't lose anything already typed.
+	Format           string  // simple|ttk
+	ScopeNote        *string // область применения
+	PresentationNote *string // требования к оформлению, подаче, реализации
+	StorageNote      *string // условия и сроки хранения
+	OrganolepticNote *string // показатели качества и безопасности (органолептика)
 }
 
-// TechCardLine is one gross ingredient of a recipe version.
+// TechCardLine is one ingredient of a recipe version. Qty is the gross
+// (as-purchased/AP) amount actually taken from stock — that's what costing
+// and the stock ledger use. YieldPermille is the ГОСТ "выход"/Western
+// AP→EP yield after cold/heat processing loss (‰, 1000 = 100%,
+// informational for kitchen prep and ТТК printing — it never affects
+// costing, which is always priced on the gross Qty actually consumed).
 type TechCardLine struct {
 	ID                  sharedkernel.ID
 	TechCardID          sharedkernel.ID
 	IngredientProductID sharedkernel.ID
-	Qty                 int64 // milli-units in the ingredient's base unit
+	Qty                 int64 // milli-units in the ingredient's base unit (gross/AP)
 	Seq                 int
+	YieldPermille       int // 1..1000, default 1000 (no loss)
+}
+
+// NetQty is the edible/usable quantity after cooking loss: Qty ×
+// YieldPermille / 1000 (informational — see TechCardLine doc comment).
+func (l TechCardLine) NetQty() int64 {
+	yp := int64(l.YieldPermille)
+	if yp <= 0 {
+		yp = YieldPermilleDefault
+	}
+	return l.Qty * yp / YieldPermilleDefault
 }
 
 // RecipeCosting is one entry in a tech card's append-only cost series
@@ -86,6 +133,9 @@ func ValidateLines(lines []TechCardLine) error {
 	for _, l := range lines {
 		if l.Qty <= 0 {
 			return ErrInvalidQty
+		}
+		if l.YieldPermille < 0 || l.YieldPermille > YieldPermilleDefault {
+			return ErrInvalidYieldPct
 		}
 		if seen[l.IngredientProductID] {
 			return ErrDuplicateIngredient

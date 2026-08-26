@@ -16,7 +16,8 @@ import (
 )
 
 const activeTechCard = `-- name: ActiveTechCard :one
-SELECT id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by, created_at
+SELECT id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by, created_at,
+       format, scope_note, presentation_note, storage_note, organoleptic_note
 FROM tech_cards
 WHERE restaurant_id = $1 AND product_id = $2 AND valid_from <= $3 AND (valid_to IS NULL OR valid_to > $3)
 `
@@ -40,6 +41,11 @@ func (q *Queries) ActiveTechCard(ctx context.Context, arg ActiveTechCardParams) 
 		&i.YieldMilli,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.Format,
+		&i.ScopeNote,
+		&i.PresentationNote,
+		&i.StorageNote,
+		&i.OrganolepticNote,
 	)
 	return i, err
 }
@@ -201,19 +207,25 @@ func (q *Queries) InsertSupplier(ctx context.Context, arg InsertSupplierParams) 
 }
 
 const insertTechCard = `-- name: InsertTechCard :exec
-INSERT INTO tech_cards (id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO tech_cards (id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by,
+                         format, scope_note, presentation_note, storage_note, organoleptic_note)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 `
 
 type InsertTechCardParams struct {
-	ID           uuid.UUID
-	RestaurantID uuid.UUID
-	ProductID    uuid.UUID
-	ValidFrom    time.Time
-	ValidTo      sql.NullTime
-	Consumption  string
-	YieldMilli   int64
-	CreatedBy    uuid.UUID
+	ID               uuid.UUID
+	RestaurantID     uuid.UUID
+	ProductID        uuid.UUID
+	ValidFrom        time.Time
+	ValidTo          sql.NullTime
+	Consumption      string
+	YieldMilli       int64
+	CreatedBy        uuid.UUID
+	Format           string
+	ScopeNote        sql.NullString
+	PresentationNote sql.NullString
+	StorageNote      sql.NullString
+	OrganolepticNote sql.NullString
 }
 
 func (q *Queries) InsertTechCard(ctx context.Context, arg InsertTechCardParams) error {
@@ -226,6 +238,11 @@ func (q *Queries) InsertTechCard(ctx context.Context, arg InsertTechCardParams) 
 		arg.Consumption,
 		arg.YieldMilli,
 		arg.CreatedBy,
+		arg.Format,
+		arg.ScopeNote,
+		arg.PresentationNote,
+		arg.StorageNote,
+		arg.OrganolepticNote,
 	)
 	return err
 }
@@ -383,7 +400,7 @@ func (q *Queries) ProductsByRestaurant(ctx context.Context, restaurantID uuid.UU
 }
 
 const techCardLines = `-- name: TechCardLines :many
-SELECT id, tech_card_id, ingredient_product_id, qty, seq FROM tech_card_lines
+SELECT id, tech_card_id, ingredient_product_id, qty, seq, yield_permille FROM tech_card_lines
 WHERE tech_card_id = $1 ORDER BY seq
 `
 
@@ -402,6 +419,7 @@ func (q *Queries) TechCardLines(ctx context.Context, techCardID uuid.UUID) ([]Te
 			&i.IngredientProductID,
 			&i.Qty,
 			&i.Seq,
+			&i.YieldPermille,
 		); err != nil {
 			return nil, err
 		}

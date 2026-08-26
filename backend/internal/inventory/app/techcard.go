@@ -14,10 +14,24 @@ import (
 )
 
 // TechCardLineInput is one recipe line as entered (display unit).
+// YieldPermille is optional (0 = default 100%, no cooking loss).
 type TechCardLineInput struct {
 	IngredientProductID uuid.UUID
 	QtyInput            float64
 	Unit                string
+	YieldPermille       int
+}
+
+// TechCardMeta bundles the tech card's document format and its ГОСТ
+// 31987-2012 ТТК text fields (§ scope/presentation/storage/organoleptic —
+// meaningful when Format is FormatTTK, stored regardless). Format defaults
+// to FormatSimple when empty.
+type TechCardMeta struct {
+	Format           string
+	ScopeNote        *string
+	PresentationNote *string
+	StorageNote      *string
+	OrganolepticNote *string
 }
 
 // CreateTechCardVersion creates a calendar-versioned recipe: it closes the
@@ -25,7 +39,7 @@ type TechCardLineInput struct {
 // inserts the new open version + lines, and records the first costing — all
 // in one transaction (§11). Rejects cycles, duplicate/empty lines, and a
 // second version starting on the same day.
-func (a *App) CreateTechCardVersion(ctx context.Context, restaurantID, productID uuid.UUID, validFrom time.Time, consumption string, yieldMilli int64, lineInputs []TechCardLineInput, createdBy uuid.UUID) (inv.TechCard, error) {
+func (a *App) CreateTechCardVersion(ctx context.Context, restaurantID, productID uuid.UUID, validFrom time.Time, consumption string, yieldMilli int64, meta TechCardMeta, lineInputs []TechCardLineInput, createdBy uuid.UUID) (inv.TechCard, error) {
 	product, err := a.store.ProductByID(ctx, restaurantID, productID)
 	if err != nil {
 		return inv.TechCard{}, err
@@ -38,6 +52,12 @@ func (a *App) CreateTechCardVersion(ctx context.Context, restaurantID, productID
 	}
 	if yieldMilli <= 0 {
 		yieldMilli = inv.MilliPerUnit
+	}
+	if meta.Format == "" {
+		meta.Format = inv.FormatSimple
+	}
+	if !inv.ValidFormat(meta.Format) {
+		return inv.TechCard{}, inv.ErrInvalidFormat
 	}
 
 	tcID := a.newID()
@@ -52,7 +72,14 @@ func (a *App) CreateTechCardVersion(ctx context.Context, restaurantID, productID
 		if err != nil {
 			return inv.TechCard{}, err
 		}
-		lines[i] = inv.TechCardLine{ID: a.newID(), TechCardID: tcID, IngredientProductID: li.IngredientProductID, Qty: qty, Seq: i + 1}
+		yield := li.YieldPermille
+		if yield <= 0 {
+			yield = inv.YieldPermilleDefault
+		}
+		lines[i] = inv.TechCardLine{
+			ID: a.newID(), TechCardID: tcID, IngredientProductID: li.IngredientProductID,
+			Qty: qty, Seq: i + 1, YieldPermille: yield,
+		}
 		ingredientIDs[i] = li.IngredientProductID
 	}
 	if err := inv.ValidateLines(lines); err != nil {
@@ -73,6 +100,8 @@ func (a *App) CreateTechCardVersion(ctx context.Context, restaurantID, productID
 		ID: tcID, RestaurantID: restaurantID, ProductID: productID,
 		ValidFrom: validFrom, ValidTo: nil, Consumption: consumption,
 		YieldMilli: yieldMilli, CreatedBy: createdBy, Lines: lines,
+		Format: meta.Format, ScopeNote: meta.ScopeNote, PresentationNote: meta.PresentationNote,
+		StorageNote: meta.StorageNote, OrganolepticNote: meta.OrganolepticNote,
 	}
 	err = a.store.InTx(ctx, func(_ *sql.Tx, st ports.Store) error {
 		active, err := st.ActiveTechCard(ctx, restaurantID, productID, validFrom)

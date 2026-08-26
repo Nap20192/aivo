@@ -123,12 +123,21 @@ func techCardView(v inventoryapp.TechCardView) map[string]any {
 	}
 	lines := make([]map[string]any, len(c.Lines))
 	for i, l := range c.Lines {
-		lines[i] = map[string]any{"ingredient_product_id": l.IngredientProductID, "qty": qtyNum(l.Qty), "seq": l.Seq}
+		lines[i] = map[string]any{
+			"ingredient_product_id": l.IngredientProductID, "qty": qtyNum(l.Qty), "seq": l.Seq,
+			"yield_permille": l.YieldPermille, "net_qty": qtyNum(l.NetQty()),
+		}
+	}
+	format := c.Format
+	if format == "" {
+		format = inv.FormatSimple
 	}
 	m := map[string]any{
 		"id": c.ID, "product_id": c.ProductID, "valid_from": c.ValidFrom.Format("2006-01-02"),
 		"valid_to": validTo, "consumption": c.Consumption, "yield_qty": qtyNum(c.YieldMilli),
 		"cost_cents": v.CostCents, "lines": lines,
+		"format": format, "scope_note": c.ScopeNote, "presentation_note": c.PresentationNote,
+		"storage_note": c.StorageNote, "organoleptic_note": c.OrganolepticNote,
 	}
 	if v.Costings != nil {
 		costings := make([]map[string]any, len(v.Costings))
@@ -182,13 +191,19 @@ func (h *handler) invCreateTechCard(w http.ResponseWriter, r *http.Request, u do
 		return
 	}
 	var req struct {
-		ValidFrom   string   `json:"valid_from"`
-		Consumption string   `json:"consumption"`
-		YieldQty    *float64 `json:"yield_qty"`
-		Lines       []struct {
+		ValidFrom        string   `json:"valid_from"`
+		Consumption      string   `json:"consumption"`
+		YieldQty         *float64 `json:"yield_qty"`
+		Format           string   `json:"format"` // simple|ttk, default simple
+		ScopeNote        *string  `json:"scope_note"`
+		PresentationNote *string  `json:"presentation_note"`
+		StorageNote      *string  `json:"storage_note"`
+		OrganolepticNote *string  `json:"organoleptic_note"`
+		Lines            []struct {
 			IngredientProductID uuid.UUID `json:"ingredient_product_id"`
 			Qty                 float64   `json:"qty"`
 			Unit                string    `json:"unit"`
+			YieldPermille       int       `json:"yield_permille"` // 1..1000, default 1000
 		} `json:"lines"`
 	}
 	if !decodeJSON(w, r, &req) {
@@ -202,11 +217,17 @@ func (h *handler) invCreateTechCard(w http.ResponseWriter, r *http.Request, u do
 	if req.YieldQty != nil {
 		yield = milliOf(*req.YieldQty)
 	}
+	meta := inventoryapp.TechCardMeta{
+		Format: req.Format, ScopeNote: req.ScopeNote, PresentationNote: req.PresentationNote,
+		StorageNote: req.StorageNote, OrganolepticNote: req.OrganolepticNote,
+	}
 	lines := make([]inventoryapp.TechCardLineInput, len(req.Lines))
 	for i, l := range req.Lines {
-		lines[i] = inventoryapp.TechCardLineInput{IngredientProductID: l.IngredientProductID, QtyInput: l.Qty, Unit: l.Unit}
+		lines[i] = inventoryapp.TechCardLineInput{
+			IngredientProductID: l.IngredientProductID, QtyInput: l.Qty, Unit: l.Unit, YieldPermille: l.YieldPermille,
+		}
 	}
-	tc, err := h.Inventory.CreateTechCardVersion(r.Context(), rest.ID, pid, validFrom, req.Consumption, yield, lines, u.ID)
+	tc, err := h.Inventory.CreateTechCardVersion(r.Context(), rest.ID, pid, validFrom, req.Consumption, yield, meta, lines, u.ID)
 	if writeAppErr(w, err) {
 		return
 	}

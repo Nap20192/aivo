@@ -24,6 +24,7 @@ import type {
   StocktakePreview,
   Supplier,
   TechCard,
+  TechCardFormat,
   TechCardInput,
   TechCardVersion,
   WriteOff,
@@ -161,8 +162,13 @@ interface CardVersion {
   valid_to: string | null;
   consumption: ConsumptionStrategy;
   yield_qty: number | null;
-  lines: { id: string; ingredient_product_id: string; qty: number; seq: number }[];
+  lines: { id: string; ingredient_product_id: string; qty: number; seq: number; yield_permille: number }[];
   costings: RecipeCosting[];
+  format: TechCardFormat;
+  scope_note: string | null;
+  presentation_note: string | null;
+  storage_note: string | null;
+  organoleptic_note: string | null;
 }
 const cards: CardVersion[] = [];
 
@@ -237,9 +243,16 @@ function toCardView(c: CardVersion): TechCard {
       qty: l.qty,
       unit: (productById(l.ingredient_product_id)?.stock_unit ?? "g") as BaseUnit,
       seq: l.seq,
+      yield_permille: l.yield_permille,
+      net_qty: Math.round((l.qty * l.yield_permille) / 1000),
     })),
     cost_cents: last(c.costings)?.cost_cents ?? 0,
     cost_history: [...c.costings].reverse(),
+    format: c.format,
+    scope_note: c.scope_note,
+    presentation_note: c.presentation_note,
+    storage_note: c.storage_note,
+    organoleptic_note: c.organoleptic_note,
   };
 }
 
@@ -276,8 +289,14 @@ function createCard(pid: string, input: TechCardInput): CardVersion {
       ingredient_product_id: l.ingredient_product_id,
       qty: toBaseMilli(l.qty, l.unit),
       seq: i,
+      yield_permille: l.yield_permille && l.yield_permille > 0 ? l.yield_permille : 1000,
     })),
     costings: [],
+    format: input.format ?? "simple",
+    scope_note: input.scope_note ?? null,
+    presentation_note: input.presentation_note ?? null,
+    storage_note: input.storage_note ?? null,
+    organoleptic_note: input.organoleptic_note ?? null,
   };
   cards.push(card);
   pushCosting(card, input.valid_from);

@@ -14,19 +14,21 @@ FROM inventory_products WHERE restaurant_id = $1 AND id = $2;
 SELECT count(*) FROM stock_moves WHERE product_id = $1;
 
 -- name: InsertTechCard :exec
-INSERT INTO tech_cards (id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+INSERT INTO tech_cards (id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by,
+                         format, scope_note, presentation_note, storage_note, organoleptic_note)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
 
 -- name: CloseTechCard :exec
 UPDATE tech_cards SET valid_to = $2 WHERE id = $1;
 
 -- name: ActiveTechCard :one
-SELECT id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by, created_at
+SELECT id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by, created_at,
+       format, scope_note, presentation_note, storage_note, organoleptic_note
 FROM tech_cards
 WHERE restaurant_id = $1 AND product_id = $2 AND valid_from <= $3 AND (valid_to IS NULL OR valid_to > $3);
 
 -- name: TechCardLines :many
-SELECT id, tech_card_id, ingredient_product_id, qty, seq FROM tech_card_lines
+SELECT id, tech_card_id, ingredient_product_id, qty, seq, yield_permille FROM tech_card_lines
 WHERE tech_card_id = $1 ORDER BY seq;
 
 -- name: InsertRecipeCosting :exec

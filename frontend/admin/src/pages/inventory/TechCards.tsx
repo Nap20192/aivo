@@ -1,7 +1,7 @@
 import { CalendarClock, Plus, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../api/client";
-import type { ConsumptionStrategy, Product, TechCardInput, Unit } from "../../api/types";
+import type { ConsumptionStrategy, Product, TechCardFormat, TechCardInput, Unit } from "../../api/types";
 import { useRestaurant } from "../../auth";
 import { useLoad } from "../../lib/useLoad";
 import { formatQty, toBaseMilli } from "../../lib/units";
@@ -13,6 +13,12 @@ const TODAY = "2026-08-24";
 const CONSUMPTION: { value: ConsumptionStrategy; label: string; hint: string }[] = [
   { value: "assemble", label: "Assemble", hint: "Selling depletes the ingredients listed below." },
   { value: "deplete_finished", label: "Deplete finished", hint: "Selling depletes this product's own stock." },
+];
+// Two document formats over the same recipe data (§ ГОСТ 31987-2012 vs a
+// lean Western-style card) — never changes costing, only which fields matter.
+const FORMATS: { value: TechCardFormat; label: string; hint: string }[] = [
+  { value: "simple", label: "Simple", hint: "Costing only — ingredients, yield, cost." },
+  { value: "ttk", label: "ТТК (ГОСТ 31987-2012)", hint: "Adds scope, presentation, storage & organoleptic sections for a regulator." },
 ];
 
 export default function TechCards({
@@ -153,6 +159,9 @@ function CardModal({ tcid, onClose, onChanged }: { tcid: string; onClose: () => 
             <Badge tone={data.consumption === "assemble" ? "info" : "neutral"}>
               {data.consumption === "assemble" ? "assemble" : "deplete finished"}
             </Badge>
+            <Badge tone={data.format === "ttk" ? "info" : "neutral"}>
+              {data.format === "ttk" ? "ТТК · ГОСТ 31987-2012" : "simple"}
+            </Badge>
             {data.yield_qty != null && <span style={{ color: "var(--text-muted)" }}>yield {data.yield_qty / 1000}</span>}
             <span style={{ marginLeft: "auto", font: "var(--type-label)" }}>Cost {formatCents(data.cost_cents)}</span>
           </div>
@@ -161,7 +170,9 @@ function CardModal({ tcid, onClose, onChanged }: { tcid: string; onClose: () => 
             <thead>
               <tr>
                 <th>Ingredient</th>
-                <th style={{ textAlign: "right" }}>Quantity</th>
+                <th style={{ textAlign: "right" }}>Gross (brutto)</th>
+                <th style={{ textAlign: "right" }}>Yield %</th>
+                <th style={{ textAlign: "right" }}>Net (netto)</th>
               </tr>
             </thead>
             <tbody>
@@ -169,10 +180,31 @@ function CardModal({ tcid, onClose, onChanged }: { tcid: string; onClose: () => 
                 <tr key={l.id}>
                   <td>{l.ingredient_name}</td>
                   <td className="num" style={{ textAlign: "right" }}>{formatQty(l.qty, l.unit)}</td>
+                  <td className="num" style={{ textAlign: "right", color: "var(--text-muted)" }}>{l.yield_permille / 10}%</td>
+                  <td className="num" style={{ textAlign: "right" }}>{formatQty(l.net_qty, l.unit)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {data.format === "ttk" && (
+            <div className="stack" style={{ gap: 8 }}>
+              <span className="field-label">ТТК — ГОСТ 31987-2012</span>
+              {[
+                ["Область применения", data.scope_note],
+                ["Требования к оформлению, подаче, реализации", data.presentation_note],
+                ["Условия и сроки хранения", data.storage_note],
+                ["Показатели качества и безопасности", data.organoleptic_note],
+              ].map(([label, value]) =>
+                value ? (
+                  <div key={label as string} className="card" style={{ padding: 10 }}>
+                    <div style={{ font: "var(--type-label)", color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
+                    <div style={{ whiteSpace: "pre-wrap" }}>{value}</div>
+                  </div>
+                ) : null,
+              )}
+            </div>
+          )}
 
           <div>
             <span className="field-label">Cost history (append-only)</span>
@@ -213,6 +245,11 @@ function NewVersionModal({
   const [validFrom, setValidFrom] = useState(TODAY);
   const [consumption, setConsumption] = useState<ConsumptionStrategy>("assemble");
   const [yieldQty, setYieldQty] = useState("1");
+  const [format, setFormat] = useState<TechCardFormat>("simple");
+  const [scopeNote, setScopeNote] = useState("");
+  const [presentationNote, setPresentationNote] = useState("");
+  const [storageNote, setStorageNote] = useState("");
+  const [organolepticNote, setOrganolepticNote] = useState("");
   const [lines, setLines] = useState<EditLine[]>([{ product_id: "", qty: "", unit: "g" }]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -227,7 +264,17 @@ function NewVersionModal({
       valid_from: validFrom,
       consumption,
       yield_qty: yieldQty.trim() ? toBaseMilli(parseFloat(yieldQty), "pcs") : null,
-      lines: validLines.map((l) => ({ ingredient_product_id: l.product_id, qty: parseFloat(l.qty), unit: l.unit as Unit })),
+      format,
+      scope_note: format === "ttk" && scopeNote.trim() ? scopeNote.trim() : null,
+      presentation_note: format === "ttk" && presentationNote.trim() ? presentationNote.trim() : null,
+      storage_note: format === "ttk" && storageNote.trim() ? storageNote.trim() : null,
+      organoleptic_note: format === "ttk" && organolepticNote.trim() ? organolepticNote.trim() : null,
+      lines: validLines.map((l) => ({
+        ingredient_product_id: l.product_id,
+        qty: parseFloat(l.qty),
+        unit: l.unit as Unit,
+        yield_permille: l.yield_pct?.trim() ? Math.round(parseFloat(l.yield_pct) * 10) : undefined,
+      })),
     };
     api
       .createTechCard(r.id, product.id, input)
@@ -272,9 +319,36 @@ function NewVersionModal({
           <Field label="Yield" hint="Portions produced (informational).">
             <input className="input num" style={{ maxWidth: 90 }} inputMode="decimal" value={yieldQty} onChange={(e) => setYieldQty(e.target.value.replace(/[^0-9.]/g, ""))} />
           </Field>
+          <Field label="Format" hint={FORMATS.find((f) => f.value === format)!.hint}>
+            <select className="select" value={format} onChange={(e) => setFormat(e.target.value as TechCardFormat)}>
+              {FORMATS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
 
-        {consumption === "assemble" && <LineEditor products={ingredients} lines={lines} setLines={setLines} />}
+        {consumption === "assemble" && <LineEditor products={ingredients} lines={lines} setLines={setLines} withYield />}
+
+        {format === "ttk" && (
+          <div className="stack" style={{ gap: 10 }}>
+            <NoticeBanner>ТТК-разделы по ГОСТ 31987-2012 — для новых, нетиповых блюд, предъявляемых проверяющим.</NoticeBanner>
+            <Field label="Область применения">
+              <textarea className="input" rows={2} value={scopeNote} onChange={(e) => setScopeNote(e.target.value)} />
+            </Field>
+            <Field label="Требования к оформлению, подаче, реализации">
+              <textarea className="input" rows={2} value={presentationNote} onChange={(e) => setPresentationNote(e.target.value)} />
+            </Field>
+            <Field label="Условия и сроки хранения">
+              <textarea className="input" rows={2} value={storageNote} onChange={(e) => setStorageNote(e.target.value)} />
+            </Field>
+            <Field label="Показатели качества и безопасности (органолептика)">
+              <textarea className="input" rows={2} value={organolepticNote} onChange={(e) => setOrganolepticNote(e.target.value)} />
+            </Field>
+          </div>
+        )}
         {err && <ErrorBanner message={err} />}
       </div>
     </Modal>

@@ -148,20 +148,28 @@ func (s *Store) UpdateProduct(ctx context.Context, p inv.Product) error {
 
 // --- tech cards --------------------------------------------------------
 
-const techCardCols = `id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by, created_at`
+const techCardCols = `id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by, created_at,
+	format, scope_note, presentation_note, storage_note, organoleptic_note`
 
 func scanTechCard(row interface{ Scan(...any) error }) (inv.TechCard, error) {
 	var t inv.TechCard
 	err := row.Scan(&t.ID, &t.RestaurantID, &t.ProductID, &t.ValidFrom, &t.ValidTo,
-		&t.Consumption, &t.YieldMilli, &t.CreatedBy, &t.CreatedAt)
+		&t.Consumption, &t.YieldMilli, &t.CreatedBy, &t.CreatedAt,
+		&t.Format, &t.ScopeNote, &t.PresentationNote, &t.StorageNote, &t.OrganolepticNote)
 	return t, err
 }
 
 func (s *Store) InsertTechCard(ctx context.Context, tc inv.TechCard) error {
+	format := tc.Format
+	if format == "" {
+		format = inv.FormatSimple
+	}
 	_, err := s.q.ExecContext(ctx,
-		`INSERT INTO tech_cards (id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		tc.ID, tc.RestaurantID, tc.ProductID, dateStr(tc.ValidFrom), nullDate(tc.ValidTo), tc.Consumption, tc.YieldMilli, tc.CreatedBy)
+		`INSERT INTO tech_cards (id, restaurant_id, product_id, valid_from, valid_to, consumption, yield_milli, created_by,
+		                         format, scope_note, presentation_note, storage_note, organoleptic_note)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+		tc.ID, tc.RestaurantID, tc.ProductID, dateStr(tc.ValidFrom), nullDate(tc.ValidTo), tc.Consumption, tc.YieldMilli, tc.CreatedBy,
+		format, tc.ScopeNote, tc.PresentationNote, tc.StorageNote, tc.OrganolepticNote)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return ports.ErrConflict
@@ -169,9 +177,13 @@ func (s *Store) InsertTechCard(ctx context.Context, tc inv.TechCard) error {
 		return fmt.Errorf("inventory store: insert tech card: %w", err)
 	}
 	for _, l := range tc.Lines {
+		yield := l.YieldPermille
+		if yield <= 0 {
+			yield = inv.YieldPermilleDefault
+		}
 		if _, err := s.q.ExecContext(ctx,
-			`INSERT INTO tech_card_lines (id, tech_card_id, ingredient_product_id, qty, seq) VALUES ($1,$2,$3,$4,$5)`,
-			l.ID, tc.ID, l.IngredientProductID, l.Qty, l.Seq); err != nil {
+			`INSERT INTO tech_card_lines (id, tech_card_id, ingredient_product_id, qty, seq, yield_permille) VALUES ($1,$2,$3,$4,$5,$6)`,
+			l.ID, tc.ID, l.IngredientProductID, l.Qty, l.Seq, yield); err != nil {
 			if isUniqueViolation(err) {
 				return ports.ErrConflict
 			}
@@ -190,7 +202,7 @@ func (s *Store) CloseTechCard(ctx context.Context, id uuid.UUID, validTo time.Ti
 }
 
 func (s *Store) techCardLines(ctx context.Context, techCardID uuid.UUID) ([]inv.TechCardLine, error) {
-	rows, err := s.q.QueryContext(ctx, `SELECT id, tech_card_id, ingredient_product_id, qty, seq FROM tech_card_lines WHERE tech_card_id = $1 ORDER BY seq`, techCardID)
+	rows, err := s.q.QueryContext(ctx, `SELECT id, tech_card_id, ingredient_product_id, qty, seq, yield_permille FROM tech_card_lines WHERE tech_card_id = $1 ORDER BY seq`, techCardID)
 	if err != nil {
 		return nil, fmt.Errorf("inventory store: tech card lines: %w", err)
 	}
@@ -198,7 +210,7 @@ func (s *Store) techCardLines(ctx context.Context, techCardID uuid.UUID) ([]inv.
 	out := []inv.TechCardLine{}
 	for rows.Next() {
 		var l inv.TechCardLine
-		if err := rows.Scan(&l.ID, &l.TechCardID, &l.IngredientProductID, &l.Qty, &l.Seq); err != nil {
+		if err := rows.Scan(&l.ID, &l.TechCardID, &l.IngredientProductID, &l.Qty, &l.Seq, &l.YieldPermille); err != nil {
 			return nil, err
 		}
 		out = append(out, l)

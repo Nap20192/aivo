@@ -370,10 +370,18 @@ export interface TechCardLine {
   id: string;
   ingredient_product_id: string;
   ingredient_name?: string;
-  qty: number; // milli base-units of ingredient
+  qty: number; // milli base-units of ingredient (gross/AP — what's taken from stock)
   unit: BaseUnit;
   seq: number;
+  yield_permille: number; // 1..1000, 1000 = 100% (no cooking loss)
+  net_qty: number; // qty × yield_permille / 1000, informational
 }
+
+// Two tech-card document formats over the same recipe data: "simple" (lean,
+// costing only) and "ttk" (adds the ГОСТ 31987-2012
+// технико-технологическая карта text sections). The format never changes
+// costing — it only gates which text fields the form shows.
+export type TechCardFormat = "simple" | "ttk";
 
 export interface RecipeCosting {
   id: string;
@@ -402,13 +410,25 @@ export interface TechCard {
   lines: TechCardLine[];
   cost_cents: number; // latest costing
   cost_history: RecipeCosting[];
+  format: TechCardFormat;
+  // ГОСТ 31987-2012 ТТК fields — meaningful when format === "ttk", stored
+  // regardless of format.
+  scope_note: string | null; // область применения
+  presentation_note: string | null; // оформление, подача, реализация
+  storage_note: string | null; // условия и сроки хранения
+  organoleptic_note: string | null; // показатели качества и безопасности
 }
 
 export interface TechCardInput {
   valid_from: string;
   consumption: ConsumptionStrategy;
   yield_qty?: number | null;
-  lines: { ingredient_product_id: string; qty: number; unit: Unit }[];
+  format?: TechCardFormat; // default "simple"
+  scope_note?: string | null;
+  presentation_note?: string | null;
+  storage_note?: string | null;
+  organoleptic_note?: string | null;
+  lines: { ingredient_product_id: string; qty: number; unit: Unit; yield_permille?: number }[];
 }
 
 export interface Supplier {

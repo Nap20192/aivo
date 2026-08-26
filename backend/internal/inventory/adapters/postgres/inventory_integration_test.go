@@ -190,13 +190,13 @@ func TestTechCardVersioning(t *testing.T) {
 	dish := f.product(t, "SOUP", "Soup", inv.TypeDish, inv.UnitPcs, ptr(uuid.New()))
 	flour := f.product(t, "FLOUR", "Flour", inv.TypeGoods, inv.UnitG, nil)
 
-	v1, err := f.app.CreateTechCardVersion(f.ctx, f.restID, dish.ID, day(2026, 1, 1), inv.ConsumeAssemble, 1000,
+	v1, err := f.app.CreateTechCardVersion(f.ctx, f.restID, dish.ID, day(2026, 1, 1), inv.ConsumeAssemble, 1000, inventoryapp.TechCardMeta{},
 		[]inventoryapp.TechCardLineInput{{IngredientProductID: flour.ID, QtyInput: 200, Unit: inv.UnitG}}, f.userID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Second version on a later date closes v1 at that date.
-	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, dish.ID, day(2026, 1, 5), inv.ConsumeAssemble, 1000,
+	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, dish.ID, day(2026, 1, 5), inv.ConsumeAssemble, 1000, inventoryapp.TechCardMeta{},
 		[]inventoryapp.TechCardLineInput{{IngredientProductID: flour.ID, QtyInput: 250, Unit: inv.UnitG}}, f.userID); err != nil {
 		t.Fatal(err)
 	}
@@ -205,18 +205,18 @@ func TestTechCardVersioning(t *testing.T) {
 		t.Errorf("v1 valid_to = %v, want 2026-01-05", reloaded.ValidTo)
 	}
 	// Same-day second version conflicts.
-	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, dish.ID, day(2026, 1, 5), inv.ConsumeAssemble, 1000,
+	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, dish.ID, day(2026, 1, 5), inv.ConsumeAssemble, 1000, inventoryapp.TechCardMeta{},
 		[]inventoryapp.TechCardLineInput{{IngredientProductID: flour.ID, QtyInput: 1, Unit: inv.UnitG}}, f.userID); !errors.Is(err, inventoryapp.ErrVersionExists) {
 		t.Errorf("same-day version: got %v, want ErrVersionExists", err)
 	}
 	// Cycle: prepared A needs B, B needs A.
 	pa := f.product(t, "PA", "Prep A", inv.TypePrepared, inv.UnitG, nil)
 	pb := f.product(t, "PB", "Prep B", inv.TypePrepared, inv.UnitG, nil)
-	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, pa.ID, day(2026, 1, 1), inv.ConsumeAssemble, 1000,
+	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, pa.ID, day(2026, 1, 1), inv.ConsumeAssemble, 1000, inventoryapp.TechCardMeta{},
 		[]inventoryapp.TechCardLineInput{{IngredientProductID: pb.ID, QtyInput: 100, Unit: inv.UnitG}}, f.userID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, pb.ID, day(2026, 1, 1), inv.ConsumeAssemble, 1000,
+	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, pb.ID, day(2026, 1, 1), inv.ConsumeAssemble, 1000, inventoryapp.TechCardMeta{},
 		[]inventoryapp.TechCardLineInput{{IngredientProductID: pa.ID, QtyInput: 100, Unit: inv.UnitG}}, f.userID); !errors.Is(err, inv.ErrRecipeCycle) {
 		t.Errorf("cycle: got %v, want ErrRecipeCycle", err)
 	}
@@ -230,7 +230,7 @@ func TestCOGSOnSale(t *testing.T) {
 	dish := f.product(t, "BORSCHT", "Borscht", inv.TypeDish, inv.UnitPcs, &menuItem)
 	flour := f.product(t, "FLOUR", "Flour", inv.TypeGoods, inv.UnitG, nil)
 	f.postReceipt(t, day(2026, 1, 1), flour.ID, 5000, inv.UnitG, 6) // avg 6c/g
-	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, dish.ID, day(2026, 1, 1), inv.ConsumeAssemble, 1000,
+	if _, err := f.app.CreateTechCardVersion(f.ctx, f.restID, dish.ID, day(2026, 1, 1), inv.ConsumeAssemble, 1000, inventoryapp.TechCardMeta{},
 		[]inventoryapp.TechCardLineInput{{IngredientProductID: flour.ID, QtyInput: 200, Unit: inv.UnitG}}, f.userID); err != nil {
 		t.Fatal(err)
 	}

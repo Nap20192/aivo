@@ -32,6 +32,7 @@ export interface EditLine {
   qty: string;
   unit: Unit;
   unit_price?: string; // dollars, receipts only
+  yield_pct?: string; // 1..100, tech-card recipe lines only (empty = 100%)
 }
 
 export function emptyLine(): EditLine {
@@ -44,8 +45,9 @@ export function LineEditor(props: {
   lines: EditLine[];
   setLines: (l: EditLine[]) => void;
   withPrice?: boolean;
+  withYield?: boolean;
 }) {
-  const { products, lines, setLines, withPrice } = props;
+  const { products, lines, setLines, withPrice, withYield } = props;
   const byId = (id: string) => products.find((p) => p.id === id);
   const set = (i: number, patch: Partial<EditLine>) =>
     setLines(lines.map((l, x) => (x === i ? { ...l, ...patch } : l)));
@@ -58,6 +60,7 @@ export function LineEditor(props: {
           <th style={{ textAlign: "right" }}>Qty</th>
           <th>Unit</th>
           {withPrice && <th style={{ textAlign: "right" }}>Price / unit</th>}
+          {withYield && <th style={{ textAlign: "right" }}>Yield %</th>}
           <th></th>
         </tr>
       </thead>
@@ -115,6 +118,18 @@ export function LineEditor(props: {
                   />
                 </td>
               )}
+              {withYield && (
+                <td style={{ textAlign: "right" }}>
+                  <input
+                    className="input num"
+                    style={{ maxWidth: 70, textAlign: "right" }}
+                    inputMode="decimal"
+                    placeholder="100"
+                    value={l.yield_pct ?? ""}
+                    onChange={(e) => set(i, { yield_pct: e.target.value.replace(/[^0-9.]/g, "").slice(0, 5) })}
+                  />
+                </td>
+              )}
               <td style={{ textAlign: "right" }}>
                 {lines.length > 1 && (
                   <button className="btn btn-ghost btn-icon" aria-label="Remove line" onClick={() => setLines(lines.filter((_, x) => x !== i))}>
@@ -126,7 +141,7 @@ export function LineEditor(props: {
           );
         })}
         <tr>
-          <td colSpan={withPrice ? 5 : 4}>
+          <td colSpan={4 + (withPrice ? 1 : 0) + (withYield ? 1 : 0)}>
             <button className="btn btn-ghost btn-sm" onClick={() => setLines([...lines, emptyLine()])}>
               <Plus size={14} /> Add line
             </button>
