@@ -36,15 +36,14 @@ var (
 )
 
 type App struct {
-	store  ports.Store
-	ledger ports.Ledger
-	sales  ports.SalesReader
-	newID  func() sharedkernel.ID
-	now    func() time.Time
+	store ports.Store
+	sales ports.SalesReader
+	newID func() sharedkernel.ID
+	now   func() time.Time
 }
 
-func New(store ports.Store, ledger ports.Ledger, sales ports.SalesReader) *App {
-	return &App{store: store, ledger: ledger, sales: sales,
+func New(store ports.Store, sales ports.SalesReader) *App {
+	return &App{store: store, sales: sales,
 		newID: sharedkernel.NewID, now: func() time.Time { return time.Now().UTC() }}
 }
 
@@ -84,7 +83,7 @@ type ProductInput struct {
 }
 
 func (a *App) CreateProduct(ctx context.Context, restaurantID uuid.UUID, in ProductInput) (inv.Product, error) {
-	p, err := inv.NewProduct(a.newID(), restaurantID, in.SKU, in.Name, in.Type, in.StockUnit, in.MenuItemID, in.MinStock)
+	p, err := inv.NewProduct(a.newID(), restaurantID, in.SKU, in.Name, inv.ProductType(in.Type), in.StockUnit, in.MenuItemID, in.MinStock)
 	if err != nil {
 		return inv.Product{}, err // domain validation error, mapped by HTTP
 	}

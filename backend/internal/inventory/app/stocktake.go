@@ -152,7 +152,7 @@ func (a *App) PostStocktake(ctx context.Context, restaurantID, stocktakeID, post
 			{Purpose: "inventory", Side: "debit", AmountCents: surplusTotal},
 			{Purpose: "inventory_surplus", Side: "credit", AmountCents: surplusTotal},
 		}
-		if _, err := a.ledger.PostInventoryJournal(ctx, tx, restaurantID, postedBy, inv.SourceStocktake, stocktakeID, st.BusinessDate, glLines); err != nil {
+		if err := a.publishPostJournal(ctx, tx, EventStocktakePosted, inv.DocKindStocktake, restaurantID, postedBy, stocktakeID, st.BusinessDate, glLines); err != nil {
 			return err
 		}
 		return store.MarkStocktakeStatus(ctx, restaurantID, stocktakeID, inv.DocDraft, inv.DocPosted, &postedBy)
@@ -164,7 +164,7 @@ func (a *App) PostStocktake(ctx context.Context, restaurantID, stocktakeID, post
 }
 
 func (a *App) CancelStocktake(ctx context.Context, restaurantID, stocktakeID uuid.UUID) (inv.Stocktake, error) {
-	err := a.cancelDocument(ctx, restaurantID, stocktakeID, inv.DocKindStocktake, inv.SourceStocktake,
+	err := a.cancelDocument(ctx, restaurantID, stocktakeID, inv.DocKindStocktake, EventStocktakeCancelled,
 		func(ctx context.Context, store ports.Store, reversalID uuid.UUID, businessDate time.Time) error {
 			return store.InsertStocktake(ctx, inv.Stocktake{
 				ID: reversalID, RestaurantID: restaurantID, Status: inv.DocPosted,

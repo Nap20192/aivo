@@ -66,8 +66,10 @@ func (a *App) ConsumeForSale(ctx context.Context, tx *sql.Tx, restaurantID, clos
 		}
 	}
 	if total != 0 {
-		// One COGS journal per ticket close: debit COGS / credit inventory.
-		if _, err := a.ledger.PostInventoryJournal(ctx, tx, restaurantID, closedBy, inv.SourceCOGS, ticketID, businessDate, []ports.JournalLine{
+		// One COGS outbox event per ticket close: debit COGS / credit
+		// inventory, posted asynchronously by ledger once it consumes the
+		// event (service-events: inventory→ledger edge).
+		if err := a.publishPostJournal(ctx, tx, EventCOGSPosted, "ticket", restaurantID, closedBy, ticketID, businessDate, []ports.JournalLine{
 			{Purpose: "cogs", Side: "debit", AmountCents: total},
 			{Purpose: "inventory", Side: "credit", AmountCents: total},
 		}); err != nil {
@@ -75,6 +77,24 @@ func (a *App) ConsumeForSale(ctx context.Context, tx *sql.Tx, restaurantID, clos
 		}
 	}
 	return total, nil
+}
+
+// HandleTicketClosed is the gRPC-facing entry point for the pos→inventory
+// TicketClosed event (specs/inventory-service, specs/service-events):
+// unlike ConsumeForSale (called inside the caller's transaction, back when
+// pos and inventory shared one process), this owns its own transaction,
+// since pos and inventory no longer share one. Idempotent: redelivering
+// ticketID applies nothing new and reports applied=false.
+func (a *App) HandleTicketClosed(ctx context.Context, restaurantID, closedBy, ticketID uuid.UUID, businessDate time.Time, lines []SaleLine) (applied bool, err error) {
+	err = a.store.InTx(ctx, func(tx *sql.Tx, _ ports.Store) error {
+		total, cerr := a.ConsumeForSale(ctx, tx, restaurantID, closedBy, ticketID, businessDate, lines)
+		if cerr != nil {
+			return cerr
+		}
+		applied = total != 0
+		return nil
+	})
+	return applied, err
 }
 
 // consumeOne issues one sale move for a product, guarded for idempotency by

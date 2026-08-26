@@ -5,7 +5,7 @@ import (
 	"time"
 
 	inv "aivo/internal/domain/inventory"
-	"aivo/internal/domain/platform"
+	"aivo/internal/inventory/adapters/jwtauth"
 	inventoryapp "aivo/internal/inventory/app"
 
 	"uuid"
@@ -28,8 +28,8 @@ func receiptView(r inv.GoodsReceipt) map[string]any {
 	}
 }
 
-func (h *handler) invReceipts(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
-	rs, err := h.Inventory.Receipts(r.Context(), rest.ID, r.URL.Query().Get("from"), r.URL.Query().Get("status"))
+func (h *handler) invReceipts(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
+	rs, err := h.Inventory.Receipts(r.Context(), restaurantID, r.URL.Query().Get("from"), r.URL.Query().Get("status"))
 	if writeAppErr(w, err) {
 		return
 	}
@@ -40,7 +40,7 @@ func (h *handler) invReceipts(w http.ResponseWriter, r *http.Request, _ domain.U
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *handler) invCreateReceipt(w http.ResponseWriter, r *http.Request, u domain.User, rest domain.Restaurant) {
+func (h *handler) invCreateReceipt(w http.ResponseWriter, r *http.Request, claims jwtauth.Claims, restaurantID uuid.UUID) {
 	var req struct {
 		SupplierID   *uuid.UUID `json:"supplier_id"`
 		BusinessDate string     `json:"business_date"`
@@ -63,43 +63,43 @@ func (h *handler) invCreateReceipt(w http.ResponseWriter, r *http.Request, u dom
 	for i, l := range req.Lines {
 		lines[i] = inventoryapp.ReceiptLineInput{ProductID: l.ProductID, QtyInput: l.Qty, Unit: l.Unit, UnitPriceCents: l.UnitPriceCents}
 	}
-	rec, err := h.Inventory.CreateReceipt(r.Context(), rest.ID, req.SupplierID, bd, req.Note, lines, u.ID)
+	rec, err := h.Inventory.CreateReceipt(r.Context(), restaurantID, req.SupplierID, bd, req.Note, lines, claims.UserID)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, receiptView(rec))
 }
 
-func (h *handler) invGetReceipt(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invGetReceipt(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "rid")
 	if !ok {
 		return
 	}
-	rec, err := h.Inventory.Receipt(r.Context(), rest.ID, id)
+	rec, err := h.Inventory.Receipt(r.Context(), restaurantID, id)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, receiptView(rec))
 }
 
-func (h *handler) invPostReceipt(w http.ResponseWriter, r *http.Request, u domain.User, rest domain.Restaurant) {
+func (h *handler) invPostReceipt(w http.ResponseWriter, r *http.Request, claims jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "rid")
 	if !ok {
 		return
 	}
-	rec, err := h.Inventory.PostReceipt(r.Context(), rest.ID, id, u.ID)
+	rec, err := h.Inventory.PostReceipt(r.Context(), restaurantID, id, claims.UserID)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, receiptView(rec))
 }
 
-func (h *handler) invCancelReceipt(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invCancelReceipt(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "rid")
 	if !ok {
 		return
 	}
-	rec, err := h.Inventory.CancelReceipt(r.Context(), rest.ID, id)
+	rec, err := h.Inventory.CancelReceipt(r.Context(), restaurantID, id)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -120,8 +120,8 @@ func writeOffView(w inv.WriteOff) map[string]any {
 	}
 }
 
-func (h *handler) invWriteOffs(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
-	ws, err := h.Inventory.WriteOffs(r.Context(), rest.ID, r.URL.Query().Get("from"), r.URL.Query().Get("status"))
+func (h *handler) invWriteOffs(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
+	ws, err := h.Inventory.WriteOffs(r.Context(), restaurantID, r.URL.Query().Get("from"), r.URL.Query().Get("status"))
 	if writeAppErr(w, err) {
 		return
 	}
@@ -132,7 +132,7 @@ func (h *handler) invWriteOffs(w http.ResponseWriter, r *http.Request, _ domain.
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *handler) invCreateWriteOff(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invCreateWriteOff(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	var req struct {
 		Reason       string `json:"reason"`
 		Note         string `json:"note"`
@@ -154,43 +154,43 @@ func (h *handler) invCreateWriteOff(w http.ResponseWriter, r *http.Request, _ do
 	for i, l := range req.Lines {
 		lines[i] = inventoryapp.WriteOffLineInput{ProductID: l.ProductID, QtyInput: l.Qty, Unit: l.Unit}
 	}
-	wo, err := h.Inventory.CreateWriteOff(r.Context(), rest.ID, req.Reason, bd, req.Note, lines)
+	wo, err := h.Inventory.CreateWriteOff(r.Context(), restaurantID, req.Reason, bd, req.Note, lines)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, writeOffView(wo))
 }
 
-func (h *handler) invGetWriteOff(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invGetWriteOff(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "wid")
 	if !ok {
 		return
 	}
-	wo, err := h.Inventory.WriteOff(r.Context(), rest.ID, id)
+	wo, err := h.Inventory.WriteOff(r.Context(), restaurantID, id)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, writeOffView(wo))
 }
 
-func (h *handler) invPostWriteOff(w http.ResponseWriter, r *http.Request, u domain.User, rest domain.Restaurant) {
+func (h *handler) invPostWriteOff(w http.ResponseWriter, r *http.Request, claims jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "wid")
 	if !ok {
 		return
 	}
-	wo, err := h.Inventory.PostWriteOff(r.Context(), rest.ID, id, u.ID)
+	wo, err := h.Inventory.PostWriteOff(r.Context(), restaurantID, id, claims.UserID)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, writeOffView(wo))
 }
 
-func (h *handler) invCancelWriteOff(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invCancelWriteOff(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "wid")
 	if !ok {
 		return
 	}
-	wo, err := h.Inventory.CancelWriteOff(r.Context(), rest.ID, id)
+	wo, err := h.Inventory.CancelWriteOff(r.Context(), restaurantID, id)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -217,8 +217,8 @@ func stocktakeView(s inv.Stocktake) map[string]any {
 	}
 }
 
-func (h *handler) invStocktakes(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
-	ss, err := h.Inventory.Stocktakes(r.Context(), rest.ID, r.URL.Query().Get("status"))
+func (h *handler) invStocktakes(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
+	ss, err := h.Inventory.Stocktakes(r.Context(), restaurantID, r.URL.Query().Get("status"))
 	if writeAppErr(w, err) {
 		return
 	}
@@ -229,33 +229,33 @@ func (h *handler) invStocktakes(w http.ResponseWriter, r *http.Request, _ domain
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *handler) invCreateStocktake(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invCreateStocktake(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	var req struct {
 		Note string `json:"note"`
 	}
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	s, err := h.Inventory.StartStocktake(r.Context(), rest.ID, dateOnly(time.Now()), req.Note)
+	s, err := h.Inventory.StartStocktake(r.Context(), restaurantID, dateOnly(time.Now()), req.Note)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, stocktakeView(s))
 }
 
-func (h *handler) invGetStocktake(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invGetStocktake(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "sid")
 	if !ok {
 		return
 	}
-	s, err := h.Inventory.Stocktake(r.Context(), rest.ID, id)
+	s, err := h.Inventory.Stocktake(r.Context(), restaurantID, id)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, stocktakeView(s))
 }
 
-func (h *handler) invEnterCounts(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invEnterCounts(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "sid")
 	if !ok {
 		return
@@ -274,19 +274,19 @@ func (h *handler) invEnterCounts(w http.ResponseWriter, r *http.Request, _ domai
 	for i, l := range req.Lines {
 		counts[i] = inventoryapp.StocktakeCountInput{ProductID: l.ProductID, QtyInput: l.CountedQty, Unit: l.Unit}
 	}
-	s, err := h.Inventory.EnterCounts(r.Context(), rest.ID, id, counts)
+	s, err := h.Inventory.EnterCounts(r.Context(), restaurantID, id, counts)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, stocktakeView(s))
 }
 
-func (h *handler) invDryRunStocktake(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invDryRunStocktake(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "sid")
 	if !ok {
 		return
 	}
-	rows, err := h.Inventory.DryRun(r.Context(), rest.ID, id)
+	rows, err := h.Inventory.DryRun(r.Context(), restaurantID, id)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -300,24 +300,24 @@ func (h *handler) invDryRunStocktake(w http.ResponseWriter, r *http.Request, _ d
 	writeJSON(w, http.StatusOK, map[string]any{"lines": out})
 }
 
-func (h *handler) invPostStocktake(w http.ResponseWriter, r *http.Request, u domain.User, rest domain.Restaurant) {
+func (h *handler) invPostStocktake(w http.ResponseWriter, r *http.Request, claims jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "sid")
 	if !ok {
 		return
 	}
-	s, err := h.Inventory.PostStocktake(r.Context(), rest.ID, id, u.ID)
+	s, err := h.Inventory.PostStocktake(r.Context(), restaurantID, id, claims.UserID)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, stocktakeView(s))
 }
 
-func (h *handler) invCancelStocktake(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invCancelStocktake(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	id, ok := pathUUID(w, r, "sid")
 	if !ok {
 		return
 	}
-	s, err := h.Inventory.CancelStocktake(r.Context(), rest.ID, id)
+	s, err := h.Inventory.CancelStocktake(r.Context(), restaurantID, id)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -326,8 +326,8 @@ func (h *handler) invCancelStocktake(w http.ResponseWriter, r *http.Request, _ d
 
 // --- on-hand / moves / food-cost ---------------------------------------
 
-func (h *handler) invOnHand(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
-	rows, err := h.Inventory.OnHand(r.Context(), rest.ID, r.URL.Query().Get("low_stock") != "")
+func (h *handler) invOnHand(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
+	rows, err := h.Inventory.OnHand(r.Context(), restaurantID, r.URL.Query().Get("low_stock") != "")
 	if writeAppErr(w, err) {
 		return
 	}
@@ -342,7 +342,7 @@ func (h *handler) invOnHand(w http.ResponseWriter, r *http.Request, _ domain.Use
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *handler) invStockMoves(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invStockMoves(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	var product *uuid.UUID
 	if q := r.URL.Query().Get("product"); q != "" {
 		id, err := uuid.Parse(q)
@@ -352,7 +352,7 @@ func (h *handler) invStockMoves(w http.ResponseWriter, r *http.Request, _ domain
 		}
 		product = &id
 	}
-	moves, err := h.Inventory.StockMoves(r.Context(), rest.ID, r.URL.Query().Get("from"), product)
+	moves, err := h.Inventory.StockMoves(r.Context(), restaurantID, r.URL.Query().Get("from"), product)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -368,9 +368,9 @@ func (h *handler) invStockMoves(w http.ResponseWriter, r *http.Request, _ domain
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *handler) invFoodCost(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invFoodCost(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	q := r.URL.Query()
-	rep, err := h.Inventory.FoodCostReport(r.Context(), rest.ID, q.Get("from"), q.Get("to"))
+	rep, err := h.Inventory.FoodCostReport(r.Context(), restaurantID, q.Get("from"), q.Get("to"))
 	if writeAppErr(w, err) {
 		return
 	}

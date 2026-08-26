@@ -34,16 +34,19 @@ func (d *Deliverer) Deliver(ctx context.Context, ev outbox.PendingEvent) error {
 	if err := json.Unmarshal(ev.Payload, &p); err != nil {
 		return fmt.Errorf("inventorygrpc: decode payload: %w", err)
 	}
-	lines := make([]*inventoryv1.SoldLine, len(p.Lines))
+	lines := make([]*inventoryv1.SaleLine, len(p.Lines))
 	for i, l := range p.Lines {
-		lines[i] = &inventoryv1.SoldLine{MenuItemId: l.MenuItemID, Qty: int32(l.Qty), TicketLineId: l.TicketLineID}
+		lines[i] = &inventoryv1.SaleLine{MenuItemId: l.MenuItemID, Qty: int64(l.Qty), TicketLineId: l.TicketLineID}
 	}
-	_, err := d.client.HandleTicketClosed(ctx, &inventoryv1.TicketClosedRequest{
+	_, err := d.client.HandleTicketClosed(ctx, &inventoryv1.HandleTicketClosedRequest{
 		RestaurantId: p.RestaurantID,
 		TicketId:     p.TicketID,
 		ClosedBy:     p.ClosedBy,
 		BusinessDate: p.BusinessDate,
 		Lines:        lines,
 	})
+	// HandleTicketClosedResponse.Applied is false on a no-op redelivery —
+	// not an error, the event is still considered delivered (see
+	// service-events spec's idempotency requirement).
 	return err
 }

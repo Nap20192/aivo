@@ -25,9 +25,6 @@ import (
 	"sync"
 	"time"
 
-	inventoryledgerbridge "aivo/internal/inventory/adapters/ledgerbridge"
-	inventorypg "aivo/internal/inventory/adapters/postgres"
-	inventoryapp "aivo/internal/inventory/app"
 	inventoryv1 "aivo/internal/inventory/v1"
 	ledgergrpcserver "aivo/internal/ledger/adapters/grpcserver"
 	ledgerpg "aivo/internal/ledger/adapters/postgres"
@@ -48,7 +45,6 @@ import (
 	"aivo/internal/pos/adapters/ledgerbridge"
 	"aivo/internal/pos/adapters/menubridge"
 	pospg "aivo/internal/pos/adapters/postgres"
-	"aivo/internal/pos/adapters/salesreader"
 	posapp "aivo/internal/pos/app"
 	"aivo/internal/provisioning"
 	"aivo/migrations"
@@ -88,13 +84,13 @@ func run() error {
 	}
 
 	// Migrations: menu first (owns restaurants), then platform (extends
-	// it), then pos (references both).
+	// it), then pos (references both). Inventory now migrates itself, into
+	// its own schema, from cmd/aivo-inventory (split-inventory-microservice).
 	err = migrate.Apply(context.Background(), db, []migrate.Source{
 		{Name: "menu", FS: migrations.FS, Dir: "menu"},
 		{Name: "platform", FS: migrations.FS, Dir: "platform"},
 		{Name: "ledger", FS: migrations.FS, Dir: "ledger"},
 		{Name: "pos", FS: migrations.FS, Dir: "pos"},
-		{Name: "inventory", FS: migrations.FS, Dir: "inventory"},
 	})
 	if err != nil {
 		return err
@@ -123,13 +119,9 @@ func run() error {
 
 	platformApplication := platformapp.New(platformStore, billing.NewFake(), themeGen)
 	ledgerApplication := ledgerapp.New(ledgerStore)
-	// Inventory posts to the GL via the ledger bridge and reads pos sales
-	// for the food-cost report (pos → inventory → ledger; no cycles).
-	inventoryApplication := inventoryapp.New(
-		inventorypg.NewStore(db),
-		inventoryledgerbridge.New(ledgerApplication),
-		salesreader.New(db),
-	)
+	// Inventory is now its own service (cmd/aivo-inventory, own schema,
+	// own port) — pos's in-process COGS-on-sale call is replaced by the
+	// TicketClosed outbox edge below (split-inventory-microservice).
 	posApplication := posapp.New(posStore, menubridge.New(menuStore), ledgerbridge.New(ledgerApplication))
 	// Live restaurant provisioning seeds the GL + payment methods in the
 	// same transaction as the restaurant row (M3 / BUG-1).
@@ -223,7 +215,6 @@ func run() error {
 		Platform:       platformApplication,
 		Pos:            posApplication,
 		Ledger:         ledgerApplication,
-		Inventory:      inventoryApplication,
 		Menu:           menuStore,
 		MenuAdmin:      menuStore,
 		MenuApp:        menuApplication,

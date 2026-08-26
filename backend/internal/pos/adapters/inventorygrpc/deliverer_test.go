@@ -15,16 +15,16 @@ import (
 )
 
 type fakeClient struct {
-	req *inventoryv1.TicketClosedRequest
+	req *inventoryv1.HandleTicketClosedRequest
 	err error
 }
 
-func (f *fakeClient) HandleTicketClosed(_ context.Context, in *inventoryv1.TicketClosedRequest, _ ...grpc.CallOption) (*inventoryv1.HandleTicketClosedResponse, error) {
+func (f *fakeClient) HandleTicketClosed(_ context.Context, in *inventoryv1.HandleTicketClosedRequest, _ ...grpc.CallOption) (*inventoryv1.HandleTicketClosedResponse, error) {
 	f.req = in
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &inventoryv1.HandleTicketClosedResponse{CogsCents: 500}, nil
+	return &inventoryv1.HandleTicketClosedResponse{Applied: true}, nil
 }
 
 func mustPayload(t *testing.T, p events.TicketClosedPayload) []byte {
