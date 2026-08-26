@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,8 +28,11 @@ import (
 	inventoryledgerbridge "aivo/internal/inventory/adapters/ledgerbridge"
 	inventorypg "aivo/internal/inventory/adapters/postgres"
 	inventoryapp "aivo/internal/inventory/app"
+	inventoryv1 "aivo/internal/inventory/v1"
+	ledgergrpcserver "aivo/internal/ledger/adapters/grpcserver"
 	ledgerpg "aivo/internal/ledger/adapters/postgres"
 	ledgerapp "aivo/internal/ledger/app"
+	ledgerv1 "aivo/internal/ledger/v1"
 	menupg "aivo/internal/menu/adapters/postgres"
 	"aivo/internal/menu/adapters/telegram"
 	menuapp "aivo/internal/menu/app"
@@ -40,7 +44,7 @@ import (
 	"aivo/internal/platform/adapters/s3"
 	platformapp "aivo/internal/platform/app"
 	platformports "aivo/internal/platform/ports"
-	"aivo/internal/pos/adapters/inventorybridge"
+	"aivo/internal/pos/adapters/inventorygrpc"
 	"aivo/internal/pos/adapters/ledgerbridge"
 	"aivo/internal/pos/adapters/menubridge"
 	pospg "aivo/internal/pos/adapters/postgres"
@@ -49,6 +53,10 @@ import (
 	"aivo/internal/provisioning"
 	"aivo/migrations"
 	"aivo/pkg/migrate"
+	"aivo/pkg/outbox"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver
 )
@@ -122,10 +130,39 @@ func run() error {
 		inventoryledgerbridge.New(ledgerApplication),
 		salesreader.New(db),
 	)
-	posApplication := posapp.New(posStore, menubridge.New(menuStore), ledgerbridge.New(ledgerApplication), inventorybridge.New(inventoryApplication))
+	posApplication := posapp.New(posStore, menubridge.New(menuStore), ledgerbridge.New(ledgerApplication))
 	// Live restaurant provisioning seeds the GL + payment methods in the
 	// same transaction as the restaurant row (M3 / BUG-1).
 	platformStore.OnProvisionRestaurant = provisioning.RestaurantProvisioner(ledgerApplication)
+
+	// :9080 gRPC listener: the inbound side of inventory's outbox (every
+	// inventory→ledger GL posting crosses this boundary once inventory is
+	// its own binary — split-inventory-microservice).
+	grpcPort := envDefault("GRPC_PORT", "9080")
+	grpcLis, err := net.Listen("tcp", ":"+grpcPort)
+	if err != nil {
+		return fmt.Errorf("server: grpc listen: %w", err)
+	}
+	grpcServer := grpc.NewServer()
+	ledgerv1.RegisterLedgerServiceServer(grpcServer, ledgergrpcserver.New(ledgerApplication))
+	go func() {
+		log.Printf("server: grpc listening on :%s", grpcPort)
+		if err := grpcServer.Serve(grpcLis); err != nil {
+			log.Printf("server: grpc serve: %v", err)
+		}
+	}()
+
+	// pos→inventory outbox edge: a gRPC client to cmd/aivo-inventory (lazy
+	// connect — inventory need not be up yet, the poller retries with
+	// backoff per service-events spec) and a Poller delivering pos's
+	// TicketClosed events from the shared platform "events" table.
+	inventoryConn, err := grpc.NewClient(envDefault("INVENTORY_GRPC_ADDR", "localhost:9081"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("server: dial inventory grpc: %w", err)
+	}
+	posPoller := &outbox.Poller{DB: db, Deliver: inventorygrpc.New(inventoryv1.NewInventoryServiceClient(inventoryConn))}
+	go posPoller.Run(context.Background())
 
 	var images platformports.ImageStore
 	imagePrefix := ""

@@ -336,7 +336,7 @@ func (s *PostgresStore) PendingServiceRequestsForTable(ctx context.Context, rest
 	return reqs, rows.Err()
 }
 
-func (s *PostgresStore) SetServiceRequestStatus(ctx context.Context, restaurantID, id uuid.UUID, status string) error {
+func (s *PostgresStore) SetServiceRequestStatus(ctx context.Context, restaurantID, id uuid.UUID, status domain.ServiceRequestStatus) error {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE service_requests SET status = $1 WHERE id = $2 AND restaurant_id = $3`,
 		status, id, restaurantID)

@@ -10,13 +10,24 @@ import (
 	"aivo/internal/sharedkernel"
 )
 
-// Shift lifecycle states (display cache; source of truth is the closed_at
-// / accepted_at columns): open → closed → accepted (D6).
+// ShiftState is a shift's lifecycle state (display cache; source of
+// truth is the closed_at / accepted_at columns): open → closed →
+// accepted.
+type ShiftState string
+
 const (
-	ShiftOpen     = "open"
-	ShiftClosed   = "closed"
-	ShiftAccepted = "accepted"
+	ShiftOpen     ShiftState = "open"
+	ShiftClosed   ShiftState = "closed"
+	ShiftAccepted ShiftState = "accepted"
 )
+
+// Default is the state of a freshly opened shift.
+func (ShiftState) Default() ShiftState { return ShiftOpen }
+
+// Valid reports whether s is one of the three known shift states.
+func (s ShiftState) Valid() bool {
+	return s == ShiftOpen || s == ShiftClosed || s == ShiftAccepted
+}
 
 // Shift is one cash shift at a restaurant. Closing posts
 // Expected/Declared/Variance immutably; acceptance (back office) posts the
@@ -44,7 +55,7 @@ func (s Shift) Open() bool { return s.ClosedAt == nil }
 func (s Shift) Accepted() bool { return s.AcceptedAt != nil }
 
 // State returns the display state (open|closed|accepted).
-func (s Shift) State() string {
+func (s Shift) State() ShiftState {
 	switch {
 	case s.Accepted():
 		return ShiftAccepted
@@ -101,29 +112,59 @@ func (s *Shift) Accept(at time.Time, by, journalDocumentID sharedkernel.ID) erro
 	return nil
 }
 
-// Ticket lifecycle states.
+// TicketStatus is a ticket's lifecycle state.
+type TicketStatus string
+
 const (
-	TicketOpen   = "open"
-	TicketClosed = "closed"
+	TicketOpen   TicketStatus = "open"
+	TicketClosed TicketStatus = "closed"
 )
 
-// Payment groups drive GL semantics (contract §2/§3). void closes a
+// Default is the status of a freshly created ticket.
+func (TicketStatus) Default() TicketStatus { return TicketOpen }
+
+// Valid reports whether s is a known ticket status.
+func (s TicketStatus) Valid() bool { return s == TicketOpen || s == TicketClosed }
+
+// PaymentGroup drives GL semantics (contract §2/§3). void closes a
 // ticket without payment (comped/cancelled) and creates no GL posting.
+type PaymentGroup string
+
 const (
-	PaymentGroupCash         = "cash"
-	PaymentGroupCard         = "card"
-	PaymentGroupGiftCard     = "gift_card"
-	PaymentGroupComp         = "comp"
-	PaymentGroupVoid         = "void"
-	PaymentGroupHouseAccount = "house_account"
+	PaymentGroupCash         PaymentGroup = "cash"
+	PaymentGroupCard         PaymentGroup = "card"
+	PaymentGroupGiftCard     PaymentGroup = "gift_card"
+	PaymentGroupComp         PaymentGroup = "comp"
+	PaymentGroupVoid         PaymentGroup = "void"
+	PaymentGroupHouseAccount PaymentGroup = "house_account"
 )
 
-// Cash operation kinds (in-shift movements, reference §7).
+// Default is the seed payment group (cash).
+func (PaymentGroup) Default() PaymentGroup { return PaymentGroupCash }
+
+// Valid reports whether g is one of the six known payment groups.
+func (g PaymentGroup) Valid() bool {
+	switch g {
+	case PaymentGroupCash, PaymentGroupCard, PaymentGroupGiftCard, PaymentGroupComp, PaymentGroupVoid, PaymentGroupHouseAccount:
+		return true
+	}
+	return false
+}
+
+// CashOpKind is an in-shift cash movement kind (reference §7).
+type CashOpKind string
+
 const (
-	CashPayIn  = "pay_in"
-	CashPayOut = "pay_out"
-	CashDrop   = "drop"
+	CashPayIn  CashOpKind = "pay_in"
+	CashPayOut CashOpKind = "pay_out"
+	CashDrop   CashOpKind = "drop"
 )
+
+// Default is the seed cash operation kind.
+func (CashOpKind) Default() CashOpKind { return CashPayIn }
+
+// Valid reports whether k is one of the three known cash op kinds.
+func (k CashOpKind) Valid() bool { return k == CashPayIn || k == CashPayOut || k == CashDrop }
 
 // PaymentMethod is a configurable tender type; payment_group drives GL
 // semantics. Seed: cash, card.
@@ -132,14 +173,14 @@ type PaymentMethod struct {
 	RestaurantID sharedkernel.ID
 	Code         string
 	Name         string
-	PaymentGroup string
+	PaymentGroup PaymentGroup
 	Active       bool
 }
 
 // Tender is one payment recorded against a ticket at close.
 type Tender struct {
 	MethodID     sharedkernel.ID
-	PaymentGroup string
+	PaymentGroup PaymentGroup
 	AmountCents  int
 	TipCents     int
 }
@@ -149,7 +190,7 @@ type CashOperation struct {
 	ID           sharedkernel.ID
 	ShiftID      sharedkernel.ID
 	RestaurantID sharedkernel.ID
-	Kind         string
+	Kind         CashOpKind
 	AmountCents  int
 	Reason       string
 	RecordedBy   sharedkernel.ID
@@ -164,7 +205,7 @@ type Ticket struct {
 	ShiftID      sharedkernel.ID
 	TableID      sharedkernel.ID
 	CustomerID   *sharedkernel.ID // linked when a customer's handoff was accepted
-	Status       string
+	Status       TicketStatus
 	Note         string // diner note from a cart handoff, "" otherwise
 	Lines        []TicketLine
 	CreatedAt    time.Time

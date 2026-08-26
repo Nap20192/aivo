@@ -332,7 +332,7 @@ func (s *Store) FireTicket(ctx context.Context, restaurantID, id uuid.UUID) erro
 // tenant) and ErrConflict if it is closed — the shared immutability guard
 // every mutating ticket path routes through (debt 3).
 func (s *Store) requireOpenTicket(ctx context.Context, restaurantID, id uuid.UUID) error {
-	var status string
+	var status domain.TicketStatus
 	err := s.q.QueryRowContext(ctx,
 		`SELECT status FROM tickets WHERE restaurant_id = $1 AND id = $2`, restaurantID, id).Scan(&status)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -561,7 +561,7 @@ func (s *Store) AcceptShift(ctx context.Context, sh domain.Shift) error {
 }
 
 // ShiftsByState lists shifts filtered by acceptance state.
-func (s *Store) ShiftsByState(ctx context.Context, restaurantID uuid.UUID, state string) ([]domain.Shift, error) {
+func (s *Store) ShiftsByState(ctx context.Context, restaurantID uuid.UUID, state domain.ShiftState) ([]domain.Shift, error) {
 	cond := "closed_at IS NOT NULL AND accepted_at IS NULL" // "closed"
 	if state == domain.ShiftAccepted {
 		cond = "accepted_at IS NOT NULL"

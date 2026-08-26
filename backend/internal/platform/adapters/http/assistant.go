@@ -45,8 +45,8 @@ func toAssistantMessageView(m domain.AssistantMessage) assistantMessageView {
 		m.Actions = []domain.AssistantAction{}
 	}
 	return assistantMessageView{
-		ID: m.ID, Role: m.Role, Text: m.Text, Attachments: m.Attachments,
-		Actions: m.Actions, ActionStatus: m.ActionStatus, CreatedAt: m.CreatedAt,
+		ID: m.ID, Role: string(m.Role), Text: m.Text, Attachments: m.Attachments,
+		Actions: m.Actions, ActionStatus: (*string)(m.ActionStatus), CreatedAt: m.CreatedAt,
 	}
 }
 
@@ -299,7 +299,7 @@ Current state:
 	if len(history) > 0 {
 		b.WriteString("\n\nRecent conversation:")
 		for _, m := range history {
-			b.WriteString("\n" + m.Role + ": " + m.Text)
+			b.WriteString("\n" + string(m.Role) + ": " + m.Text)
 		}
 	}
 	b.WriteString("\n\nAdmin request:\n" + text + "\n\nReturn ONLY the JSON object.")
@@ -350,7 +350,7 @@ func (h *handler) assistantApply(w http.ResponseWriter, r *http.Request, u domai
 	failed, succeeded := false, 0
 	for _, i := range selected {
 		a := msg.Actions[i]
-		res := result{Index: i, Type: a.Type, OK: true}
+		res := result{Index: i, Type: string(a.Type), OK: true}
 		if failed {
 			res.OK, res.Error = false, "skipped: earlier action failed"
 		} else if err := h.applyAction(r, rest, a, refs); err != nil {
@@ -372,7 +372,7 @@ func (h *handler) assistantApply(w http.ResponseWriter, r *http.Request, u domai
 	// retry after fixing the cause; mark applied only on real effect.
 	status := domain.ActionStatusApplied
 	if succeeded > 0 {
-		if writeAppErr(w, h.AssistantStore.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, domain.ActionStatusApplied)) {
+		if writeAppErr(w, h.AssistantStore.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, string(domain.ActionStatusApplied))) {
 			return
 		}
 	} else {
@@ -405,7 +405,7 @@ func (h *handler) assistantDiscard(w http.ResponseWriter, r *http.Request, _ dom
 	if !ok {
 		return
 	}
-	if writeAppErr(w, h.AssistantStore.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, domain.ActionStatusDiscarded)) {
+	if writeAppErr(w, h.AssistantStore.SetAssistantMessageStatus(r.Context(), rest.ID, msg.ID, string(domain.ActionStatusDiscarded))) {
 		return
 	}
 	slog.Info("assistant actions discarded", "restaurant_id", rest.ID, "message_id", msg.ID)
@@ -429,7 +429,7 @@ func (h *handler) assistantDecidableMessage(w http.ResponseWriter, r *http.Reque
 		return domain.AssistantMessage{}, false
 	}
 	if msg.ActionStatus != nil {
-		writeErr(w, http.StatusConflict, "conflict", "actions already "+*msg.ActionStatus)
+		writeErr(w, http.StatusConflict, "conflict", "actions already "+string(*msg.ActionStatus))
 		return domain.AssistantMessage{}, false
 	}
 	return msg, true

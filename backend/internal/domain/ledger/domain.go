@@ -14,32 +14,92 @@ import (
 	"aivo/internal/sharedkernel"
 )
 
-// Account types and normal sides.
-const (
-	TypeAsset       = "asset"
-	TypeLiability   = "liability"
-	TypeRevenue     = "revenue"
-	TypeExpense     = "expense"
-	TypeEquity      = "equity"
-	TypeStatistical = "statistical"
+// AccountType is a chart-of-accounts entry's type.
+type AccountType string
 
-	SideDebit  = "debit"
-	SideCredit = "credit"
+// Account types.
+const (
+	TypeAsset       AccountType = "asset"
+	TypeLiability   AccountType = "liability"
+	TypeRevenue     AccountType = "revenue"
+	TypeExpense     AccountType = "expense"
+	TypeEquity      AccountType = "equity"
+	TypeStatistical AccountType = "statistical"
 )
 
-// Document kinds and states.
+// Default is the seed account type.
+func (AccountType) Default() AccountType { return TypeAsset }
+
+// Valid reports whether t is one of the six known account types.
+func (t AccountType) Valid() bool {
+	switch t {
+	case TypeAsset, TypeLiability, TypeRevenue, TypeExpense, TypeEquity, TypeStatistical:
+		return true
+	}
+	return false
+}
+
+// Side is a journal line's (or account's normal) side.
+type Side string
+
+// Normal sides.
 const (
-	KindShiftAcceptance = "shift_acceptance"
-	KindManual          = "manual"
-	KindReversal        = "reversal"
-
-	StateDraft     = "draft"
-	StatePosted    = "posted"
-	StateCancelled = "cancelled"
-
-	// SourceShift marks a document produced by shift acceptance.
-	SourceShift = "shift"
+	SideDebit  Side = "debit"
+	SideCredit Side = "credit"
 )
+
+// Default is the zero-value side.
+func (Side) Default() Side { return SideDebit }
+
+// Valid reports whether s is debit or credit.
+func (s Side) Valid() bool { return s == SideDebit || s == SideCredit }
+
+// DocumentKind is a journal document's own kind. Inventory-originated
+// documents (posted via PostInventoryJournal) pass their source kind
+// (e.g. "cogs") straight through this field too — a pre-existing quirk
+// this refactor preserves, not a closed set in practice.
+type DocumentKind string
+
+// Document kinds.
+const (
+	KindShiftAcceptance DocumentKind = "shift_acceptance"
+	KindManual          DocumentKind = "manual"
+	KindReversal        DocumentKind = "reversal"
+)
+
+// Default is the manual-journal kind.
+func (DocumentKind) Default() DocumentKind { return KindManual }
+
+// Valid reports whether k is one of the three named document kinds
+// (inventory source kinds passed through this field are not covered).
+func (k DocumentKind) Valid() bool {
+	return k == KindShiftAcceptance || k == KindManual || k == KindReversal
+}
+
+// DocumentState is a journal document's lifecycle state.
+type DocumentState string
+
+// Document states.
+const (
+	StateDraft     DocumentState = "draft"
+	StatePosted    DocumentState = "posted"
+	StateCancelled DocumentState = "cancelled"
+)
+
+// Default is the state of a freshly created document.
+func (DocumentState) Default() DocumentState { return StateDraft }
+
+// Valid reports whether s is one of the three known document states.
+func (s DocumentState) Valid() bool {
+	return s == StateDraft || s == StatePosted || s == StateCancelled
+}
+
+// SourceShift marks a document produced by shift acceptance. SourceKind
+// stays a plain string (not a typed enum, see the JournalDocument field
+// doc): inventory contributes further values (SourceReceipt, SourceCOGS,
+// ...) it owns itself, so ledger cannot close the set without coupling
+// to another context's constants (D6).
+const SourceShift = "shift"
 
 var (
 	ErrNotDraft         = errors.New("ledger: document is not draft")
@@ -60,8 +120,8 @@ type Account struct {
 	RestaurantID sharedkernel.ID
 	Code         string
 	Name         string
-	Type         string // asset|liability|revenue|expense|equity|statistical
-	NormalSide   string // debit|credit
+	Type         AccountType
+	NormalSide   Side
 	Postable     bool
 	CreatedAt    time.Time
 }
@@ -81,8 +141,8 @@ type JournalLine struct {
 	ID           sharedkernel.ID
 	DocumentID   sharedkernel.ID
 	AccountID    sharedkernel.ID
-	Side         string // debit|credit
-	AmountCents  int64  // > 0, single currency (§16.4)
+	Side         Side
+	AmountCents  int64 // > 0, single currency (§16.4)
 	CostCenterID sharedkernel.ID
 	Memo         string
 	Seq          int
@@ -95,8 +155,8 @@ type JournalDocument struct {
 
 	ID           sharedkernel.ID
 	RestaurantID sharedkernel.ID
-	Kind         string // shift_acceptance|manual|reversal
-	State        string // draft|posted|cancelled
+	Kind         DocumentKind
+	State        DocumentState
 
 	AccountingDate time.Time // business date of the fact (D7)
 	RecordedAt     time.Time // wall-clock of the record (D7)
@@ -113,7 +173,7 @@ type JournalDocument struct {
 
 // NewDocument creates a draft document. accountingDate is the business
 // date; recordedAt is the wall clock of the record (both required, D7).
-func NewDocument(id, restaurantID, createdBy sharedkernel.ID, kind string, accountingDate, recordedAt time.Time) *JournalDocument {
+func NewDocument(id, restaurantID, createdBy sharedkernel.ID, kind DocumentKind, accountingDate, recordedAt time.Time) *JournalDocument {
 	return &JournalDocument{
 		ID:             id,
 		RestaurantID:   restaurantID,
@@ -127,7 +187,7 @@ func NewDocument(id, restaurantID, createdBy sharedkernel.ID, kind string, accou
 
 // AddLine appends a one-sided line. Returns ErrInvalidSide/ErrInvalidAmount
 // on a bad line. Only allowed while draft.
-func (d *JournalDocument) AddLine(id, accountID, costCenterID sharedkernel.ID, side string, amountCents int64, memo string) error {
+func (d *JournalDocument) AddLine(id, accountID, costCenterID sharedkernel.ID, side Side, amountCents int64, memo string) error {
 	if d.State != StateDraft {
 		return ErrNotDraft
 	}

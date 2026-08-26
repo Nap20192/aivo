@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"os"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	ledgerapp "aivo/internal/ledger/app"
 	"aivo/internal/pos/adapters/ledgerbridge"
 	posapp "aivo/internal/pos/app"
+	"aivo/internal/pos/events"
 	posports "aivo/internal/pos/ports"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -86,7 +88,7 @@ func setupPos(t *testing.T) posFixture {
 
 	ledgerApp := ledgerapp.New(ledgerpg.NewStore(db))
 	store := NewStore(db)
-	app := posapp.New(store, menuStub{}, ledgerbridge.New(ledgerApp), nil)
+	app := posapp.New(store, menuStub{}, ledgerbridge.New(ledgerApp))
 
 	orgID := uuid.New()
 	f := posFixture{
@@ -330,9 +332,9 @@ func TestCloseShiftFormulaVarianceAndJournal(t *testing.T) {
 	}
 }
 
-func mustCashOp(t *testing.T, f posFixture, shiftID uuid.UUID, kind string, amt int) {
+func mustCashOp(t *testing.T, f posFixture, shiftID uuid.UUID, kind domain.CashOpKind, amt int) {
 	t.Helper()
-	if _, err := f.app.RecordCashOperation(f.ctx, f.restID, shiftID, f.userID, kind, amt, "test"); err != nil {
+	if _, err := f.app.RecordCashOperation(f.ctx, f.restID, shiftID, f.userID, string(kind), amt, "test"); err != nil {
 		t.Fatalf("cash op %s: %v", kind, err)
 	}
 }
@@ -489,5 +491,69 @@ func TestCloseTicketRejectsForeignShift(t *testing.T) {
 		[]domain.Tender{{MethodID: f.cashID, AmountCents: f.price}})
 	if !errors.Is(err, posapp.ErrShiftNotOpen) {
 		t.Errorf("close ticket from a foreign shift: got %v, want ErrShiftNotOpen", err)
+	}
+}
+
+// TestCloseTicketPublishesEventCommitsRegardlessOfInventory covers the
+// service-events spec's "ticket closed while inventory is down" scenario:
+// the ticket-close transaction commits and a TicketClosed event is
+// durably recorded with published_at unset — nothing in the close path
+// depends on inventory being reachable. (pkg/outbox's own test suite
+// covers the poller's retry-until-delivered behavior on top of that
+// pending row; not duplicated here.)
+func TestCloseTicketPublishesEventCommitsRegardlessOfInventory(t *testing.T) {
+	f := setupPos(t)
+	sh := f.openShift(t, 0)
+	tk := f.newTicket(t, sh.ID, 2) // total = price*2
+
+	closed, err := f.app.CloseTicket(f.ctx, f.restID, tk.ID, f.userID,
+		[]domain.Tender{{MethodID: f.cashID, AmountCents: f.price * 2}})
+	if err != nil {
+		t.Fatalf("close ticket: %v", err)
+	}
+	if closed.Status != domain.TicketClosed {
+		t.Fatalf("ticket status = %s, want closed", closed.Status)
+	}
+
+	var (
+		name          string
+		aggregateType string
+		aggregateID   uuid.UUID
+		publishedAt   sql.NullTime
+		payload       []byte
+	)
+	if err := f.db.QueryRowContext(f.ctx,
+		`SELECT name, aggregate_type, aggregate_id, published_at, payload FROM events WHERE aggregate_id = $1`,
+		tk.ID).Scan(&name, &aggregateType, &aggregateID, &publishedAt, &payload); err != nil {
+		t.Fatalf("query event row: %v", err)
+	}
+	if name != events.TicketClosedName {
+		t.Errorf("event name = %q, want %q", name, events.TicketClosedName)
+	}
+	if aggregateType != "ticket" {
+		t.Errorf("aggregate_type = %q, want ticket", aggregateType)
+	}
+	if aggregateID != tk.ID {
+		t.Errorf("aggregate_id = %s, want %s", aggregateID, tk.ID)
+	}
+	if publishedAt.Valid {
+		t.Errorf("published_at set before any delivery attempt")
+	}
+	var p events.TicketClosedPayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		t.Fatalf("decode payload: %v", err)
+	}
+	if p.TicketID != tk.ID.String() || len(p.Lines) != 1 || p.Lines[0].Qty != 2 {
+		t.Errorf("payload = %+v, want ticket_id %s and one line with qty 2", p, tk.ID)
+	}
+
+	// The ticket-close transaction's own effects are unaffected by
+	// delivery failing — re-reading confirms the commit stuck.
+	got, err := f.store.TicketByID(f.ctx, f.restID, tk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != domain.TicketClosed {
+		t.Errorf("re-read ticket status = %s, want closed", got.Status)
 	}
 }

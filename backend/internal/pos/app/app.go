@@ -5,13 +5,17 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	menudomain "aivo/internal/domain/menu"
 	"aivo/internal/domain/pos"
+	"aivo/internal/pos/events"
 	"aivo/internal/pos/ports"
+	"aivo/internal/sharedkernel"
+	"aivo/pkg/outbox"
 
 	"uuid"
 )
@@ -31,14 +35,13 @@ var ErrShiftNotOpen = errors.New("shift is not open")
 var ErrOpenTicketsUnpaid = errors.New("open tickets are unpaid")
 
 type App struct {
-	store     ports.Store
-	menu      ports.Menu
-	ledger    ports.Ledger
-	inventory ports.Inventory // nil disables COGS on sale (increment-2)
+	store  ports.Store
+	menu   ports.Menu
+	ledger ports.Ledger
 }
 
-func New(store ports.Store, menu ports.Menu, ledger ports.Ledger, inventory ports.Inventory) *App {
-	return &App{store: store, menu: menu, ledger: ledger, inventory: inventory}
+func New(store ports.Store, menu ports.Menu, ledger ports.Ledger) *App {
+	return &App{store: store, menu: menu, ledger: ledger}
 }
 
 // State is the POS floor view: the open shift (nil if none), every
@@ -274,7 +277,7 @@ func (a *App) CloseTicket(ctx context.Context, restaurantID, ticketID, closedBy 
 	if err != nil {
 		return domain.Ticket{}, err
 	}
-	groupByMethod := map[uuid.UUID]string{}
+	groupByMethod := map[uuid.UUID]domain.PaymentGroup{}
 	for _, m := range methods {
 		groupByMethod[m.ID] = m.PaymentGroup
 	}
@@ -295,23 +298,36 @@ func (a *App) CloseTicket(ctx context.Context, restaurantID, ticketID, closedBy 
 			return domain.Ticket{}, err
 		}
 	}
-	// Close the ticket and deplete stock / post COGS in ONE transaction so a
-	// crash can never leave a paid sale without its cost of goods (debt 1 /
-	// §7). Missing tech cards are skipped inside ConsumeForSale.
+	// Close the ticket and publish TicketClosed in ONE transaction, so a
+	// crash can never leave a paid sale without a durable record that
+	// stock/COGS still needs to happen (§7). Inventory consumes the event
+	// asynchronously (service-events spec) — ticket close no longer waits
+	// on inventory's availability.
 	err = a.store.InTx(ctx, func(tx *sql.Tx, st ports.Store) error {
 		if err := st.CloseTicketWithPayments(ctx, restaurantID, t, tenders, closedBy); err != nil {
 			return err
 		}
-		if a.inventory != nil {
-			lines := make([]ports.SaleLine, len(t.Lines))
-			for i, l := range t.Lines {
-				lines[i] = ports.SaleLine{MenuItemID: l.MenuItemID, Qty: l.Qty, TicketLineID: l.ID}
-			}
-			if _, err := a.inventory.ConsumeForSale(ctx, tx, restaurantID, closedBy, t.ID, businessDate(shift.OpenedAt), lines); err != nil {
-				return err
-			}
+		lines := make([]events.TicketClosedLine, len(t.Lines))
+		for i, l := range t.Lines {
+			lines[i] = events.TicketClosedLine{MenuItemID: l.MenuItemID.String(), Qty: l.Qty, TicketLineID: l.ID.String()}
 		}
-		return nil
+		payload, err := json.Marshal(events.TicketClosedPayload{
+			RestaurantID: restaurantID.String(),
+			TicketID:     t.ID.String(),
+			ClosedBy:     closedBy.String(),
+			BusinessDate: businessDate(shift.OpenedAt).Format("2006-01-02"),
+			Lines:        lines,
+		})
+		if err != nil {
+			return err
+		}
+		return outbox.Publish(ctx, tx, outbox.Event{
+			Name:          events.TicketClosedName,
+			AggregateType: "ticket",
+			AggregateID:   t.ID,
+			RestaurantID:  sharedkernel.NullID{V: restaurantID, Valid: true},
+			Payload:       payload,
+		})
 	})
 	if err != nil {
 		return domain.Ticket{}, err
@@ -324,7 +340,8 @@ func (a *App) RecordCashOperation(ctx context.Context, restaurantID, shiftID, re
 	if amountCents <= 0 {
 		return domain.CashOperation{}, fmt.Errorf("%w: amount_cents must be > 0", ErrInvalid)
 	}
-	if kind != domain.CashPayIn && kind != domain.CashPayOut && kind != domain.CashDrop {
+	k := domain.CashOpKind(kind)
+	if !k.Valid() {
 		return domain.CashOperation{}, fmt.Errorf("%w: unknown kind %q", ErrInvalid, kind)
 	}
 	sh, err := a.store.ShiftByID(ctx, restaurantID, shiftID)
@@ -336,7 +353,7 @@ func (a *App) RecordCashOperation(ctx context.Context, restaurantID, shiftID, re
 	}
 	op := domain.CashOperation{
 		ID: uuid.New(), ShiftID: shiftID, RestaurantID: restaurantID,
-		Kind: kind, AmountCents: amountCents, Reason: reason, RecordedBy: recordedBy,
+		Kind: k, AmountCents: amountCents, Reason: reason, RecordedBy: recordedBy,
 		RecordedAt: time.Now().UTC(),
 	}
 	if err := a.store.RecordCashOperation(ctx, op); err != nil {
@@ -378,7 +395,7 @@ type ZReport struct {
 	ExpectedCashCents int
 	DeclaredCents     int
 	VarianceCents     int
-	State             string
+	State             domain.ShiftState
 }
 
 // ZReport builds the shift breakdown. For an open shift declared/variance
@@ -420,10 +437,11 @@ func (a *App) Shift(ctx context.Context, restaurantID, shiftID uuid.UUID) (domai
 
 // ShiftsByState lists closed or accepted shifts (acceptance queue).
 func (a *App) ShiftsByState(ctx context.Context, restaurantID uuid.UUID, state string) ([]domain.Shift, error) {
-	if state != domain.ShiftClosed && state != domain.ShiftAccepted {
+	st := domain.ShiftState(state)
+	if st != domain.ShiftClosed && st != domain.ShiftAccepted {
 		return nil, fmt.Errorf("%w: state must be closed or accepted", ErrInvalid)
 	}
-	return a.store.ShiftsByState(ctx, restaurantID, state)
+	return a.store.ShiftsByState(ctx, restaurantID, st)
 }
 
 // LineInput is one line a waiter adds: item + chosen options + qty.

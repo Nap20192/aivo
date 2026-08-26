@@ -16,17 +16,38 @@ import (
 	"aivo/internal/sharedkernel"
 )
 
+// AssistantRole is an assistant chat message's author.
+type AssistantRole string
+
 // Assistant message roles.
 const (
-	AssistantRoleUser      = "user"
-	AssistantRoleAssistant = "assistant"
+	AssistantRoleUser      AssistantRole = "user"
+	AssistantRoleAssistant AssistantRole = "assistant"
 )
+
+// Default is the role of a freshly composed message.
+func (AssistantRole) Default() AssistantRole { return AssistantRoleUser }
+
+// Valid reports whether r is user or assistant.
+func (r AssistantRole) Valid() bool { return r == AssistantRoleUser || r == AssistantRoleAssistant }
+
+// ActionStatus is the admin's decision on a message's proposed actions.
+// The zero value ("") is not a named status: it means pending decision,
+// tracked in Go via a nil *ActionStatus rather than a member of this
+// type.
+type ActionStatus string
 
 // Assistant action statuses (nil = pending decision).
 const (
-	ActionStatusApplied   = "applied"
-	ActionStatusDiscarded = "discarded"
+	ActionStatusApplied   ActionStatus = "applied"
+	ActionStatusDiscarded ActionStatus = "discarded"
 )
+
+// Default is the zero value, meaning no decision yet.
+func (ActionStatus) Default() ActionStatus { return "" }
+
+// Valid reports whether s is applied or discarded.
+func (s ActionStatus) Valid() bool { return s == ActionStatusApplied || s == ActionStatusDiscarded }
 
 // Attachment is one uploaded file on a user message.
 type Attachment struct {
@@ -35,24 +56,40 @@ type Attachment struct {
 	Mime string `json:"mime"`
 }
 
+// ActionType is a proposed assistant action's kind.
+type ActionType string
+
 // Allowed assistant action types.
 const (
-	ActionCreateCategory   = "create_category"
-	ActionRenameCategory   = "rename_category"
-	ActionDeleteCategory   = "delete_category"
-	ActionCreateItem       = "create_item"
-	ActionUpdateItem       = "update_item"
-	ActionDeleteItem       = "delete_item"
-	ActionSetItemAvailable = "set_item_available"
-	ActionUpdateTheme      = "update_theme"
-	ActionCreateMenu       = "create_menu"
+	ActionCreateCategory   ActionType = "create_category"
+	ActionRenameCategory   ActionType = "rename_category"
+	ActionDeleteCategory   ActionType = "delete_category"
+	ActionCreateItem       ActionType = "create_item"
+	ActionUpdateItem       ActionType = "update_item"
+	ActionDeleteItem       ActionType = "delete_item"
+	ActionSetItemAvailable ActionType = "set_item_available"
+	ActionUpdateTheme      ActionType = "update_theme"
+	ActionCreateMenu       ActionType = "create_menu"
 )
+
+// Default is the first-declared action type.
+func (ActionType) Default() ActionType { return ActionCreateCategory }
+
+// Valid reports whether t is one of the nine known action types.
+func (t ActionType) Valid() bool {
+	switch t {
+	case ActionCreateCategory, ActionRenameCategory, ActionDeleteCategory, ActionCreateItem,
+		ActionUpdateItem, ActionDeleteItem, ActionSetItemAvailable, ActionUpdateTheme, ActionCreateMenu:
+		return true
+	}
+	return false
+}
 
 // AssistantAction is one proposed action. One flat struct for all types;
 // which fields matter depends on Type (see ValidateAction). Unknown JSON
 // fields are dropped on decode.
 type AssistantAction struct {
-	Type string `json:"type"`
+	Type ActionType `json:"type"`
 
 	// References into the restaurant's data.
 	ID         *sharedkernel.ID `json:"id,omitempty"`          // rename/delete category, item ops
@@ -252,11 +289,11 @@ func ValidateActionRefs(a AssistantAction, refs ActionRefs) error {
 type AssistantMessage struct {
 	ID           sharedkernel.ID
 	ThreadID     sharedkernel.ID
-	Role         string
+	Role         AssistantRole
 	Text         string
 	Attachments  []Attachment
 	Actions      []AssistantAction
-	ActionStatus *string
+	ActionStatus *ActionStatus
 	CreatedAt    time.Time
 }
 

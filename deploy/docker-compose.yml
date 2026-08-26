@@ -49,7 +49,10 @@ services:
       - minio
     # depends_on only waits for the container to start, not for Postgres
     # to accept connections — retry instead of a healthcheck+condition,
-    # simpler for a single dev-compose dependency.
+    # simpler for a single dev-compose dependency. Same reasoning covers
+    # aivo-inventory/aivo-auth not being up yet: the outbox poller and
+    # gRPC clients retry with backoff (service-events spec), so a strict
+    # startup ordering isn't needed here either.
     restart: on-failure
     environment:
       DATABASE_URL: postgres://aivo:aivo@postgres:5432/aivo?sslmode=disable
@@ -58,13 +61,51 @@ services:
       TOKEN_ENCRYPTION_KEY: "Q/FdcxiVr0KrjLPWlHhjr+AOXqSL86BizU+FhcdkagI="
       BASE_URL: http://localhost:8080
       PORT: "8080"
+      GRPC_PORT: "9080" # LedgerService: inbound side of inventory's outbox
+      INVENTORY_GRPC_ADDR: aivo-inventory:9081
       S3_ENDPOINT: minio:9000
       S3_ACCESS_KEY: aivo
       S3_SECRET_KEY: aivo_minio
       S3_BUCKET: aivo-menu-images
       S3_PUBLIC_URL: http://localhost:9000
     ports:
-      - "8080:8080"
+      - "8080:8080" # HTTP: /api/v1, admin/pos/menu SPAs
+      - "9080:9080" # gRPC: LedgerService
+
+  # cmd/aivo-inventory (split-inventory-microservice): inventory's own
+  # REST surface (unchanged endpoints, now JWT-authenticated) plus its
+  # gRPC inbound (TicketClosed from pos) and outbound (COGS/receipt/
+  # write-off/stocktake posting to aivo-server's LedgerService) sides.
+  # Dockerfile owned by that branch; path here is the agreed convention
+  # (deploy/Dockerfile.<binary>) — reconcile on merge if it differs.
+  aivo-inventory:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.inventory
+    depends_on:
+      - postgres
+    restart: on-failure
+    environment:
+      DATABASE_URL: postgres://aivo:aivo@postgres:5432/aivo?sslmode=disable
+      PORT: "8081"      # REST: inventory admin API
+      GRPC_PORT: "9081" # gRPC: InventoryService.HandleTicketClosed
+      LEDGER_GRPC_ADDR: aivo-server:9080
+    ports:
+      - "8081:8081"
+      - "9081:9081"
+
+  # cmd/aivo-auth (service-auth): thin Ed25519 token-minting service, no
+  # REST surface, no database. Dockerfile owned by that branch; same
+  # naming convention as aivo-inventory above.
+  aivo-auth:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.auth
+    restart: on-failure
+    environment:
+      GRPC_PORT: "9082" # gRPC-only: AuthService.Mint
+    ports:
+      - "9082:9082"
 
 volumes:
   aivo_pgdata:

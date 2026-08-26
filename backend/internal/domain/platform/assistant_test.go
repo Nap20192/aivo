@@ -103,3 +103,57 @@ func TestValidateActionRefsTenantScoping(t *testing.T) {
 		t.Errorf("no image prefix: got %v, want ErrInvalidAction", err)
 	}
 }
+
+func TestAssistantRoleValid(t *testing.T) {
+	cases := []struct {
+		r    AssistantRole
+		want bool
+	}{
+		{AssistantRoleUser, true}, {AssistantRoleAssistant, true}, {"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.r.Valid(); got != c.want {
+			t.Errorf("AssistantRole(%q).Valid() = %v, want %v", c.r, got, c.want)
+		}
+	}
+	if AssistantRole("").Default() != AssistantRoleUser {
+		t.Errorf("AssistantRole default = %q, want %q", AssistantRole("").Default(), AssistantRoleUser)
+	}
+}
+
+func TestActionStatusValid(t *testing.T) {
+	cases := []struct {
+		s    ActionStatus
+		want bool
+	}{
+		{ActionStatusApplied, true}, {ActionStatusDiscarded, true}, {"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.s.Valid(); got != c.want {
+			t.Errorf("ActionStatus(%q).Valid() = %v, want %v", c.s, got, c.want)
+		}
+	}
+	if ActionStatus("").Default() != "" {
+		t.Errorf("ActionStatus default = %q, want empty (pending)", ActionStatus("").Default())
+	}
+}
+
+func TestActionTypeValid(t *testing.T) {
+	cases := []struct {
+		a    ActionType
+		want bool
+	}{
+		{ActionCreateCategory, true}, {ActionRenameCategory, true}, {ActionDeleteCategory, true},
+		{ActionCreateItem, true}, {ActionUpdateItem, true}, {ActionDeleteItem, true},
+		{ActionSetItemAvailable, true}, {ActionUpdateTheme, true}, {ActionCreateMenu, true},
+		{"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.a.Valid(); got != c.want {
+			t.Errorf("ActionType(%q).Valid() = %v, want %v", c.a, got, c.want)
+		}
+	}
+	if ActionType("").Default() != ActionCreateCategory {
+		t.Errorf("ActionType default = %q, want %q", ActionType("").Default(), ActionCreateCategory)
+	}
+}

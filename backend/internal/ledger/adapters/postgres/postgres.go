@@ -54,6 +54,20 @@ func (s *Store) InTx(ctx context.Context, fn func(ports.Store) error) error {
 	return tx.Commit()
 }
 
+// InTxWithConn runs fn in one transaction, handing back both the raw tx
+// and a Store bound to it.
+func (s *Store) InTxWithConn(ctx context.Context, fn func(tx *sql.Tx, st ports.Store) error) error {
+	tx, err := s.pool.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("ledger store: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	if err := fn(tx, s.WithTx(tx)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
@@ -288,8 +302,8 @@ func (s *Store) LiveDocumentBySource(ctx context.Context, restaurantID uuid.UUID
 
 // LockDocumentState locks the document row FOR UPDATE and returns its
 // state, serializing the override and post paths on one row.
-func (s *Store) LockDocumentState(ctx context.Context, restaurantID, id uuid.UUID) (string, error) {
-	var state string
+func (s *Store) LockDocumentState(ctx context.Context, restaurantID, id uuid.UUID) (ledger.DocumentState, error) {
+	var state ledger.DocumentState
 	err := s.q.QueryRowContext(ctx,
 		`SELECT state FROM journal_documents WHERE restaurant_id = $1 AND id = $2 FOR UPDATE`,
 		restaurantID, id).Scan(&state)

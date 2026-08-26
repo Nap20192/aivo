@@ -25,3 +25,21 @@ func TestCanDeleteMenu(t *testing.T) {
 		t.Errorf("empty extra menu: got %v", err)
 	}
 }
+
+func TestServiceRequestStatusValid(t *testing.T) {
+	cases := []struct {
+		s    ServiceRequestStatus
+		want bool
+	}{
+		{ServiceRequestPending, true}, {ServiceRequestAcknowledged, true}, {ServiceRequestDismissed, true},
+		{"", false}, {"bogus", false},
+	}
+	for _, c := range cases {
+		if got := c.s.Valid(); got != c.want {
+			t.Errorf("ServiceRequestStatus(%q).Valid() = %v, want %v", c.s, got, c.want)
+		}
+	}
+	if ServiceRequestStatus("").Default() != ServiceRequestPending {
+		t.Errorf("ServiceRequestStatus default = %q, want %q", ServiceRequestStatus("").Default(), ServiceRequestPending)
+	}
+}
