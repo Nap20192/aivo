@@ -215,7 +215,7 @@ func (a *App) PostReceipt(ctx context.Context, restaurantID, receiptID, postedBy
 			}
 		}
 		total := r.TotalCents()
-		if _, err := a.ledger.PostInventoryJournal(ctx, tx, restaurantID, postedBy, inv.SourceReceipt, receiptID, r.BusinessDate, []ports.JournalLine{
+		if err := a.publishPostJournal(ctx, tx, EventReceiptPosted, inv.DocKindReceipt, restaurantID, postedBy, receiptID, r.BusinessDate, []ports.JournalLine{
 			{Purpose: "inventory", Side: "debit", AmountCents: total},
 			{Purpose: "accounts_payable", Side: "credit", AmountCents: total},
 		}); err != nil {
@@ -230,7 +230,7 @@ func (a *App) PostReceipt(ctx context.Context, restaurantID, receiptID, postedBy
 }
 
 func (a *App) CancelReceipt(ctx context.Context, restaurantID, receiptID uuid.UUID) (inv.GoodsReceipt, error) {
-	err := a.cancelDocument(ctx, restaurantID, receiptID, inv.DocKindReceipt, inv.SourceReceipt,
+	err := a.cancelDocument(ctx, restaurantID, receiptID, inv.DocKindReceipt, EventReceiptCancelled,
 		func(ctx context.Context, st ports.Store, reversalID uuid.UUID, businessDate time.Time) error {
 			orig, err := st.ReceiptByID(ctx, restaurantID, receiptID)
 			if err != nil {
@@ -251,9 +251,9 @@ func (a *App) CancelReceipt(ctx context.Context, restaurantID, receiptID uuid.UU
 }
 
 // cancelDocument is the shared cancel flow: guard posted, create a reversal
-// document row, mirror its moves, cancel the GL journal, mark cancelled —
-// all in one transaction (§6).
-func (a *App) cancelDocument(ctx context.Context, restaurantID, docID uuid.UUID, docKind, sourceKind string, insertReversal func(context.Context, ports.Store, uuid.UUID, time.Time) error, mark func(context.Context, ports.Store, string, string) error) error {
+// document row, mirror its moves, publish the GL-cancel outbox event, mark
+// cancelled — all in one transaction (§6).
+func (a *App) cancelDocument(ctx context.Context, restaurantID, docID uuid.UUID, docKind, cancelEvent string, insertReversal func(context.Context, ports.Store, uuid.UUID, time.Time) error, mark func(context.Context, ports.Store, string, string) error) error {
 	return a.store.InTx(ctx, func(tx *sql.Tx, st ports.Store) error {
 		status, err := st.LockDocument(ctx, docKind, restaurantID, docID)
 		if err != nil {
@@ -270,7 +270,7 @@ func (a *App) cancelDocument(ctx context.Context, restaurantID, docID uuid.UUID,
 		if err := a.reverseMoves(ctx, st, restaurantID, docKind, docID, reversalID, today); err != nil {
 			return err
 		}
-		if _, err := a.ledger.CancelJournalForSource(ctx, tx, restaurantID, sourceKind, docID); err != nil {
+		if err := a.publishCancelJournal(ctx, tx, cancelEvent, docKind, restaurantID, docID); err != nil {
 			return err
 		}
 		return mark(ctx, st, inv.DocPosted, inv.DocCancelled)
@@ -346,7 +346,7 @@ func (a *App) PostWriteOff(ctx context.Context, restaurantID, writeOffID, posted
 			}
 			total += cost
 		}
-		if _, err := a.ledger.PostInventoryJournal(ctx, tx, restaurantID, postedBy, inv.SourceWriteoff, writeOffID, w.BusinessDate, []ports.JournalLine{
+		if err := a.publishPostJournal(ctx, tx, EventWriteOffPosted, inv.DocKindWriteoff, restaurantID, postedBy, writeOffID, w.BusinessDate, []ports.JournalLine{
 			{Purpose: "inventory_shrinkage", Side: "debit", AmountCents: total},
 			{Purpose: "inventory", Side: "credit", AmountCents: total},
 		}); err != nil {
@@ -361,7 +361,7 @@ func (a *App) PostWriteOff(ctx context.Context, restaurantID, writeOffID, posted
 }
 
 func (a *App) CancelWriteOff(ctx context.Context, restaurantID, writeOffID uuid.UUID) (inv.WriteOff, error) {
-	err := a.cancelDocument(ctx, restaurantID, writeOffID, inv.DocKindWriteoff, inv.SourceWriteoff,
+	err := a.cancelDocument(ctx, restaurantID, writeOffID, inv.DocKindWriteoff, EventWriteOffCancelled,
 		func(ctx context.Context, st ports.Store, reversalID uuid.UUID, businessDate time.Time) error {
 			orig, err := st.WriteOffByID(ctx, restaurantID, writeOffID)
 			if err != nil {

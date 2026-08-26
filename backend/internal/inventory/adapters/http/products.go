@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	inv "aivo/internal/domain/inventory"
-	"aivo/internal/domain/platform"
+	"aivo/internal/inventory/adapters/jwtauth"
 	inventoryapp "aivo/internal/inventory/app"
 
 	"uuid"
@@ -37,8 +37,8 @@ func onHandView(unit string, oh inv.OnHand) map[string]any {
 	}
 }
 
-func (h *handler) invListProducts(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
-	ps, err := h.Inventory.Products(r.Context(), rest.ID)
+func (h *handler) invListProducts(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
+	ps, err := h.Inventory.Products(r.Context(), restaurantID)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -49,7 +49,7 @@ func (h *handler) invListProducts(w http.ResponseWriter, r *http.Request, _ doma
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *handler) invCreateProduct(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invCreateProduct(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	var req struct {
 		SKU        string     `json:"sku"`
 		Name       string     `json:"name"`
@@ -66,19 +66,19 @@ func (h *handler) invCreateProduct(w http.ResponseWriter, r *http.Request, _ dom
 		m := milliOf(*req.MinStock)
 		in.MinStock = &m
 	}
-	p, err := h.Inventory.CreateProduct(r.Context(), rest.ID, in)
+	p, err := h.Inventory.CreateProduct(r.Context(), restaurantID, in)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, productView(p))
 }
 
-func (h *handler) invGetProduct(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invGetProduct(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	pid, ok := pathUUID(w, r, "pid")
 	if !ok {
 		return
 	}
-	p, oh, err := h.Inventory.Product(r.Context(), rest.ID, pid)
+	p, oh, err := h.Inventory.Product(r.Context(), restaurantID, pid)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -87,7 +87,7 @@ func (h *handler) invGetProduct(w http.ResponseWriter, r *http.Request, _ domain
 	writeJSON(w, http.StatusOK, v)
 }
 
-func (h *handler) invPatchProduct(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invPatchProduct(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	pid, ok := pathUUID(w, r, "pid")
 	if !ok {
 		return
@@ -106,7 +106,7 @@ func (h *handler) invPatchProduct(w http.ResponseWriter, r *http.Request, _ doma
 		m := milliOf(*req.MinStock)
 		patch.MinStock = &m
 	}
-	p, err := h.Inventory.UpdateProduct(r.Context(), rest.ID, pid, patch)
+	p, err := h.Inventory.UpdateProduct(r.Context(), restaurantID, pid, patch)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -130,7 +130,7 @@ func techCardView(v inventoryapp.TechCardView) map[string]any {
 	}
 	format := c.Format
 	if format == "" {
-		format = inv.FormatSimple
+		format = inv.DefaultTechCardFormat()
 	}
 	m := map[string]any{
 		"id": c.ID, "product_id": c.ProductID, "valid_from": c.ValidFrom.Format("2006-01-02"),
@@ -149,12 +149,12 @@ func techCardView(v inventoryapp.TechCardView) map[string]any {
 	return m
 }
 
-func (h *handler) invTechCards(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invTechCards(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	pid, ok := pathUUID(w, r, "pid")
 	if !ok {
 		return
 	}
-	views, err := h.Inventory.TechCardVersions(r.Context(), rest.ID, pid)
+	views, err := h.Inventory.TechCardVersions(r.Context(), restaurantID, pid)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -165,7 +165,7 @@ func (h *handler) invTechCards(w http.ResponseWriter, r *http.Request, _ domain.
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *handler) invActiveTechCard(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invActiveTechCard(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	pid, ok := pathUUID(w, r, "pid")
 	if !ok {
 		return
@@ -178,14 +178,14 @@ func (h *handler) invActiveTechCard(w http.ResponseWriter, r *http.Request, _ do
 		}
 		on = d
 	}
-	v, err := h.Inventory.ActiveTechCard(r.Context(), rest.ID, pid, on)
+	v, err := h.Inventory.ActiveTechCard(r.Context(), restaurantID, pid, on)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, techCardView(v))
 }
 
-func (h *handler) invCreateTechCard(w http.ResponseWriter, r *http.Request, u domain.User, rest domain.Restaurant) {
+func (h *handler) invCreateTechCard(w http.ResponseWriter, r *http.Request, claims jwtauth.Claims, restaurantID uuid.UUID) {
 	pid, ok := pathUUID(w, r, "pid")
 	if !ok {
 		return
@@ -218,7 +218,7 @@ func (h *handler) invCreateTechCard(w http.ResponseWriter, r *http.Request, u do
 		yield = milliOf(*req.YieldQty)
 	}
 	meta := inventoryapp.TechCardMeta{
-		Format: req.Format, ScopeNote: req.ScopeNote, PresentationNote: req.PresentationNote,
+		Format: inv.TechCardFormat(req.Format), ScopeNote: req.ScopeNote, PresentationNote: req.PresentationNote,
 		StorageNote: req.StorageNote, OrganolepticNote: req.OrganolepticNote,
 	}
 	lines := make([]inventoryapp.TechCardLineInput, len(req.Lines))
@@ -227,31 +227,31 @@ func (h *handler) invCreateTechCard(w http.ResponseWriter, r *http.Request, u do
 			IngredientProductID: l.IngredientProductID, QtyInput: l.Qty, Unit: l.Unit, YieldPermille: l.YieldPermille,
 		}
 	}
-	tc, err := h.Inventory.CreateTechCardVersion(r.Context(), rest.ID, pid, validFrom, req.Consumption, yield, meta, lines, u.ID)
+	tc, err := h.Inventory.CreateTechCardVersion(r.Context(), restaurantID, pid, validFrom, inv.ConsumeStrategy(req.Consumption), yield, meta, lines, claims.UserID)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, techCardView(inventoryapp.TechCardView{Card: tc}))
 }
 
-func (h *handler) invGetTechCard(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invGetTechCard(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	tcid, ok := pathUUID(w, r, "tcid")
 	if !ok {
 		return
 	}
-	v, err := h.Inventory.TechCard(r.Context(), rest.ID, tcid)
+	v, err := h.Inventory.TechCard(r.Context(), restaurantID, tcid)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, techCardView(v))
 }
 
-func (h *handler) invRecost(w http.ResponseWriter, r *http.Request, u domain.User, rest domain.Restaurant) {
+func (h *handler) invRecost(w http.ResponseWriter, r *http.Request, claims jwtauth.Claims, restaurantID uuid.UUID) {
 	tcid, ok := pathUUID(w, r, "tcid")
 	if !ok {
 		return
 	}
-	cost, err := h.Inventory.Recost(r.Context(), rest.ID, tcid, u.ID)
+	cost, err := h.Inventory.Recost(r.Context(), restaurantID, tcid, claims.UserID)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -264,8 +264,8 @@ func supplierView(s inv.Supplier) map[string]any {
 	return map[string]any{"id": s.ID, "name": s.Name, "contacts": s.Contacts, "note": s.Note, "archived": s.Archived}
 }
 
-func (h *handler) invListSuppliers(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
-	ss, err := h.Inventory.Suppliers(r.Context(), rest.ID)
+func (h *handler) invListSuppliers(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
+	ss, err := h.Inventory.Suppliers(r.Context(), restaurantID)
 	if writeAppErr(w, err) {
 		return
 	}
@@ -276,7 +276,7 @@ func (h *handler) invListSuppliers(w http.ResponseWriter, r *http.Request, _ dom
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (h *handler) invCreateSupplier(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invCreateSupplier(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	var req struct {
 		Name     string            `json:"name"`
 		Contacts map[string]string `json:"contacts"`
@@ -285,14 +285,14 @@ func (h *handler) invCreateSupplier(w http.ResponseWriter, r *http.Request, _ do
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	s, err := h.Inventory.CreateSupplier(r.Context(), rest.ID, req.Name, req.Contacts, req.Note)
+	s, err := h.Inventory.CreateSupplier(r.Context(), restaurantID, req.Name, req.Contacts, req.Note)
 	if writeAppErr(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, supplierView(s))
 }
 
-func (h *handler) invPatchSupplier(w http.ResponseWriter, r *http.Request, _ domain.User, rest domain.Restaurant) {
+func (h *handler) invPatchSupplier(w http.ResponseWriter, r *http.Request, _ jwtauth.Claims, restaurantID uuid.UUID) {
 	sid, ok := pathUUID(w, r, "sid")
 	if !ok {
 		return
@@ -305,7 +305,7 @@ func (h *handler) invPatchSupplier(w http.ResponseWriter, r *http.Request, _ dom
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	s, err := h.Inventory.UpdateSupplier(r.Context(), rest.ID, sid, inventoryapp.SupplierPatch{Name: req.Name, Contacts: req.Contacts, Archived: req.Archived})
+	s, err := h.Inventory.UpdateSupplier(r.Context(), restaurantID, sid, inventoryapp.SupplierPatch{Name: req.Name, Contacts: req.Contacts, Archived: req.Archived})
 	if writeAppErr(w, err) {
 		return
 	}

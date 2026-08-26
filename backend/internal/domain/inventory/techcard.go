@@ -7,27 +7,53 @@ import (
 	"aivo/internal/sharedkernel"
 )
 
-// Consumption strategies (Domain 3): how a sale of the product depletes
-// stock.
+// ConsumeStrategy is how a sale of the product depletes stock (Domain 3).
+type ConsumeStrategy string
+
 const (
-	ConsumeAssemble        = "assemble"         // deplete the recipe's ingredients
-	ConsumeDepleteFinished = "deplete_finished" // deplete the finished product itself
+	ConsumeAssemble        ConsumeStrategy = "assemble"         // deplete the recipe's ingredients
+	ConsumeDepleteFinished ConsumeStrategy = "deplete_finished" // deplete the finished product itself
 )
 
-// Recipe costing method.
-const CostMethodWeightedAvg = "weighted_avg"
+// DefaultConsumeStrategy is the strategy assumed when none is given.
+func DefaultConsumeStrategy() ConsumeStrategy { return ConsumeAssemble }
 
-// Tech card document formats. Simple (default) is the lean costing-only
-// card; TTK adds the ГОСТ 31987-2012 технико-технологическая карта text
-// sections (§ scope/presentation/storage/organoleptic — required for a new,
-// non-typical dish presented to a regulator) on top of the same recipe
-// data. The format never changes costing math — it only gates which text
-// fields a restaurant is expected to fill in and which print template
-// renders.
+// Valid reports whether c is a known strategy.
+func (c ConsumeStrategy) Valid() bool {
+	return c == ConsumeAssemble || c == ConsumeDepleteFinished
+}
+
+// CostMethod is a recipe's costing method.
+type CostMethod string
+
+// CostMethodWeightedAvg is the only supported costing method today.
+const CostMethodWeightedAvg CostMethod = "weighted_avg"
+
+// DefaultCostMethod is the method assumed when none is given.
+func DefaultCostMethod() CostMethod { return CostMethodWeightedAvg }
+
+// Valid reports whether m is a known costing method.
+func (m CostMethod) Valid() bool { return m == CostMethodWeightedAvg }
+
+// TechCardFormat is a tech card's document format. Simple (default) is the
+// lean costing-only card; TTK adds the ГОСТ 31987-2012
+// технико-технологическая карта text sections (§
+// scope/presentation/storage/organoleptic — required for a new, non-typical
+// dish presented to a regulator) on top of the same recipe data. The format
+// never changes costing math — it only gates which text fields a
+// restaurant is expected to fill in and which print template renders.
+type TechCardFormat string
+
 const (
-	FormatSimple = "simple"
-	FormatTTK    = "ttk"
+	FormatSimple TechCardFormat = "simple"
+	FormatTTK    TechCardFormat = "ttk"
 )
+
+// DefaultTechCardFormat is the format assumed when none is given.
+func DefaultTechCardFormat() TechCardFormat { return FormatSimple }
+
+// Valid reports whether f is a known tech card format.
+func (f TechCardFormat) Valid() bool { return f == FormatSimple || f == FormatTTK }
 
 // YieldPermilleDefault is 100.0% (no cooking loss modeled) — a tech card
 // line that doesn't specify a yield defaults to gross == net.
@@ -43,9 +69,6 @@ var (
 	ErrInvalidYieldPct     = errors.New("inventory: yield_permille must be in (0, 1000]")
 )
 
-// ValidFormat reports whether f is a known tech card format.
-func ValidFormat(f string) bool { return f == FormatSimple || f == FormatTTK }
-
 // TechCard is a calendar-versioned recipe for a dish/prepared product (D5).
 // The aggregate boundary is the version + its lines. A version's interval
 // is [ValidFrom, ValidTo); the open (current) version has ValidTo == nil.
@@ -55,8 +78,8 @@ type TechCard struct {
 	ProductID    sharedkernel.ID
 	ValidFrom    time.Time  // date
 	ValidTo      *time.Time // date, nil = open/current
-	Consumption  string     // assemble|deplete_finished
-	YieldMilli   int64      // yield quantity (informational / prepared unit cost)
+	Consumption  ConsumeStrategy
+	YieldMilli   int64 // yield quantity (informational / prepared unit cost)
 	CreatedBy    sharedkernel.ID
 	CreatedAt    time.Time
 	Lines        []TechCardLine
@@ -65,7 +88,7 @@ type TechCard struct {
 	// Format == FormatTTK (a "новая, нетиповая" dish presented to a
 	// regulator needs them); stored regardless of format so switching a
 	// card to ttk later doesn't lose anything already typed.
-	Format           string  // simple|ttk
+	Format           TechCardFormat
 	ScopeNote        *string // область применения
 	PresentationNote *string // требования к оформлению, подаче, реализации
 	StorageNote      *string // условия и сроки хранения
@@ -104,14 +127,9 @@ type RecipeCosting struct {
 	ID         sharedkernel.ID
 	TechCardID sharedkernel.ID
 	CostCents  int64
-	Method     string // weighted_avg
+	Method     CostMethod
 	ComputedAt time.Time
 	ComputedBy sharedkernel.ID
-}
-
-// ValidConsumption reports whether c is a known strategy.
-func ValidConsumption(c string) bool {
-	return c == ConsumeAssemble || c == ConsumeDepleteFinished
 }
 
 // ActiveOn reports whether the version is the active one on date d:

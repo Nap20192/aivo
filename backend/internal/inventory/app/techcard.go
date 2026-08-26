@@ -27,7 +27,7 @@ type TechCardLineInput struct {
 // meaningful when Format is FormatTTK, stored regardless). Format defaults
 // to FormatSimple when empty.
 type TechCardMeta struct {
-	Format           string
+	Format           inv.TechCardFormat
 	ScopeNote        *string
 	PresentationNote *string
 	StorageNote      *string
@@ -39,7 +39,7 @@ type TechCardMeta struct {
 // inserts the new open version + lines, and records the first costing — all
 // in one transaction (§11). Rejects cycles, duplicate/empty lines, and a
 // second version starting on the same day.
-func (a *App) CreateTechCardVersion(ctx context.Context, restaurantID, productID uuid.UUID, validFrom time.Time, consumption string, yieldMilli int64, meta TechCardMeta, lineInputs []TechCardLineInput, createdBy uuid.UUID) (inv.TechCard, error) {
+func (a *App) CreateTechCardVersion(ctx context.Context, restaurantID, productID uuid.UUID, validFrom time.Time, consumption inv.ConsumeStrategy, yieldMilli int64, meta TechCardMeta, lineInputs []TechCardLineInput, createdBy uuid.UUID) (inv.TechCard, error) {
 	product, err := a.store.ProductByID(ctx, restaurantID, productID)
 	if err != nil {
 		return inv.TechCard{}, err
@@ -47,16 +47,16 @@ func (a *App) CreateTechCardVersion(ctx context.Context, restaurantID, productID
 	if product.Type != inv.TypeDish && product.Type != inv.TypePrepared {
 		return inv.TechCard{}, fmt.Errorf("%w: tech cards belong to a dish or prepared product", ErrInvalid)
 	}
-	if !inv.ValidConsumption(consumption) {
+	if !consumption.Valid() {
 		return inv.TechCard{}, inv.ErrInvalidConsumption
 	}
 	if yieldMilli <= 0 {
 		yieldMilli = inv.MilliPerUnit
 	}
 	if meta.Format == "" {
-		meta.Format = inv.FormatSimple
+		meta.Format = inv.DefaultTechCardFormat()
 	}
-	if !inv.ValidFormat(meta.Format) {
+	if !meta.Format.Valid() {
 		return inv.TechCard{}, inv.ErrInvalidFormat
 	}
 

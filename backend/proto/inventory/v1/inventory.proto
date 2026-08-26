@@ -1,0 +1,39 @@
+// inventory-service capability (see openspec/changes/split-inventory-microservice).
+//
+// Written by the inventory worktree since it was not present when this
+// worktree started (tasks.md 3.2) — svc-server's ticket-close client
+// needs this shape to compile against; reconcile at merge if svc-server
+// independently authored a conflicting version.
+syntax = "proto3";
+
+package inventory.v1;
+
+option go_package = "aivo/internal/inventory/v1;inventoryv1";
+
+// InventoryService is inventory's gRPC inbound: the pos→inventory
+// TicketClosed edge (service-events capability).
+service InventoryService {
+  // HandleTicketClosed applies stock consumption for a closed ticket's
+  // sold lines. Idempotent on ticket_id (service-events: "Delivery is
+  // idempotent on the consumer side") — redelivering the same ticket_id
+  // is a no-op that still acknowledges success.
+  rpc HandleTicketClosed(HandleTicketClosedRequest) returns (HandleTicketClosedResponse);
+}
+
+message SaleLine {
+  string menu_item_id = 1;    // uuid
+  int64 qty = 2;
+  string ticket_line_id = 3;  // uuid; used with menu_item_id to derive per-line idempotency
+}
+
+message HandleTicketClosedRequest {
+  string restaurant_id = 1;   // uuid; tenant scope
+  string ticket_id = 2;       // uuid; idempotency key (source_document_id)
+  string closed_by = 3;       // uuid
+  string business_date = 4;   // YYYY-MM-DD
+  repeated SaleLine lines = 5;
+}
+
+message HandleTicketClosedResponse {
+  bool applied = 1; // false when this ticket_id was already processed (no-op redelivery)
+}

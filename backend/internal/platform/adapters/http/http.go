@@ -15,13 +15,10 @@ import (
 	"strconv"
 	"time"
 
-	inventorydomain "aivo/internal/domain/inventory"
 	ledgerdomain "aivo/internal/domain/ledger"
 	menudomain "aivo/internal/domain/menu"
 	"aivo/internal/domain/platform"
 	posdomain "aivo/internal/domain/pos"
-	inventoryapp "aivo/internal/inventory/app"
-	inventoryports "aivo/internal/inventory/ports"
 	ledgerapp "aivo/internal/ledger/app"
 	ledgerports "aivo/internal/ledger/ports"
 	menuapp "aivo/internal/menu/app"
@@ -55,7 +52,6 @@ type Deps struct {
 	Platform       *app.App
 	Pos            *posapp.App
 	Ledger         *ledgerapp.App
-	Inventory      *inventoryapp.App
 	Menu           menuports.Store
 	MenuAdmin      menuports.AdminStore
 	MenuApp        menuapp.Application
@@ -155,39 +151,8 @@ func NewMux(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/v1/restaurants/{id}/ledger/journals/{docID}", h.restaurant(true, h.getJournal))
 	mux.HandleFunc("POST /api/v1/restaurants/{id}/ledger/journals/{docID}/cancel", h.restaurant(true, h.cancelJournal))
 
-	// Inventory (increment-2; manager+, restaurant-scoped — storekeeper role deferred).
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/products", h.restaurant(true, h.invListProducts))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/products", h.restaurant(true, h.invCreateProduct))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/products/{pid}", h.restaurant(true, h.invGetProduct))
-	mux.HandleFunc("PATCH /api/v1/restaurants/{id}/inventory/products/{pid}", h.restaurant(true, h.invPatchProduct))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/products/{pid}/tech-cards", h.restaurant(true, h.invTechCards))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/products/{pid}/tech-cards/active", h.restaurant(true, h.invActiveTechCard))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/products/{pid}/tech-cards", h.restaurant(true, h.invCreateTechCard))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/tech-cards/{tcid}", h.restaurant(true, h.invGetTechCard))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/tech-cards/{tcid}/recost", h.restaurant(true, h.invRecost))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/suppliers", h.restaurant(true, h.invListSuppliers))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/suppliers", h.restaurant(true, h.invCreateSupplier))
-	mux.HandleFunc("PATCH /api/v1/restaurants/{id}/inventory/suppliers/{sid}", h.restaurant(true, h.invPatchSupplier))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/receipts", h.restaurant(true, h.invReceipts))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/receipts", h.restaurant(true, h.invCreateReceipt))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/receipts/{rid}", h.restaurant(true, h.invGetReceipt))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/receipts/{rid}/post", h.restaurant(true, h.invPostReceipt))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/receipts/{rid}/cancel", h.restaurant(true, h.invCancelReceipt))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/write-offs", h.restaurant(true, h.invWriteOffs))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/write-offs", h.restaurant(true, h.invCreateWriteOff))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/write-offs/{wid}", h.restaurant(true, h.invGetWriteOff))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/write-offs/{wid}/post", h.restaurant(true, h.invPostWriteOff))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/write-offs/{wid}/cancel", h.restaurant(true, h.invCancelWriteOff))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/stocktakes", h.restaurant(true, h.invCreateStocktake))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/stocktakes", h.restaurant(true, h.invStocktakes))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/stocktakes/{sid}", h.restaurant(true, h.invGetStocktake))
-	mux.HandleFunc("PATCH /api/v1/restaurants/{id}/inventory/stocktakes/{sid}", h.restaurant(true, h.invEnterCounts))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/stocktakes/{sid}/dry-run", h.restaurant(true, h.invDryRunStocktake))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/stocktakes/{sid}/post", h.restaurant(true, h.invPostStocktake))
-	mux.HandleFunc("POST /api/v1/restaurants/{id}/inventory/stocktakes/{sid}/cancel", h.restaurant(true, h.invCancelStocktake))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/on-hand", h.restaurant(true, h.invOnHand))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/stock-moves", h.restaurant(true, h.invStockMoves))
-	mux.HandleFunc("GET /api/v1/restaurants/{id}/inventory/reports/food-cost", h.restaurant(true, h.invFoodCost))
+	// Inventory now lives at cmd/aivo-inventory (own port, JWT auth) — see
+	// internal/inventory/adapters/http and split-inventory-microservice.
 
 	// POS (any authenticated role, scoped to the user's restaurant).
 	mux.HandleFunc("GET /api/v1/pos/state", h.pos(h.posState))
@@ -361,45 +326,8 @@ func writeAppErr(w http.ResponseWriter, err error) bool {
 		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
 	case errors.Is(err, ledgerports.ErrConflict):
 		writeErr(w, http.StatusConflict, "conflict", err.Error())
-	// --- inventory (increment-2) ---
-	case errors.Is(err, inventoryports.ErrNotFound):
-		writeErr(w, http.StatusNotFound, "not_found", "not found")
-	case errors.Is(err, inventorydomain.ErrUnitIncompatible), errors.Is(err, inventorydomain.ErrInvalidUnit),
-		errors.Is(err, inventorydomain.ErrNonBaseStockUnit):
-		writeErr(w, http.StatusUnprocessableEntity, "unit_incompatible", err.Error())
-	case errors.Is(err, inventorydomain.ErrRecipeCycle):
-		writeErr(w, http.StatusUnprocessableEntity, "recipe_cycle", err.Error())
-	case errors.Is(err, inventorydomain.ErrEmptyRecipe):
-		writeErr(w, http.StatusUnprocessableEntity, "empty_recipe", err.Error())
-	case errors.Is(err, inventorydomain.ErrDuplicateIngredient):
-		writeErr(w, http.StatusUnprocessableEntity, "duplicate_ingredient", err.Error())
-	case errors.Is(err, inventorydomain.ErrEmptyDocument):
-		writeErr(w, http.StatusUnprocessableEntity, "empty_document", err.Error())
-	case errors.Is(err, inventorydomain.ErrInvalidType), errors.Is(err, inventorydomain.ErrInvalidQty),
-		errors.Is(err, inventorydomain.ErrMenuItemOnNonDish), errors.Is(err, inventorydomain.ErrInvalidConsumption),
-		errors.Is(err, inventorydomain.ErrInvalidReason), errors.Is(err, inventorydomain.ErrBadInterval),
-		errors.Is(err, inventoryapp.ErrInvalid):
-		writeErr(w, http.StatusUnprocessableEntity, "invalid", err.Error())
-	case errors.Is(err, inventoryapp.ErrSKUTaken):
-		writeErr(w, http.StatusUnprocessableEntity, "sku_taken", err.Error())
-	case errors.Is(err, inventoryapp.ErrBackdated):
-		writeErr(w, http.StatusUnprocessableEntity, "backdated_before_last_move", err.Error())
-	case errors.Is(err, inventoryapp.ErrMenuItemTaken):
-		writeErr(w, http.StatusConflict, "menu_item_taken", err.Error())
-	case errors.Is(err, inventoryapp.ErrVersionExists):
-		writeErr(w, http.StatusConflict, "version_exists", err.Error())
-	case errors.Is(err, inventoryapp.ErrStocktakeOpen):
-		writeErr(w, http.StatusConflict, "stocktake_open_exists", err.Error())
-	case errors.Is(err, inventoryapp.ErrSupplierNameTaken):
-		writeErr(w, http.StatusConflict, "supplier_name_taken", err.Error())
-	case errors.Is(err, inventoryapp.ErrAlreadyPosted):
-		writeErr(w, http.StatusConflict, "already_posted", err.Error())
-	case errors.Is(err, inventoryapp.ErrAlreadyCancelled):
-		writeErr(w, http.StatusConflict, "already_cancelled", err.Error())
-	case errors.Is(err, inventoryapp.ErrNotDraft), errors.Is(err, inventoryapp.ErrNotPosted):
-		writeErr(w, http.StatusConflict, "conflict", err.Error())
-	case errors.Is(err, inventoryports.ErrConflict):
-		writeErr(w, http.StatusConflict, "conflict", err.Error())
+	// Inventory errors: mapped by internal/inventory/adapters/http now that
+	// inventory is served by cmd/aivo-inventory, not this mux.
 	case errors.Is(err, menuapp.ErrServiceRequestAlreadyOpen):
 		// Duplicate open request for the table: 409 per the menu client
 		// contract (it renders the existing open-request state).

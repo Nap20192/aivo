@@ -1,0 +1,111 @@
+// service-events / inventory-service capability (see
+// openspec/changes/split-inventory-microservice). Request shapes mirror
+// what internal/ledger/app's PostInventoryJournal/CancelJournalForSource
+// take as arguments today (internal/inventory/ports.Ledger,
+// internal/inventory/ports.JournalLine) — inventory calls this once it
+// stops calling ledger in-process.
+//
+// Written by the inventory worktree since it was not present when this
+// worktree started (tasks.md 3.3) — svc-server owns the actual
+// LedgerService implementation (cmd/aivo-server's :9080 listener,
+// tasks.md 6.1); reconcile at merge if svc-server independently authored
+// a conflicting version.
+syntax = "proto3";
+
+package ledger.v1;
+
+option go_package = "aivo/internal/ledger/v1;ledgerv1";
+
+// LedgerService is ledger's gRPC inbound for every inventory-originated
+// GL posting (sale COGS, receipt, write-off, stocktake, and reversals of
+// the latter three) — one bespoke RPC per event, no generic envelope
+// (design.md D4).
+service LedgerService {
+  rpc PostCOGSJournal(PostCOGSJournalRequest) returns (PostCOGSJournalResponse);
+  rpc PostReceiptJournal(PostReceiptJournalRequest) returns (PostReceiptJournalResponse);
+  rpc PostWriteOffJournal(PostWriteOffJournalRequest) returns (PostWriteOffJournalResponse);
+  rpc PostStocktakeJournal(PostStocktakeJournalRequest) returns (PostStocktakeJournalResponse);
+
+  rpc CancelReceiptJournal(CancelReceiptJournalRequest) returns (CancelReceiptJournalResponse);
+  rpc CancelWriteOffJournal(CancelWriteOffJournalRequest) returns (CancelWriteOffJournalResponse);
+  rpc CancelStocktakeJournal(CancelStocktakeJournalRequest) returns (CancelStocktakeJournalResponse);
+}
+
+message JournalLine {
+  string purpose = 1;
+  string side = 2; // "debit" | "credit"
+  int64 amount_cents = 3;
+}
+
+// PostCOGSJournalRequest and the other three Post*JournalRequest messages
+// are structurally identical (design.md D3: idempotency key = the
+// existing domain document id) — kept as separate messages per RPC to
+// satisfy buf's standard lint ruleset (one request/response pair per
+// RPC), not because their fields differ.
+message PostCOGSJournalRequest {
+  string restaurant_id = 1;    // uuid
+  string created_by = 2;       // uuid
+  string source_id = 3;        // uuid; idempotency key (ticket id)
+  string accounting_date = 4;  // YYYY-MM-DD
+  repeated JournalLine lines = 5;
+}
+message PostCOGSJournalResponse {
+  string doc_id = 1; // uuid of the posted GL journal (or the existing one, on a no-op redelivery)
+}
+
+message PostReceiptJournalRequest {
+  string restaurant_id = 1;
+  string created_by = 2;
+  string source_id = 3; // receipt id
+  string accounting_date = 4;
+  repeated JournalLine lines = 5;
+}
+message PostReceiptJournalResponse {
+  string doc_id = 1;
+}
+
+message PostWriteOffJournalRequest {
+  string restaurant_id = 1;
+  string created_by = 2;
+  string source_id = 3; // write-off id
+  string accounting_date = 4;
+  repeated JournalLine lines = 5;
+}
+message PostWriteOffJournalResponse {
+  string doc_id = 1;
+}
+
+message PostStocktakeJournalRequest {
+  string restaurant_id = 1;
+  string created_by = 2;
+  string source_id = 3; // stocktake id
+  string accounting_date = 4;
+  repeated JournalLine lines = 5;
+}
+message PostStocktakeJournalResponse {
+  string doc_id = 1;
+}
+
+message CancelReceiptJournalRequest {
+  string restaurant_id = 1;
+  string source_id = 2; // the original receipt's id
+}
+message CancelReceiptJournalResponse {
+  string reversal_id = 1;
+}
+
+message CancelWriteOffJournalRequest {
+  string restaurant_id = 1;
+  string source_id = 2;
+}
+message CancelWriteOffJournalResponse {
+  string reversal_id = 1;
+}
+
+message CancelStocktakeJournalRequest {
+  string restaurant_id = 1;
+  string source_id = 2;
+}
+message CancelStocktakeJournalResponse {
+  string reversal_id = 1;
+}

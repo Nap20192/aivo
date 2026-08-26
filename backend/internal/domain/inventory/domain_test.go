@@ -174,6 +174,230 @@ func TestValidateLines(t *testing.T) {
 	}
 }
 
+func TestProductType_Valid(t *testing.T) {
+	cases := []struct {
+		t    ProductType
+		want bool
+	}{
+		{TypeGoods, true}, {TypeDish, true}, {TypePrepared, true}, {TypeModifier, true},
+		{"", false}, {"unknown", false},
+	}
+	for _, c := range cases {
+		if got := c.t.Valid(); got != c.want {
+			t.Errorf("ProductType(%q).Valid() = %v, want %v", c.t, got, c.want)
+		}
+	}
+}
+
+func TestDefaultProductType(t *testing.T) {
+	if got := DefaultProductType(); got != TypeGoods {
+		t.Errorf("DefaultProductType() = %v, want %v", got, TypeGoods)
+	}
+}
+
+func TestTechCardFormat_Valid(t *testing.T) {
+	cases := []struct {
+		f    TechCardFormat
+		want bool
+	}{
+		{FormatSimple, true}, {FormatTTK, true}, {"", false}, {"unknown", false},
+	}
+	for _, c := range cases {
+		if got := c.f.Valid(); got != c.want {
+			t.Errorf("TechCardFormat(%q).Valid() = %v, want %v", c.f, got, c.want)
+		}
+	}
+}
+
+func TestDefaultTechCardFormat(t *testing.T) {
+	if got := DefaultTechCardFormat(); got != FormatSimple {
+		t.Errorf("DefaultTechCardFormat() = %v, want %v", got, FormatSimple)
+	}
+}
+
+func TestConsumeStrategy_Valid(t *testing.T) {
+	cases := []struct {
+		c    ConsumeStrategy
+		want bool
+	}{
+		{ConsumeAssemble, true}, {ConsumeDepleteFinished, true}, {"", false}, {"unknown", false},
+	}
+	for _, c := range cases {
+		if got := c.c.Valid(); got != c.want {
+			t.Errorf("ConsumeStrategy(%q).Valid() = %v, want %v", c.c, got, c.want)
+		}
+	}
+}
+
+func TestDefaultConsumeStrategy(t *testing.T) {
+	if got := DefaultConsumeStrategy(); got != ConsumeAssemble {
+		t.Errorf("DefaultConsumeStrategy() = %v, want %v", got, ConsumeAssemble)
+	}
+}
+
+func TestCostMethod_Valid(t *testing.T) {
+	cases := []struct {
+		m    CostMethod
+		want bool
+	}{
+		{CostMethodWeightedAvg, true}, {"", false}, {"unknown", false},
+	}
+	for _, c := range cases {
+		if got := c.m.Valid(); got != c.want {
+			t.Errorf("CostMethod(%q).Valid() = %v, want %v", c.m, got, c.want)
+		}
+	}
+}
+
+func TestDefaultCostMethod(t *testing.T) {
+	if got := DefaultCostMethod(); got != CostMethodWeightedAvg {
+		t.Errorf("DefaultCostMethod() = %v, want %v", got, CostMethodWeightedAvg)
+	}
+}
+
+func TestValidUnit(t *testing.T) {
+	for _, u := range []string{UnitG, UnitKg, UnitMl, UnitL, UnitPcs} {
+		if !ValidUnit(u) {
+			t.Errorf("ValidUnit(%q) = false, want true", u)
+		}
+	}
+	if ValidUnit("oz") {
+		t.Error("ValidUnit(oz) = true, want false")
+	}
+}
+
+func TestToBaseMilli_InvalidStockUnit(t *testing.T) {
+	if _, err := ToBaseMilli(1, UnitG, "oz"); !errors.Is(err, ErrInvalidUnit) {
+		t.Errorf("bad stock unit: got %v want ErrInvalidUnit", err)
+	}
+}
+
+func TestToBaseMilli_NonPositiveQty(t *testing.T) {
+	if _, err := ToBaseMilli(0, UnitG, UnitG); !errors.Is(err, ErrInvalidQty) {
+		t.Errorf("zero qty: got %v want ErrInvalidQty", err)
+	}
+	if _, err := ToBaseMilli(-1, UnitG, UnitG); !errors.Is(err, ErrInvalidQty) {
+		t.Errorf("negative qty: got %v want ErrInvalidQty", err)
+	}
+}
+
+func TestFromBaseMilli(t *testing.T) {
+	if got := FromBaseMilli(2_500_000); got != 2500 {
+		t.Errorf("FromBaseMilli(2500000) = %v, want 2500", got)
+	}
+}
+
+func TestNewProductValidation_InvalidType(t *testing.T) {
+	if _, err := NewProduct(id(), id(), "SKU", "X", "bogus", UnitG, nil, nil); !errors.Is(err, ErrInvalidType) {
+		t.Errorf("invalid type: got %v want ErrInvalidType", err)
+	}
+}
+
+func TestValidReason(t *testing.T) {
+	for _, r := range []string{ReasonSpoilage, ReasonExpiry, ReasonStaffMeal, ReasonLoss, ReasonOther} {
+		if !ValidReason(r) {
+			t.Errorf("ValidReason(%q) = false, want true", r)
+		}
+	}
+	if ValidReason("bogus") {
+		t.Error("ValidReason(bogus) = true, want false")
+	}
+}
+
+func TestGoodsReceiptTotalCents(t *testing.T) {
+	r := GoodsReceipt{Lines: []GoodsReceiptLine{{LineCostCents: 100}, {LineCostCents: 250}}}
+	if got := r.TotalCents(); got != 350 {
+		t.Errorf("TotalCents() = %d, want 350", got)
+	}
+	if got := (GoodsReceipt{}).TotalCents(); got != 0 {
+		t.Errorf("TotalCents() empty = %d, want 0", got)
+	}
+}
+
+// CostOfMilli's shortage branch when on-hand is already negative (avail
+// clamped to 0, whole deficit priced at LastAvgCents).
+func TestCostOfMilli_NegativeOnHand(t *testing.T) {
+	oh := OnHand{QtyMilli: -1000, LastAvgCents: 5}
+	cost, estimated := oh.CostOfMilli(2000)
+	if !estimated {
+		t.Error("expected estimated = true")
+	}
+	// deficit = 2000 - 0 = 2000 milli * 5c / 1000 = 10c.
+	if cost != 10 {
+		t.Errorf("cost = %d, want 10", cost)
+	}
+}
+
+func TestAvgCentsPerBase_NonPositiveQty(t *testing.T) {
+	oh := OnHand{QtyMilli: 0, LastAvgCents: 42}
+	if got := oh.AvgCentsPerBase(); got != 42 {
+		t.Errorf("AvgCentsPerBase() at zero qty = %d, want LastAvgCents 42", got)
+	}
+	oh = OnHand{QtyMilli: -5, LastAvgCents: 9}
+	if got := oh.AvgCentsPerBase(); got != 9 {
+		t.Errorf("AvgCentsPerBase() at negative qty = %d, want LastAvgCents 9", got)
+	}
+}
+
+func TestBankRound_ZeroDenominator(t *testing.T) {
+	if got := bankRound(5, 0); got != 0 {
+		t.Errorf("bankRound(5,0) = %d, want 0", got)
+	}
+}
+
+func TestBankRound_NegativeDenominator(t *testing.T) {
+	// Both negative: signs cancel, same as bankRound(5,2) = 2.
+	if got := bankRound(-5, -2); got != 2 {
+		t.Errorf("bankRound(-5,-2) = %d, want 2", got)
+	}
+	// Positive numerator, negative denominator: negative result.
+	if got := bankRound(5, -2); got != -2 {
+		t.Errorf("bankRound(5,-2) = %d, want -2", got)
+	}
+}
+
+func TestTechCardLine_NetQty(t *testing.T) {
+	if got := (TechCardLine{Qty: 1000, YieldPermille: 900}).NetQty(); got != 900 {
+		t.Errorf("NetQty() = %d, want 900", got)
+	}
+	// YieldPermille <= 0 defaults to 100% (no loss).
+	if got := (TechCardLine{Qty: 1000, YieldPermille: 0}).NetQty(); got != 1000 {
+		t.Errorf("NetQty() default yield = %d, want 1000", got)
+	}
+}
+
+func TestValidateLines_YieldOutOfRange(t *testing.T) {
+	a := id()
+	bad := []TechCardLine{{IngredientProductID: a, Qty: 1, YieldPermille: 1001}}
+	if err := ValidateLines(bad); !errors.Is(err, ErrInvalidYieldPct) {
+		t.Errorf("yield too high: %v", err)
+	}
+	negative := []TechCardLine{{IngredientProductID: a, Qty: 1, YieldPermille: -1}}
+	if err := ValidateLines(negative); !errors.Is(err, ErrInvalidYieldPct) {
+		t.Errorf("negative yield: %v", err)
+	}
+}
+
+func TestValidateLines_Valid(t *testing.T) {
+	a, b := id(), id()
+	lines := []TechCardLine{
+		{IngredientProductID: a, Qty: 1, YieldPermille: 500},
+		{IngredientProductID: b, Qty: 2, YieldPermille: YieldPermilleDefault},
+	}
+	if err := ValidateLines(lines); err != nil {
+		t.Errorf("ValidateLines() = %v, want nil", err)
+	}
+}
+
+func TestUnitCostFromRecipe_ZeroYield(t *testing.T) {
+	if got := UnitCostFromRecipe(3000, 0); got != 0 {
+		t.Errorf("UnitCostFromRecipe with zero yield = %d, want 0", got)
+	}
+	if got := UnitCostFromRecipe(3000, -1); got != 0 {
+		t.Errorf("UnitCostFromRecipe with negative yield = %d, want 0", got)
+	}
+}
+
 func TestRecipeCost(t *testing.T) {
 	flour, water := id(), id()
 	// 200 g flour @ 6c/base + 100 g water @ 0.

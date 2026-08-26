@@ -1,7 +1,9 @@
 // Package ports defines the inventory context's boundaries: persistence
-// (Store), the synchronous port into the ledger context (Ledger, via a
-// bridge adapter), and a read-only view of pos sales (SalesReader) for the
-// food-cost report. Go interfaces, not gRPC (ADR 0001).
+// (Store) and a read-only view of pos sales (SalesReader) for the
+// food-cost report. Inventory no longer reaches the ledger context
+// in-process (split-inventory-microservice) — every GL posting is an
+// outbox event (internal/inventory/app/events.go) delivered over gRPC by
+// the process's own Deliverer, not a synchronous port call.
 package ports
 
 import (
@@ -105,19 +107,13 @@ type Store interface {
 	MarkStocktakeStatus(ctx context.Context, restaurantID, id uuid.UUID, from, to string, postedBy *uuid.UUID) error
 }
 
-// JournalLine is one line of an inventory GL document, by purpose.
+// JournalLine is one line of an inventory GL document, by purpose — the
+// shape an outbox Post*Journal event's payload carries for a Deliverer to
+// turn into a ledger.v1.PostJournalRequest.
 type JournalLine struct {
-	Purpose     string
-	Side        string
-	AmountCents int64
-}
-
-// Ledger is the synchronous port into the ledger context. Posting happens
-// inside the inventory transaction (shared *sql.Tx); correction is a
-// reversal, never an edit (append-only).
-type Ledger interface {
-	PostInventoryJournal(ctx context.Context, tx *sql.Tx, restaurantID, createdBy uuid.UUID, sourceKind string, sourceID uuid.UUID, accountingDate time.Time, lines []JournalLine) (docID uuid.UUID, err error)
-	CancelJournalForSource(ctx context.Context, tx *sql.Tx, restaurantID uuid.UUID, sourceKind string, sourceID uuid.UUID) (reversalID uuid.UUID, err error)
+	Purpose     string `json:"purpose"`
+	Side        string `json:"side"`
+	AmountCents int64  `json:"amount_cents"`
 }
 
 // SaleQty is a sold dish and its quantity over a period (food-cost report).

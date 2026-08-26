@@ -16,13 +16,27 @@ import (
 	"aivo/internal/sharedkernel"
 )
 
-// Product types (closed enum, Domain 3).
+// ProductType is a product's nomenclature kind (closed enum, Domain 3).
+type ProductType string
+
 const (
-	TypeGoods    = "goods"    // raw material
-	TypeDish     = "dish"     // sold item, linked to a menu_item
-	TypePrepared = "prepared" // in-house semi-product (has its own tech card + stock)
-	TypeModifier = "modifier" // add-on (syrup, extra cheese)
+	TypeGoods    ProductType = "goods"    // raw material
+	TypeDish     ProductType = "dish"     // sold item, linked to a menu_item
+	TypePrepared ProductType = "prepared" // in-house semi-product (has its own tech card + stock)
+	TypeModifier ProductType = "modifier" // add-on (syrup, extra cheese)
 )
+
+// DefaultProductType is the type assumed when none is given.
+func DefaultProductType() ProductType { return TypeGoods }
+
+// Valid reports whether t is a known product type.
+func (t ProductType) Valid() bool {
+	switch t {
+	case TypeGoods, TypeDish, TypePrepared, TypeModifier:
+		return true
+	}
+	return false
+}
 
 // Units. Base units (in which stock is kept) are g, ml, pcs; kg and l are
 // compatible display units.
@@ -68,11 +82,6 @@ func ValidBaseUnit(u string) bool {
 	return ok && i.factor == 1
 }
 
-// ValidType reports whether t is a known product type.
-func ValidType(t string) bool {
-	return t == TypeGoods || t == TypeDish || t == TypePrepared || t == TypeModifier
-}
-
 // ToBaseMilli converts a display quantity (a decimal number in inputUnit)
 // into int64 milli-units of stockUnit. inputUnit must share stockUnit's
 // dimension (else ErrUnitIncompatible). Banker's rounding to the nearest
@@ -107,7 +116,7 @@ type Product struct {
 	RestaurantID sharedkernel.ID
 	SKU          string
 	Name         string
-	Type         string           // goods|dish|prepared|modifier
+	Type         ProductType
 	StockUnit    string           // g|ml|pcs (base unit stock is kept in)
 	MenuItemID   *sharedkernel.ID // only for dish; bare uuid, no FK
 	MinStock     *int64           // milli-units, for low-stock alerts
@@ -117,8 +126,8 @@ type Product struct {
 
 // NewProduct validates and constructs a product. menuItemID is allowed
 // only for a dish.
-func NewProduct(id, restaurantID sharedkernel.ID, sku, name, ptype, stockUnit string, menuItemID *sharedkernel.ID, minStock *int64) (Product, error) {
-	if !ValidType(ptype) {
+func NewProduct(id, restaurantID sharedkernel.ID, sku, name string, ptype ProductType, stockUnit string, menuItemID *sharedkernel.ID, minStock *int64) (Product, error) {
+	if !ptype.Valid() {
 		return Product{}, ErrInvalidType
 	}
 	if !ValidBaseUnit(stockUnit) {

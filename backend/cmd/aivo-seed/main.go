@@ -61,12 +61,13 @@ func run() error {
 	ctx := context.Background()
 
 	// Same migration set as the server, so the seed works on a fresh DB.
+	// Inventory now migrates itself, into its own schema, from
+	// cmd/aivo-inventory (split-inventory-microservice).
 	err = migrate.Apply(ctx, db, []migrate.Source{
 		{Name: "menu", FS: migrations.FS, Dir: "menu"},
 		{Name: "platform", FS: migrations.FS, Dir: "platform"},
 		{Name: "ledger", FS: migrations.FS, Dir: "ledger"},
 		{Name: "pos", FS: migrations.FS, Dir: "pos"},
-		{Name: "inventory", FS: migrations.FS, Dir: "inventory"},
 	})
 	if err != nil {
 		return err
