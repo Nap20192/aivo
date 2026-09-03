@@ -1,0 +1,15 @@
+# Builds cmd/aivo-inventory (split-inventory-microservice). No frontend —
+# it's a REST+gRPC API service, the admin SPA is served by aivo-server.
+FROM golang:1.27-alpine AS build
+ENV GOTOOLCHAIN=auto
+WORKDIR /src
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+COPY backend/ .
+RUN CGO_ENABLED=0 go build -o /out/aivo-inventory ./cmd/aivo-inventory
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=build /out/aivo-inventory /usr/local/bin/aivo-inventory
+EXPOSE 8081 9081
+ENTRYPOINT ["aivo-inventory"]

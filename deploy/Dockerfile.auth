@@ -1,0 +1,15 @@
+# Builds cmd/aivo-auth (service-auth): gRPC-only token-minting service,
+# no database, no frontend.
+FROM golang:1.27-alpine AS build
+ENV GOTOOLCHAIN=auto
+WORKDIR /src
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+COPY backend/ .
+RUN CGO_ENABLED=0 go build -o /out/aivo-auth ./cmd/aivo-auth
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=build /out/aivo-auth /usr/local/bin/aivo-auth
+EXPOSE 9082
+ENTRYPOINT ["aivo-auth"]
