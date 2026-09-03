@@ -1,5 +1,6 @@
 # <img src="docs/assets/icon.svg" alt="aivo" width="28"/> AIVO RMS
 
+
 Multi-tenant restaurant management SaaS: restaurants self-register, build
 a digital menu, manage it from an admin panel, and run service with a
 phone POS. One Go binary (`cmd/aivo-server`) serves the whole platform —
