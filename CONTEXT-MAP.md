@@ -7,6 +7,7 @@
 - [Ledger](./backend/internal/ledger/CONTEXT.md) — append-only, double-entry GL core (chart of accounts, journal documents, GL-semantics config). Consumed by POS and Inventory.
 - [Inventory](./backend/internal/inventory/CONTEXT.md) — nomenclature, calendar-versioned tech cards + costing, perpetual weighted-average stock ledger, stock documents (receipt/write-off/stocktake), COGS on sale. Downstream of Menu; posts to Ledger; consumed by POS at ticket close.
 
+
 ## Relationships
 
 - **POS → Inventory → Ledger** (synchronous, in-process, increment-2): at ticket
