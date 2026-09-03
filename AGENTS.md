@@ -1,5 +1,6 @@
 # AGENTS.md
 
+
 ## Project
 
 **AIVO RMS** is an open-source, AI-powered restaurant management system SaaS.
