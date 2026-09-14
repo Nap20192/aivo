@@ -31,6 +31,7 @@ for the menu domain glossary.
    The server applies all SQL migrations itself on startup (tracked in
    `schema_migrations`); no manual `psql` step.
 
+
 2. Seed the demo tenant:
 
    ```bash
